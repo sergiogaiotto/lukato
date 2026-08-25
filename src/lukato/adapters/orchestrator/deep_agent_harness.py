@@ -22,7 +22,10 @@ import json
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:  # imports so para tipagem; deepagents e carregado tardiamente
+    from deepagents import SubAgent
 
 from lukato.adapters.orchestrator.direct import clip_text, new_step, run_id_of
 from lukato.adapters.orchestrator.tools import ToolContext, ToolRegistry, ToolSpec
@@ -342,16 +345,29 @@ class DeepAgentOrchestrator:
         _invoke.__doc__ = spec.description
         return _invoke
 
-    def _build_subagents(self, config: Sequence[Json], ctx: ToolContext) -> list[Json]:
-        """Traduz `config['subagents']` para o formato `SubAgent` da `deepagents`."""
-        subagents: list[Json] = []
-        for item in config:
+    def _build_subagents(self, config: Sequence[Json], ctx: ToolContext) -> list[SubAgent]:
+        """Traduz `config['subagents']` para o formato `SubAgent` da `deepagents`.
+
+        `SubAgent` e um `TypedDict` cujas chaves obrigatorias sao `name`, `description`
+        e `system_prompt` — por isso um dicionario simples serve, desde que completo.
+        Config malformada vira `ValidationError` com o indice do item, em vez de um
+        `KeyError` cru vazando do adaptador.
+        """
+        subagents: list[SubAgent] = []
+        for indice, item in enumerate(config):
+            faltando = [chave for chave in ("name", "description", "prompt") if chave not in item]
+            if faltando:
+                raise ValidationError(
+                    f"subagente {indice} de config['subagents'] esta incompleto: "
+                    f"faltam {', '.join(faltando)}",
+                    details={"indice": indice, "faltando": faltando, "recebido": sorted(item)},
+                )
             names = [str(name) for name in item.get("tools", [])]
             subagents.append(
                 {
-                    "name": item["name"],
-                    "description": item["description"],
-                    "system_prompt": item["prompt"],
+                    "name": str(item["name"]),
+                    "description": str(item["description"]),
+                    "system_prompt": str(item["prompt"]),
                     "tools": self._langchain_tools(names, ctx),
                 }
             )

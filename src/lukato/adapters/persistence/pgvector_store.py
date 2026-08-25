@@ -21,11 +21,11 @@ from __future__ import annotations
 import builtins
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import numpy as np
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ColumnElement, Float, delete, literal, select
+from sqlalchemy import ColumnElement, CursorResult, Float, delete, literal, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -217,7 +217,7 @@ class PgVectorStore:
         if document_id is not None:
             statement = statement.where(ChunkRow.document_id == document_id)
         async with self._open("vector_store.delete") as session:
-            result = await session.execute(statement)
+            result: CursorResult[Any] = cast("CursorResult[Any]", await session.execute(statement))
             await session.commit()
             return int(result.rowcount or 0)
 
@@ -230,7 +230,7 @@ class PgVectorStore:
             .limit(MAX_COLLECTIONS)
         )
         async with self._open("vector_store.collections") as session:
-            result = await session.execute(statement)
+            result: CursorResult[Any] = cast("CursorResult[Any]", await session.execute(statement))
             names: Sequence[str] = result.scalars().all()
         return [str(name) for name in names]
 

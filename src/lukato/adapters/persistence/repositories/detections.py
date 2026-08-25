@@ -19,9 +19,9 @@ from __future__ import annotations
 import builtins
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Final
+from typing import Any, Final, cast
 
-from sqlalchemy import ColumnElement, delete, func, select
+from sqlalchemy import ColumnElement, CursorResult, delete, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -190,7 +190,9 @@ class SqlAlchemyDetectionRepository:
         """Remove todas as deteccoes do ativo; devolve quantas foram apagadas."""
         statement = delete(DetectionRow).where(DetectionRow.media_id == media_id)
         async with _translate("detections.delete_by_media"):
-            result = await self._session.execute(statement)
+            # DELETE/UPDATE devolvem CursorResult, o unico com `rowcount`;
+            # os stubs do SQLAlchemy tipam `execute` como Result[Any].
+            result = cast("CursorResult[Any]", await self._session.execute(statement))
             await self._session.flush()
         return int(result.rowcount or 0)
 

@@ -24,7 +24,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, replace
-from typing import Any, Final, TypedDict
+from typing import Any, Final, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -254,10 +254,15 @@ class LangGraphOrchestrator:
             "steps": [],
             "usage": TokenUsage(),
         }
-        final: GraphState = await graph.ainvoke(
-            initial,
-            context=context,
-            config={"recursion_limit": 8 + 4 * context.max_iterations},
+        # `ainvoke` e tipado como dict[str, Any] pelos stubs do LangGraph; o grafo
+        # foi construido com GraphState, entao o formato de retorno e conhecido.
+        final: GraphState = cast(
+            "GraphState",
+            await graph.ainvoke(
+                initial,
+                context=context,
+                config={"recursion_limit": 8 + 4 * context.max_iterations},
+            ),
         )
         steps = list(final.get("steps", []))
         usage = final.get("usage") or TokenUsage()

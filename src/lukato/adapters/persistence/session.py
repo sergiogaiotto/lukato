@@ -17,10 +17,11 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -60,24 +61,46 @@ def _url_text(engine_or_url: AsyncEngine | Engine | URL | str) -> str:
     return engine_or_url.url.render_as_string(hide_password=True)
 
 
-def _backend_name(engine_or_url: AsyncEngine | Engine | URL | str) -> str:
-    """Devolve o nome do backend (`postgresql`, `sqlite`, ...) de forma tolerante."""
-    if isinstance(engine_or_url, AsyncEngine | Engine):
-        return engine_or_url.url.get_backend_name()
-    if isinstance(engine_or_url, URL):
-        return engine_or_url.get_backend_name()
-    scheme = str(engine_or_url).split("://", 1)[0]
-    return scheme.split("+", 1)[0].lower()
+DialectTarget = AsyncEngine | Engine | AsyncConnection | Connection | URL | str
+"""Qualquer coisa de onde se consiga extrair o dialeto do banco."""
 
 
-def is_postgres(engine_or_url: AsyncEngine | Engine | URL | str) -> bool:
+def _backend_name(target: DialectTarget) -> str:
+    """Devolve o nome do backend (`postgresql`, `sqlite`, ...) de forma tolerante.
+
+    `Connection` e `AsyncConnection` precisam de tratamento proprio: sem eles o
+    objeto caia no ramo de string e virava o proprio `repr` ("<sqlalchemy...object
+    at 0x...>"), fazendo `is_postgres` devolver False para uma conexao PostgreSQL
+    legitima. O efeito seria silencioso e caro — `PgVectorStore.search` chama
+    `is_postgres(session.get_bind())` e passaria a varrer a colecao com numpy em
+    vez de usar o indice HNSW. Uma sessao ligada a uma `Connection` (padrao quando
+    o teste roda dentro de uma transacao externa) cairia exatamente nisso.
+    """
+    if isinstance(target, AsyncConnection | Connection):
+        return target.engine.url.get_backend_name()
+    if isinstance(target, AsyncEngine | Engine):
+        return target.url.get_backend_name()
+    if isinstance(target, URL):
+        return target.get_backend_name()
+    if isinstance(target, str):
+        scheme = target.split("://", 1)[0]
+        return scheme.split("+", 1)[0].lower()
+    # Tipo inesperado: falhar alto e melhor do que devolver um nome invalido que
+    # desliga o pgvector sem ninguem perceber.
+    raise ConfigurationError(
+        f"Nao foi possivel determinar o dialeto do banco a partir de "
+        f"{type(target).__name__}; passe um Engine, Connection, URL ou string."
+    )
+
+
+def is_postgres(target: DialectTarget) -> bool:
     """Indica se o alvo usa o dialeto PostgreSQL (unico com `JSONB` e pgvector)."""
-    return _backend_name(engine_or_url) == POSTGRES_DIALECT
+    return _backend_name(target) == POSTGRES_DIALECT
 
 
-def is_sqlite(engine_or_url: AsyncEngine | Engine | URL | str) -> bool:
+def is_sqlite(target: DialectTarget) -> bool:
     """Indica se o alvo usa SQLite (modo de desenvolvimento, teste e offline)."""
-    return _backend_name(engine_or_url) == "sqlite"
+    return _backend_name(target) == "sqlite"
 
 
 def _enable_sqlite_foreign_keys(engine: AsyncEngine) -> None:

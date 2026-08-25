@@ -12,9 +12,9 @@ import builtins
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Final
+from typing import Any, Final, cast
 
-from sqlalchemy import ColumnElement, select, update
+from sqlalchemy import ColumnElement, CursorResult, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -128,7 +128,9 @@ class SqlAlchemyApiKeyRepository:
             .execution_options(synchronize_session="fetch")
         )
         async with _translate("api_keys.touch"):
-            result = await self._session.execute(statement)
+            # DELETE/UPDATE devolvem CursorResult, o unico com `rowcount`;
+            # os stubs do SQLAlchemy tipam `execute` como Result[Any].
+            result = cast("CursorResult[Any]", await self._session.execute(statement))
             await self._session.flush()
         if not result.rowcount:
             raise NotFoundError(
