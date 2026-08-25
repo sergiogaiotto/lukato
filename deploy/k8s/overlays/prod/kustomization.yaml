@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lukato
+
+resources:
+  - ../../base
+
+patches:
+  - target: { kind: Deployment, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "2"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+  - target: { kind: PodDisruptionBudget, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+configMapGenerator:
+  - name: lukato-config
+    behavior: merge
+    literals:
+      - LUKATO_APP__ENV=prod
+      - LUKATO_APP__DEBUG=false
+      - LUKATO_APP__WORKERS=4
+      - LUKATO_SECURITY__AUTH_ENABLED=true
+      - LUKATO_OBSERVABILITY__LOG_JSON=true
+
+generatorOptions:
+  disableNameSuffixHash: true
