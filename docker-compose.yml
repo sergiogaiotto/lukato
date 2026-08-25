@@ -47,12 +47,10 @@ services:
     ports: ["8000:8000"]
     volumes:
       - adwatch:/app/var
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 25s
+    # Sem `healthcheck:` aqui de proposito: a imagem ja traz o dela (HEALTHCHECK no
+    # Dockerfile) e duas definicoes se desencontram. Foi o que aconteceu: o curl
+    # saiu da imagem e este bloco continuou chamando `curl`, deixando o container
+    # eternamente unhealthy com a aplicacao respondendo 200 o tempo todo.
     restart: unless-stopped
 
   # ---- observabilidade opcional: docker compose --profile obs up -d ---------

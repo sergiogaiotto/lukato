@@ -123,15 +123,23 @@ modulo (uma linha no banco), nao um arquivo Python.
    make docker-build  # somente a imagem  (lukato:1.0.0)
    make docker-run    # roda a imagem isolada com o .env local
 
- Rede restrita (proxy corporativo que bloqueia o CDN do Docker Hub):
- a imagem base e parametrizavel, entao aponte para o espelho interno --
+ Rede restrita. O Dockerfile nao roda `apt-get` nenhum, entao o build NAO
+ depende de alcancar um espelho Debian. O que ele ainda precisa alcancar:
 
-   make docker-build-mirror PYTHON_IMAGE=<registry-interno>/python:3.11-slim-bookworm
+   1. o registry da imagem base. Bloqueou o CDN do Docker Hub? Aponte para outro:
+        make docker-build-mirror PYTHON_IMAGE=mirror.gcr.io/library/python:3.11-slim-bookworm
+      Tambem funciona public.ecr.aws/docker/library/python:3.11-slim-bookworm, ou
+      o espelho interno de voces. Serve qualquer imagem com Python 3.11 e useradd.
+   2. o PyPI, para os wheels (todos binarios: nada compila no build).
+   3. o binario estatico do tini, conferido por sha256. Espelho interno:
+        docker build --build-arg TINI_URL=<url> --build-arg TINI_SHA256=<sha> .
 
- Serve qualquer imagem Debian bookworm com Python 3.11 (o Dockerfile usa apt).
- O build tambem precisa alcancar deb.debian.org para instalar curl, libpq5 e
- tini; se o proxy bloquear o repositorio Debian, aponte o apt para o espelho
- interno de voces.
+ Proxy que faz interceptacao TLS: ponha a CA de voces em deploy/ca/*.crt. O
+ builder acrescenta ao conjunto de confianca antes de baixar qualquer coisa.
+ Sem isso o download do tini falha com CERTIFICATE_VERIFY_FAILED.
+
+ A imagem nao tem curl, libpq5 nem compilador: o HEALTHCHECK usa o proprio
+ Python, o asyncpg fala o protocolo do PostgreSQL sem libpq, e nada compila.
 
  Perfil de observabilidade (Langfuse local em http://localhost:3000):
 

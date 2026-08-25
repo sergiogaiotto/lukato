@@ -14,7 +14,7 @@ Nenhuma funcao aqui levanta excecao por indisponibilidade de rede: `ping` devolv
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
@@ -35,6 +35,7 @@ from lukato.config import Settings, get_logger
 from lukato.domain.errors import ConfigurationError, ProviderError
 
 __all__ = [
+    "EngineResolution",
     "build_engine",
     "build_sessionmaker",
     "create_all",
@@ -174,8 +175,25 @@ async def ping(engine: AsyncEngine) -> bool:
     return True
 
 
-async def resolve_engine(settings: Settings) -> tuple[AsyncEngine, str]:
-    """Devolve `(engine, url_efetiva)` aplicando o fallback automatico do SPEC-0011.
+class EngineResolution(NamedTuple):
+    """Resultado de `resolve_engine`: o engine, a URL efetiva e o que aconteceu.
+
+    `reachable` existe porque "nao caiu para o fallback" e "o banco respondeu"
+    NAO sao a mesma coisa. Com `auto_fallback=false` e o banco fora, a URL
+    efetiva continua sendo a configurada e nada caiu — mas o ping falhou. Sem
+    este campo, quem chama so via as duas URLs iguais e concluia sucesso; era
+    exatamente o que o log de boot vinha afirmando, uma linha depois de registrar
+    `database_unreachable_without_fallback`.
+    """
+
+    engine: AsyncEngine
+    url: str
+    reachable: bool
+    fell_back: bool
+
+
+async def resolve_engine(settings: Settings) -> EngineResolution:
+    """Resolve o engine aplicando o fallback automatico do SPEC-0011.
 
     Tenta `settings.db.url`; se o ping falhar e `auto_fallback` estiver ligado,
     registra WARNING e devolve o engine de `settings.db.fallback_url`.
@@ -183,7 +201,7 @@ async def resolve_engine(settings: Settings) -> tuple[AsyncEngine, str]:
     primary_url = settings.db.url.strip() or settings.db.fallback_url.strip()
     engine = build_engine(settings, url=primary_url)
     if await ping(engine):
-        return engine, primary_url
+        return EngineResolution(engine, primary_url, reachable=True, fell_back=False)
 
     fallback_url = settings.db.fallback_url.strip()
     if not settings.db.auto_fallback or not fallback_url or fallback_url == primary_url:
@@ -192,7 +210,7 @@ async def resolve_engine(settings: Settings) -> tuple[AsyncEngine, str]:
             url=_url_text(engine),
             auto_fallback=settings.db.auto_fallback,
         )
-        return engine, primary_url
+        return EngineResolution(engine, primary_url, reachable=False, fell_back=False)
 
     _logger.warning(
         "database_fallback_activated",
@@ -200,7 +218,10 @@ async def resolve_engine(settings: Settings) -> tuple[AsyncEngine, str]:
         fallback=fallback_url.split("://", 1)[0],
     )
     await dispose_engine(engine)
-    return build_engine(settings, url=fallback_url), fallback_url
+    fallback_engine = build_engine(settings, url=fallback_url)
+    return EngineResolution(
+        fallback_engine, fallback_url, reachable=await ping(fallback_engine), fell_back=True
+    )
 
 
 async def ensure_pgvector(engine: AsyncEngine) -> bool:

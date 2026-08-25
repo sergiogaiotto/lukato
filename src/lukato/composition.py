@@ -180,18 +180,30 @@ async def build_container(settings: Settings) -> tuple[Container, AsyncEngine]:
     global escondido.
     """
     # -- banco -------------------------------------------------------------
-    engine, effective_url = await resolve_engine(settings)
+    resolucao = await resolve_engine(settings)
+    engine, effective_url = resolucao.engine, resolucao.url
     configured_url = settings.db.url.strip() or settings.db.fallback_url.strip()
-    fell_back = effective_url != configured_url
+    fell_back = resolucao.fell_back
+    # Tres estados, nao dois. "Nao caiu para o fallback" nao quer dizer que o
+    # banco respondeu: com auto_fallback=false e o banco fora, a URL efetiva
+    # continua sendo a configurada. Antes esta linha dizia "ping respondeu"
+    # justamente ai, uma linha depois do WARNING de banco inalcancavel.
+    if fell_back:
+        razao = f"ping em '{safe_url(configured_url)}' falhou e o fallback automatico assumiu"
+    elif resolucao.reachable:
+        razao = "ping respondeu na URL configurada"
+    else:
+        razao = (
+            f"ping em '{safe_url(configured_url)}' NAO respondeu e nao ha fallback "
+            "(LUKATO_DB__AUTO_FALLBACK=false): seguindo com o engine configurado"
+        )
     _selected(
         "database",
         "postgresql+asyncpg" if is_postgres(engine) else make_url(effective_url).get_backend_name(),
-        reason=(
-            f"ping em '{safe_url(configured_url)}' falhou e o fallback automatico assumiu"
-            if fell_back
-            else "ping respondeu na URL configurada"
-        ),
-        degraded=fell_back,
+        reason=razao,
+        # Banco fora sem fallback tambem e degradado — antes so o fallback contava,
+        # e o pior dos tres estados era o unico que aparecia como saudavel.
+        degraded=fell_back or not resolucao.reachable,
         url=safe_url(effective_url),
     )
 
