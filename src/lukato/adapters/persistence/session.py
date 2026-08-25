@@ -20,10 +20,14 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-from lukato.adapters.persistence import orm as _orm  # noqa: F401  (registra as 18 tabelas)
+from lukato.adapters.persistence import orm as _orm
 from lukato.adapters.persistence.base import Base
 from lukato.adapters.persistence.types import POSTGRES_DIALECT
 from lukato.config import Settings, get_logger
@@ -105,9 +109,8 @@ def build_engine(settings: Settings, *, url: str | None = None) -> AsyncEngine:
     if is_postgres(target):
         options["pool_size"] = settings.db.pool_size
         options["max_overflow"] = settings.db.max_overflow
-    elif is_sqlite(target):
-        options["poolclass"] = NullPool
-        options.pop("pool_pre_ping", None)
+    # SQLite nao aceita pool_size/max_overflow; o proprio dialeto aiosqlite escolhe
+    # NullPool para arquivo e StaticPool para ':memory:' (a base some se a conexao cai).
 
     try:
         engine = create_async_engine(target, **options)
@@ -198,9 +201,7 @@ async def create_all(engine: AsyncEngine, *, vector_dim: int) -> None:
     (`orm.VECTOR_DIM`): divergencia gera WARNING, pois o DDL ja esta fixado no import.
     """
     if vector_dim != _orm.VECTOR_DIM:
-        _logger.warning(
-            "vector_dim_mismatch", requested=vector_dim, declared=_orm.VECTOR_DIM
-        )
+        _logger.warning("vector_dim_mismatch", requested=vector_dim, declared=_orm.VECTOR_DIM)
     if is_postgres(engine):
         await ensure_pgvector(engine)
     try:

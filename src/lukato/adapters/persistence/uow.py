@@ -84,7 +84,11 @@ _CANDIDATES: Final[dict[str, tuple[str, ...]]] = {
         "DocumentRepositoryImpl",
     ),
     "users": ("SqlAlchemyUserRepository", "SQLAlchemyUserRepository", "UserRepositoryImpl"),
-    "api_keys": ("SqlAlchemyApiKeyRepository", "SQLAlchemyApiKeyRepository", "ApiKeyRepositoryImpl"),
+    "api_keys": (
+        "SqlAlchemyApiKeyRepository",
+        "SQLAlchemyApiKeyRepository",
+        "ApiKeyRepositoryImpl",
+    ),
     "commercials": (
         "SqlAlchemyCommercialRepository",
         "SQLAlchemyCommercialRepository",

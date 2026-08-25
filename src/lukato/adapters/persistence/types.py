@@ -26,8 +26,8 @@ from lukato.domain.types import utcnow
 __all__ = [
     "DEFAULT_VECTOR_DIM",
     "ID_LEN",
-    "JSONType",
     "POSTGRES_DIALECT",
+    "JSONType",
     "VectorType",
     "id_column",
     "utcnow_column",

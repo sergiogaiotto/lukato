@@ -169,7 +169,9 @@ def _enum(enum_cls: type[_EnumT], value: Any, *, field: str) -> _EnumT:
 
 def _submodel(model_cls: type[_ModelT], data: Any) -> _ModelT:
     """Reconstroi um sub-modelo a partir do JSON, ignorando chaves desconhecidas."""
-    payload = {key: value for key, value in _json_dict(data).items() if key in model_cls.model_fields}
+    payload = {
+        key: value for key, value in _json_dict(data).items() if key in model_cls.model_fields
+    }
     try:
         return model_cls.model_validate(payload)
     except PydanticValidationError as exc:

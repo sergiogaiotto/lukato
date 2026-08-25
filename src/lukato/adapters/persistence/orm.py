@@ -79,9 +79,7 @@ def _resolve_vector_dim() -> int:
     try:
         return int(get_settings().embedding.dimensions)
     except Exception as exc:  # configuracao invalida nao pode quebrar o import
-        _logger.warning(
-            "vector_dim_fallback", default=DEFAULT_VECTOR_DIM, error=str(exc)
-        )
+        _logger.warning("vector_dim_fallback", default=DEFAULT_VECTOR_DIM, error=str(exc))
         return DEFAULT_VECTOR_DIM
 
 
@@ -279,9 +277,7 @@ class DocumentRow(Base):
     title: Mapped[str] = mapped_column(String(NAME_LEN), nullable=False)
     source: Mapped[str] = mapped_column(String(URI_LEN), nullable=False, default="")
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    meta: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSONType, nullable=False, default=dict
-    )
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONType, nullable=False, default=dict)
     checksum: Mapped[str] = mapped_column(String(NAME_LEN), nullable=False, default="", index=True)
     created_at: Mapped[datetime] = utcnow_column()
     updated_at: Mapped[datetime] = utcnow_column(onupdate=True)
@@ -307,9 +303,7 @@ class ChunkRow(Base):
     collection: Mapped[str] = mapped_column(String(NAME_LEN), nullable=False, index=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    meta: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSONType, nullable=False, default=dict
-    )
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONType, nullable=False, default=dict)
     embedding: Mapped[list[float] | None] = mapped_column(VectorType(VECTOR_DIM), nullable=True)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -375,9 +369,7 @@ class CommercialRow(Base):
     key_phrases: Mapped[list[Any]] = mapped_column(JSONType, nullable=False, default=list)
     language: Mapped[str] = mapped_column(String(SHORT_LEN), nullable=False, default="pt-BR")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
-    meta: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSONType, nullable=False, default=dict
-    )
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONType, nullable=False, default=dict)
     created_at: Mapped[datetime] = utcnow_column()
     updated_at: Mapped[datetime] = utcnow_column(onupdate=True)
 
@@ -433,9 +425,7 @@ class MediaAssetRow(Base):
     status: Mapped[str] = mapped_column(
         String(ENUM_LEN), nullable=False, default="registered", index=True
     )
-    meta: Mapped[dict[str, Any]] = mapped_column(
-        "metadata", JSONType, nullable=False, default=dict
-    )
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONType, nullable=False, default=dict)
     created_at: Mapped[datetime] = utcnow_column()
     updated_at: Mapped[datetime] = utcnow_column(onupdate=True)
 
@@ -527,9 +517,7 @@ class DetectionRow(Base):
     """Deteccao consolidada de um comercial dentro de um ativo (`Detection`)."""
 
     __tablename__ = "detections"
-    __table_args__ = (
-        Index("ix_detections_media_id_start_seconds", "media_id", "start_seconds"),
-    )
+    __table_args__ = (Index("ix_detections_media_id_start_seconds", "media_id", "start_seconds"),)
 
     id: Mapped[str] = id_column()
     media_id: Mapped[str] = mapped_column(
