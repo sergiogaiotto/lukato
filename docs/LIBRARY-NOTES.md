@@ -147,3 +147,31 @@ Limite de 72 bytes: faca pre-hash SHA-256 antes de `hashpw` para senhas longas.
   nao respondem fora da rede corporativa. Todo adaptador de rede precisa de um
   fallback offline deterministico, e a suite de testes nao pode depender de rede.
 * `pip` funciona; a venv de referencia fica em `.venv/`.
+
+---
+
+## Validacao em PostgreSQL 16 + pgvector 0.6.0 (executada)
+
+O caminho PostgreSQL foi exercitado de verdade, nao so em SQLite:
+
+```
+alembic upgrade head            0001 -> 0002 aplicadas (Context impl PostgresqlImpl)
+indices HNSW                    ix_chunks_embedding_hnsw
+                                ix_ad_fingerprints_embedding_hnsw
+tipos reais                     embedding -> vector   metadata/input/output -> jsonb
+is_postgres(engine)             True
+busca semantica                 0.785 (alvo) vs 0.260 / 0.016 (distratores)
+prova_trinca.py                 7/7 asercoes, incluindo 0 chamadas apos bloqueio
+readyz                          200 degraded (so o tracer, honestamente)
+OpenAPI                         65 caminhos
+```
+
+As variantes cross-dialect de `types.py` fazem o que prometem: `JSONType` vira
+`JSONB` e `VectorType` vira `Vector(1024)` no PostgreSQL, enquanto degradam para
+`JSON` no SQLite.
+
+> Nota de ambiente: o registry do Docker Hub e bloqueado pela politica de rede deste
+> sandbox (403 em `production.cloudfront.docker.com`), entao `docker compose up` nao
+> pode ser exercitado aqui. O PostgreSQL foi instalado via apt
+> (`postgresql-16` + `postgresql-16-pgvector`) para conseguir validar o caminho real.
+> O `docker-compose.yml` continua sendo o caminho recomendado fora deste sandbox.
