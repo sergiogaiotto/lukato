@@ -317,9 +317,7 @@ def _validate_object(value: dict[str, Any], schema: Json, path: str) -> Json:
         )
     if isinstance(additional, dict):
         for key in extras:
-            result[key] = validate_against_schema(
-                value[key], additional, path=f"{path}.{key}"
-            )
+            result[key] = validate_against_schema(value[key], additional, path=f"{path}.{key}")
     else:
         for key in extras:
             result[key] = value[key]

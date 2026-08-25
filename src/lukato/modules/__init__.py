@@ -6,6 +6,11 @@ embutidos sao carregados por nome e os externos por entry point.
 
 Regra hexagonal: um building block pode importar `lukato.domain` e
 `lukato.application`; nunca `lukato.adapters` nem `lukato.interfaces`.
+
+Atencao ao nome `registry`: aqui ele e o *singleton* :class:`ModuleRegistry`, nao
+o submodulo. Use `from lukato.modules import registry` (instancia) ou
+`from lukato.modules.registry import ModuleRegistry` (classe); nunca
+`import lukato.modules.registry as x`, que devolve a instancia.
 """
 
 from __future__ import annotations

@@ -279,7 +279,7 @@ class ModuleRegistry:
 
         kind = getattr(module_cls, "kind", None)
         try:
-            ModuleKind(kind)
+            ModuleKind(str(kind))
         except ValueError as exc:
             raise ValidationError(
                 f"Kind de modulo invalido em '{slug}': {kind!r}.",
