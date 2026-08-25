@@ -37,6 +37,7 @@ from lukato.config import Settings, configure_logging, get_logger, get_settings
 from lukato.domain.errors import ConfigurationError
 from lukato.interfaces.http.api.v1 import api_router
 from lukato.interfaces.http.api.v1.routers.health import root_router
+from lukato.interfaces.http.console_forms import ConsoleFormMiddleware
 from lukato.interfaces.http.errors import install_error_handlers
 from lukato.interfaces.http.middleware import install_middlewares
 from lukato.interfaces.http.openapi import API_TITLE, customize_openapi
@@ -260,6 +261,12 @@ def _install_middlewares(app: FastAPI, settings: Settings) -> None:
         hsts=settings.is_production,
         rate_limit_enabled=True,
     )
+    # Traduz o formulario HTML do console para o JSON que a API entende. Fica
+    # DEPOIS destes na lista, o que em Starlette significa mais por dentro: ele
+    # precisa rodar antes da validacao da rota, mas depois do request-id e do
+    # rate limit, para que um formulario apareca no log e conte na cota igual a
+    # qualquer outra requisicao.
+    app.add_middleware(ConsoleFormMiddleware)
     origins = [origin for origin in settings.security.cors_origins if origin]
     allow_all = "*" in origins
     # Curinga e credencial nao convivem: `Access-Control-Allow-Origin: *` com
@@ -277,7 +284,7 @@ def _install_middlewares(app: FastAPI, settings: Settings) -> None:
     )
     _logger.info(
         "middlewares_installed",
-        order=["cors", "request_id", "security_headers", "rate_limit", "timing"],
+        order=["cors", "request_id", "security_headers", "rate_limit", "timing", "console_form"],
         cors_origins=origins or ["*"],
         allow_credentials=not allow_all,
         hsts=settings.is_production,
