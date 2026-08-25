@@ -60,6 +60,14 @@ modulo (uma linha no banco), nao um arquivo Python.
 -------------------------------------------------------------------------------
 
    git clone <repositorio> && cd lukato
+   make start              # <<< do zero ao ar: instala, configura, semeia e sobe
+
+ So isso. Ao final ele imprime a URL — http://localhost:8000 com o .env padrao,
+ ou a porta que voce tiver posto em LUKATO_APP__PORT. Sem PostgreSQL na maquina,
+ cai sozinho no SQLite de LUKATO_DB__FALLBACK_URL; o passo do seed avisa quais
+ recursos ficaram degradados e como ligar cada um.
+
+ Passo a passo, se preferir enxergar as partes:
 
    make install-dev        # cria .venv e instala runtime + ferramentas
    make env                # copia .env.example para .env
