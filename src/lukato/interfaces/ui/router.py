@@ -106,6 +106,7 @@ __all__ = [
     "STATIC_URL",
     "TEMPLATES_DIR",
     "mount_static",
+    "render_error_page",
     "router",
     "templates",
 ]
@@ -243,7 +244,7 @@ def _render(
     return response
 
 
-async def _error_page(
+async def render_error_page(
     request: Request,
     container: Container,
     *,
@@ -306,7 +307,7 @@ async def _page(
         return _render(request, template, context)
     except LukatoError as exc:
         _logger.info("ui_page_error", route=active, code=exc.code, message=exc.message)
-        return await _error_page(
+        return await render_error_page(
             request,
             container,
             active=active,
@@ -317,7 +318,7 @@ async def _page(
         )
     except Exception as exc:
         _logger.exception("ui_page_failed", route=active, error=f"{type(exc).__name__}: {exc}")
-        return await _error_page(
+        return await render_error_page(
             request,
             container,
             active=active,

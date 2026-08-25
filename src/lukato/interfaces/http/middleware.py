@@ -122,10 +122,33 @@ def _settings_of(request: Request) -> Settings | None:
 
 
 def _route_template(request: Request) -> str:
-    """Template da rota casada (`/api/v1/modules/{slug}`) ou :data:`UNMATCHED_ROUTE`."""
-    route = request.scope.get("route")
-    template = getattr(route, "path", None)
-    return str(template) if template else UNMATCHED_ROUTE
+    """Template da rota casada (`/api/v1/modules/{slug}`) ou :data:`UNMATCHED_ROUTE`.
+
+    O Starlette 1.6 aninha cada `include_router`, entao `scope["route"].path` traz
+    apenas o caminho **local** do router (`/modules/{slug}`) e o prefixo fica em
+    `scope["root_path"]`. Sem juntar os dois, a metrica perde o `/api/v1` e duas
+    rotas homonimas em versoes diferentes da API colidiriam na mesma serie.
+    """
+    scope = request.scope
+    route = scope.get("route")
+    local = getattr(route, "path_format", None) or getattr(route, "path", None)
+    if not local:
+        return UNMATCHED_ROUTE
+
+    local = str(local)
+    concreto = str(scope.get("path") or "")
+    params: dict[str, object] = scope.get("path_params") or {}
+
+    # `local` cobre so o sufixo casado pelo router aninhado; o prefixo (`/api/v1`)
+    # esta apenas no caminho concreto. Substituindo os parametros em `local`
+    # obtem-se o sufixo concreto, e o que sobra a esquerda e exatamente o prefixo.
+    sufixo_concreto = local
+    for nome, valor in params.items():
+        sufixo_concreto = sufixo_concreto.replace(f"{{{nome}}}", str(valor))
+    if concreto.endswith(sufixo_concreto):
+        prefixo = concreto[: len(concreto) - len(sufixo_concreto)]
+        return f"{prefixo}{local}"
+    return local
 
 
 # ---------------------------------------------------------------------------

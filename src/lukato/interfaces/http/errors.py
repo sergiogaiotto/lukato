@@ -23,6 +23,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
 
 from lukato.config import get_logger
 from lukato.domain.errors import GuardrailViolation, LukatoError
@@ -109,6 +110,50 @@ def _respond(
     return JSONResponse(status_code=status_code, content=payload, headers=headers)
 
 
+_CAMINHOS_DE_API: Final[tuple[str, ...]] = ("/api/", "/metrics", "/healthz", "/readyz", "/static/")
+"""Prefixos que sempre respondem no envelope JSON, qualquer que seja o `Accept`."""
+
+
+def _quer_html(request: Request) -> bool:
+    """True quando quem pediu foi um navegador numa rota de pagina.
+
+    O console promete que "uma pagina nunca devolve JSON"
+    (`interfaces/ui/router.py`), mas ate aqui um caminho inexistente digitado no
+    navegador recebia o envelope da API — texto cru, sem moldura e sem caminho de
+    volta. A negociacao e por `Accept` **e** por prefixo: um cliente de API que
+    aceite `*/*` continua recebendo JSON.
+    """
+    caminho = request.url.path
+    if caminho.startswith(_CAMINHOS_DE_API):
+        return False
+    aceita = request.headers.get("accept", "")
+    return "text/html" in aceita
+
+
+async def _pagina_de_erro(
+    request: Request, *, status_code: int, code: str, message: str, details: Json | None = None
+) -> Response | None:
+    """Renderiza a pagina de erro do console, ou `None` se nao for possivel."""
+    container = getattr(request.app.state, "container", None)
+    if container is None:
+        return None
+    try:
+        from lukato.interfaces.ui.router import render_error_page
+
+        return await render_error_page(
+            request,
+            container,
+            active="",
+            code=code,
+            message=message,
+            status_code=status_code,
+            details=details,
+        )
+    except Exception as exc:  # pragma: no cover - moldura indisponivel
+        _logger.warning("error_page_render_failed", error=f"{type(exc).__name__}: {exc}")
+        return None
+
+
 def _serialize_findings(raw: Any) -> list[Json]:
     """Converte achados de guardrail (modelos ou mapas) em objetos JSON."""
     if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
@@ -184,8 +229,8 @@ async def _handle_validation_error(request: Request, exc: Exception) -> JSONResp
     )
 
 
-async def _handle_http_exception(request: Request, exc: Exception) -> JSONResponse:
-    """Traduz `404`, `405` e afins no mesmo envelope, em vez do JSON do Starlette."""
+async def _handle_http_exception(request: Request, exc: Exception) -> Response:
+    """Traduz `404`, `405` e afins no envelope — ou na pagina de erro, no navegador."""
     status_code = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", "")
     headers = getattr(exc, "headers", None) or {}
@@ -201,6 +246,14 @@ async def _handle_http_exception(request: Request, exc: Exception) -> JSONRespon
         route=_route(request),
         path=request.url.path,
     )
+    if _quer_html(request):
+        pagina = await _pagina_de_erro(
+            request, status_code=status_code, code=code, message=message, details=details
+        )
+        if pagina is not None:
+            for chave, valor in headers.items():
+                pagina.headers.setdefault(chave, valor)
+            return pagina
     response = _respond(
         request, status_code=status_code, code=code, message=message, details=details
     )

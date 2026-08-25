@@ -822,6 +822,7 @@ class InvokeModule(_UseCase):
         run.finished_at = utcnow()
         run.touch()
         await self._persist(run, records=records)
+        self._observe_metrics(run, definition, records=records)
         _logger.info(
             "module_invoked",
             module=definition.slug,
@@ -833,6 +834,74 @@ class InvokeModule(_UseCase):
             latency_ms=run.latency_ms,
         )
         return final
+
+    # -- metricas ----------------------------------------------------------
+    def _observe_metrics(
+        self,
+        run: AgentRun,
+        definition: ModuleDefinition,
+        *,
+        records: Sequence[UsageRecord] = (),
+    ) -> None:
+        """Alimenta os contadores de negocio da SPEC-0008 secao 4.
+
+        Sem esta chamada, seis das nove metricas ficam declaradas e permanentemente
+        vazias: um painel de Prometheus montado sobre a SPEC mostraria series que
+        nunca recebem amostra. Falha de telemetria nunca derruba a requisicao, entao
+        tudo aqui e best-effort.
+        """
+        metrics = self._container.metrics
+        if metrics is None:
+            return
+        try:
+            metrics.observe_module(
+                module=definition.slug,
+                runtime=definition.runtime,
+                status=run.status.value,
+                duration=max(0.0, run.latency_ms) / 1000.0,
+            )
+            for record in records:
+                metrics.observe_llm(
+                    model=record.model,
+                    module=definition.slug,
+                    usage=record.usage,
+                    cost=record.cost_usd,
+                )
+        except Exception as exc:  # pragma: no cover - telemetria nunca derruba
+            _logger.warning(
+                "metrics_observation_failed",
+                module=definition.slug,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+
+    def _observe_guardrail(
+        self,
+        stage: GuardrailStage,
+        policy: GuardrailPolicy | None,
+        verdict: GuardrailVerdict,
+    ) -> None:
+        """Contabiliza os achados do estagio, onde `stage` e `policy` sao conhecidos.
+
+        Observar isto no fim da invocacao perderia a informacao: `GuardrailFinding`
+        nao carrega o estagio nem a politica, e a metrica sairia com `stage=unknown`.
+        """
+        metrics = self._container.metrics
+        if metrics is None or not verdict.findings:
+            return
+        slug = policy.slug if policy is not None else None
+        try:
+            for finding in verdict.findings:
+                metrics.observe_guardrail(
+                    stage=stage.value,
+                    kind=finding.kind.value,
+                    action=finding.action.value,
+                    blocked=finding.action is GuardrailAction.BLOCK,
+                    policy=slug,
+                )
+        except Exception as exc:  # pragma: no cover - telemetria nunca derruba
+            _logger.warning(
+                "metrics_guardrail_failed", stage=stage.value, error=f"{type(exc).__name__}: {exc}"
+            )
 
     # -- guardrails --------------------------------------------------------
     async def _guardrail(
@@ -880,6 +949,7 @@ class InvokeModule(_UseCase):
                     started_at=started_at,
                 )
                 raise
+            self._observe_guardrail(stage, policy, verdict)
             _span_update(
                 span,
                 output={

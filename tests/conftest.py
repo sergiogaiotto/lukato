@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
+from typing import Final
 
 import pytest
 from fastapi import FastAPI
@@ -33,6 +34,7 @@ from lukato.adapters.embeddings.hashing import HashingEmbedder
 from lukato.adapters.guardrails.composite import build_default_evaluators
 from lukato.adapters.guardrails.policies import default_policies
 from lukato.adapters.llm.echo import EchoLLM
+from lukato.adapters.observability.metrics import get_metrics
 from lukato.adapters.observability.noop_tracer import NoopTracer
 from lukato.adapters.orchestrator.factory import build_orchestrators
 from lukato.adapters.orchestrator.tools import ToolContext, ToolRegistry, build_tool_registry
@@ -328,6 +330,7 @@ def container(
         tokens=JwtTokenService(settings),
         media=MediaToolbox(),
         tools=tool_registry,
+        metrics=get_metrics(),
         cache=InMemoryCache(),
     )
 
@@ -463,3 +466,31 @@ async def seeded(uow_factory: UnitOfWorkFactoryImpl) -> SeedIds:
         ids.modules[adwatch.slug] = adwatch.id
         await unidade.commit()
     return ids
+
+
+# ---------------------------------------------------------------------------
+# Marcacao automatica por diretorio
+# ---------------------------------------------------------------------------
+_MARCADOR_POR_PASTA: Final[dict[str, str]] = {
+    "unit": "unit",
+    "integration": "integration",
+    "contract": "contract",
+}
+"""Pasta sob `tests/` -> marcador pytest correspondente."""
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Aplica `unit`/`integration`/`contract` conforme a pasta do teste.
+
+    Sem isto os marcadores declarados no `pyproject.toml` existem mas nao selecionam
+    nada: `make test-unit` e o job de CI que roda `pytest -m integration` passariam
+    verdes tendo executado zero teste — o pior tipo de suite, a que nao roda e nao
+    avisa. Marcar pela pasta mantem a convencao valendo sem depender de ninguem
+    lembrar de anotar cada arquivo.
+    """
+    for item in items:
+        partes = item.path.parts
+        for pasta, marcador in _MARCADOR_POR_PASTA.items():
+            if pasta in partes:
+                item.add_marker(getattr(pytest.mark, marcador))
+                break

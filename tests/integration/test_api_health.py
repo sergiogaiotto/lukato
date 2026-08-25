@@ -158,9 +158,7 @@ async def test_metrics_expoe_os_nove_nomes_normativos_apos_uma_invocacao(
     client: AsyncClient, seeded: Any
 ) -> None:
     """Depois de invocar um modulo, `/metrics` publica as nove metricas da secao 4."""
-    invocacao = await client.post(
-        "/api/v1/modules/assistente/invoke", json={"input": "bom dia"}
-    )
+    invocacao = await client.post("/api/v1/modules/assistente/invoke", json={"input": "bom dia"})
     assert invocacao.status_code == 200, invocacao.text
 
     resposta = await client.get("/metrics")
@@ -171,35 +169,29 @@ async def test_metrics_expoe_os_nove_nomes_normativos_apos_uma_invocacao(
     assert not ausentes, f"metricas normativas ausentes da exposicao: {ausentes}"
 
 
-async def test_metrics_contabiliza_a_requisicao_pelo_template_da_rota(
+async def test_metrics_usa_o_template_da_rota_e_nunca_o_slug_concreto(
     client: AsyncClient, seeded: Any
 ) -> None:
-    """O label `path` guarda o template, nunca o valor concreto (cardinalidade)."""
+    """O label `path` guarda o template versionado; o slug concreto explodiria a serie."""
     await client.get("/api/v1/modules/assistente")
 
     corpo = (await client.get("/metrics")).text
 
-    amostras = [linha for linha in corpo.splitlines() if linha.startswith("lukato_http_requests")]
-    assert 'path="/api/v1/modules/{slug}"' in corpo, f"amostras: {amostras}"
+    assert 'path="/api/v1/modules/{slug}"' in corpo, "o label deveria usar o template da rota"
     assert 'path="/api/v1/modules/assistente"' not in corpo
+    assert 'path="/modules/assistente"' not in corpo
 
 
-@pytest.mark.xfail(
-    reason=(
-        "defeito real: nenhuma producao chama Metrics.observe_module/observe_llm/"
-        "observe_guardrail — as metricas de negocio da SPEC-0008 secao 4 sao declaradas "
-        "mas nunca alimentadas, entao ficam permanentemente sem amostra"
-    ),
-    strict=False,
-)
 async def test_metrics_registra_a_invocacao_do_modulo(client: AsyncClient, seeded: Any) -> None:
-    """Uma invocacao bem-sucedida deveria incrementar `lukato_module_invocations_total`."""
+    """Uma invocacao alimenta as metricas de negocio, nao apenas as de HTTP."""
     resposta = await client.post("/api/v1/modules/assistente/invoke", json={"input": "oi"})
     assert resposta.status_code == 200, resposta.text
 
     corpo = (await client.get("/metrics")).text
 
     assert 'lukato_module_invocations_total{module="assistente"' in corpo
+    assert 'lukato_llm_tokens_total{kind="prompt",model="modelo-de-teste"}' in corpo
+    assert "lukato_llm_cost_usd_total" in corpo
 
 
 # --------------------------------------------------------------------------- #

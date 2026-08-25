@@ -16,6 +16,8 @@ monta o seu e o registro global do `prometheus_client` nunca e tocado.
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from lukato.adapters.observability.factory import NOOP_REASONS, build_tracer
@@ -40,6 +42,20 @@ HOST_INALCANCAVEL = "http://127.0.0.1:9"
 
 CHAVE_FALSA_PUBLICA = "pk-lf-00000000-0000-0000-0000-000000000000"
 CHAVE_FALSA_SECRETA = "sk-lf-00000000-0000-0000-0000-000000000000"
+
+_OTEL_EXPORTER_LOGGER = "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+"""Logger do exportador OTel: e ele que reclama do host inalcancavel deste arquivo."""
+
+
+@pytest.fixture(autouse=True)
+def _silenciar_exportador_otel() -> None:
+    """Cala o exportador OTel enquanto este arquivo roda.
+
+    O host de teste recusa conexao de proposito, entao o exportador em background
+    reclama em nivel de erro depois que o teste ja passou. E ruido esperado — e
+    nao pode poluir a saida da suite. Nenhum teste deste arquivo le esse logger.
+    """
+    logging.getLogger(_OTEL_EXPORTER_LOGGER).setLevel(logging.CRITICAL)
 
 
 def _settings(**observability: object) -> Settings:

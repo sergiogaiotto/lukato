@@ -31,7 +31,7 @@ from lukato.config import get_logger
 from lukato.domain.errors import ModuleNotFound
 from lukato.domain.models.identity import Permission, Principal
 from lukato.interfaces.http.deps import ContainerDep, require
-from lukato.interfaces.http.schemas.common import OutSchema, error_responses
+from lukato.interfaces.http.schemas.common import OutSchema, Page, error_responses
 from lukato.modules.registry import (
     DEFAULT_ENTRY_POINT_GROUP,
     ModuleDescriptor,
@@ -109,7 +109,7 @@ def _descriptor(registry: ModuleRegistry, slug: str) -> ModuleDescriptor:
 # ---------------------------------------------------------------------------
 @router.get(
     "",
-    response_model=list[ModuleDescriptor],
+    response_model=Page[ModuleDescriptor],
     status_code=status.HTTP_200_OK,
     responses=error_responses(401, 403),
     summary="Lista os building blocks instalados",
@@ -120,9 +120,15 @@ def _descriptor(registry: ModuleRegistry, slug: str) -> ModuleDescriptor:
         "presenca na UI. Reflete exatamente `registry.describe()`."
     ),
 )
-async def list_registry(container: ContainerDep, principal: _ReaderDep) -> list[ModuleDescriptor]:
-    """Devolve os descritores de todos os building blocks registrados."""
-    return container.registry.describe()
+async def list_registry(container: ContainerDep, principal: _ReaderDep) -> Page[ModuleDescriptor]:
+    """Devolve os descritores de todos os building blocks registrados.
+
+    Envelopado em `Page` como toda listagem da API (SPEC-0000 secao 11), mesmo o
+    registry sendo um conjunto pequeno e fixo: um cliente nao deveria precisar
+    saber, endpoint a endpoint, se a resposta vem crua ou envelopada.
+    """
+    descritores = container.registry.describe()
+    return Page.of(descritores, total=len(descritores), limit=len(descritores), offset=0)
 
 
 @router.post(

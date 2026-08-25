@@ -8,7 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from lukato.domain.types import Json
 
-__all__ = ["SpanHandle", "TracerPort"]
+__all__ = ["MetricsPort", "SpanHandle", "TracerPort"]
 
 
 class SpanHandle(Protocol):
@@ -98,4 +98,40 @@ class TracerPort(Protocol):
 
     def current_trace_id(self) -> str | None:
         """Identificador do trace ativo no contexto corrente, se houver."""
+        ...
+
+
+@runtime_checkable
+class MetricsPort(Protocol):
+    """Contadores de negocio da SPEC-0008 secao 4.
+
+    Separada de `TracerPort` de proposito: trace responde "o que aconteceu nesta
+    requisicao", metrica responde "quanto disso aconteceu no total". As tres
+    primeiras sao alimentadas de dentro do `InvokeModule` — sem isso, seis das
+    nove metricas da SPEC ficariam declaradas e permanentemente vazias.
+    """
+
+    def observe_module(self, module: str, runtime: str, status: str, duration: float) -> None:
+        """Uma invocacao de building block e sua latencia."""
+        ...
+
+    def observe_llm(
+        self, model: str, module: str, usage: Any = None, cost: float | None = None
+    ) -> None:
+        """Tokens e custo de uma chamada de LLM."""
+        ...
+
+    def observe_guardrail(
+        self,
+        stage: str,
+        kind: str,
+        action: str,
+        blocked: bool = False,
+        policy: str | None = None,
+    ) -> None:
+        """Um achado de guardrail e, quando houve, o bloqueio."""
+        ...
+
+    def observe_provider_error(self, provider: str, code: str | int) -> None:
+        """Um erro devolvido por provedor externo."""
         ...

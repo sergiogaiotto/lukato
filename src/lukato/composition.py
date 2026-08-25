@@ -48,6 +48,7 @@ from lukato.adapters.guardrails.composite import build_default_evaluators
 from lukato.adapters.llm.factory import build_llm
 from lukato.adapters.media.factory import build_media_toolbox
 from lukato.adapters.observability.factory import build_tracer_with_health
+from lukato.adapters.observability.metrics import get_metrics
 from lukato.adapters.observability.noop_tracer import NoopTracer
 from lukato.adapters.orchestrator.factory import build_orchestrators
 from lukato.adapters.orchestrator.tools import ToolContext, ToolRegistry, build_tool_registry
@@ -352,6 +353,7 @@ async def build_container(settings: Settings) -> tuple[Container, AsyncEngine]:
         tokens=tokens,
         media=media,
         tools=tools,
+        metrics=get_metrics() if settings.observability.metrics_enabled else None,
         cache=InMemoryCache(),
     )
     _logger.info(

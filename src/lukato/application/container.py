@@ -25,7 +25,7 @@ from lukato.domain.ports.guardrail import GuardrailPort
 from lukato.domain.ports.llm import LLMPort
 from lukato.domain.ports.media import MediaToolbox
 from lukato.domain.ports.misc import CachePort, PasswordHasherPort, TokenServicePort
-from lukato.domain.ports.observability import TracerPort
+from lukato.domain.ports.observability import MetricsPort, TracerPort
 from lukato.domain.ports.orchestrator import OrchestratorPort
 from lukato.domain.ports.unit_of_work import UnitOfWorkFactory
 from lukato.domain.ports.vector_store import VectorStorePort
@@ -110,6 +110,8 @@ class Container:
     tokens: TokenServicePort
     media: MediaToolbox = field(default_factory=MediaToolbox)
     tools: ToolCatalog | None = None
+    metrics: MetricsPort | None = None
+    """Contadores de negocio (SPEC-0008 secao 4); `None` desliga a instrumentacao."""
     cache: CachePort | None = None
     """Cache compartilhado do processo; alimenta o rate limit da borda HTTP.
 
