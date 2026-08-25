@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import asyncio
 
+from _prova_isolada import isolar_banco, limpar_banco
+
 from lukato.adapters.embeddings.hashing import HashingEmbedder
 from lukato.adapters.media.importers import SceneImporter, TranscriptImporter
 from lukato.adapters.persistence.session import build_engine, build_sessionmaker, create_all
@@ -243,4 +245,9 @@ def _container(settings: object, uow_factory: object, embedder: object) -> objec
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Banco descartavel: ver a nota em scripts/_prova_isolada.py.
+    _tmp = isolar_banco()
+    try:
+        asyncio.run(main())
+    finally:
+        limpar_banco(_tmp)

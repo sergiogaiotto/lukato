@@ -21,6 +21,8 @@ O LLM aqui e um `EchoLLM` instrumentado que conta chamadas: e ele que transforma
 
 import asyncio
 
+from _prova_isolada import isolar_banco, limpar_banco
+
 from lukato.adapters.embeddings.factory import build_embedder
 from lukato.adapters.guardrails.composite import build_default_evaluators
 from lukato.adapters.guardrails.policies import default_policies
@@ -245,4 +247,11 @@ async def main():
     await e.dispose()
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    # Banco descartavel: a prova anuncia rodar sem PostgreSQL, e um `.env` no
+    # projeto (o primeiro passo do README) apontaria ela para o banco de verdade.
+    _tmp = isolar_banco()
+    try:
+        asyncio.run(main())
+    finally:
+        limpar_banco(_tmp)

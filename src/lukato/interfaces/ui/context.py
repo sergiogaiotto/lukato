@@ -46,7 +46,7 @@ from lukato.domain.types import Json, utcnow
 
 __all__ = [
     "COST_WINDOW_HOURS",
-    "ENTITY_BY_ROUTE",
+    "ENTITIES_BY_ROUTE",
     "HEALTH_TTL_SECONDS",
     "NAV_SECTIONS",
     "NOT_CONFIGURED",
@@ -64,16 +64,19 @@ __all__ = [
     "HealthView",
     "NavItem",
     "NavSection",
+    "Selection",
     "SettingsItem",
     "SettingsSection",
     "base_context",
     "build_nav",
     "context_template_for",
     "crumbs",
+    "entities_for_route",
     "entity_for_route",
     "load_entity",
     "mask_secret",
     "mask_url",
+    "resolve_selection",
     "settings_public",
 ]
 
@@ -777,30 +780,50 @@ SUPPORTED_ENTITIES: Final[tuple[str, ...]] = (
 )
 """Entidades que o painel de contexto sabe detalhar (SPEC-0009 secao 7)."""
 
-ENTITY_BY_ROUTE: Final[dict[str, str]] = {
-    "/": "run",
-    "/modules": "module",
-    "/modules/{slug}": "module",
-    "/prompts": "prompt",
-    "/guardrails": "guardrail",
-    "/runs": "run",
-    "/runs/{run_id}": "run",
-    "/knowledge": "document",
-    "/finops": "run",
-    "/observability": "run",
-    "/registry": "module",
-    "/adwatch": "commercial",
-    "/adwatch/commercials": "commercial",
-    "/adwatch/detections": "detection",
-    "/identity": "user",
-    "/settings": "module",
+ENTITIES_BY_ROUTE: Final[dict[str, tuple[str, ...]]] = {
+    "/": ("run",),
+    "/modules": ("module",),
+    # O modulo vem primeiro porque ele e o ASSUNTO da tela — e a primeira da tupla
+    # e tambem a entidade padrao anunciada pelo painel. As execucoes vem depois: um
+    # id de execucao nao casa com nenhum modulo, entao a ordem so decide quem tenta
+    # primeiro, nunca quem ganha.
+    "/modules/{slug}": ("module", "run"),
+    "/prompts": ("prompt",),
+    "/guardrails": ("guardrail",),
+    "/runs": ("run",),
+    "/runs/{run_id}": ("run",),
+    "/knowledge": ("document",),
+    "/finops": ("run",),
+    "/observability": ("run",),
+    "/registry": ("module",),
+    "/adwatch": ("commercial",),
+    "/adwatch/commercials": ("commercial",),
+    "/adwatch/detections": ("detection",),
+    "/identity": ("user", "apikey"),
+    "/settings": ("module",),
 }
-"""Entidade que `?sel=<id>` seleciona em cada pagina do console."""
+"""Entidades que `?sel=<id>` pode nomear em cada pagina, na ordem de tentativa.
+
+Uma tela hospeda mais de uma entidade com frequencia: `/identity` lista usuarios
+**e** chaves de API, `/modules/{slug}` mostra o modulo **e** as execucoes dele.
+Com JavaScript a entidade viaja no proprio link (`data-context-entity`); sem
+JavaScript o link e apenas `<a href="?sel=<id>">` — literal da SPEC-0009 secao 7
+— e a entidade nao viaja em lugar nenhum. Entao quem descobre a qual entidade o
+id pertence e o servidor, tentando esta lista em ordem.
+
+A primeira entidade e tambem a padrao da tela: e ela que o painel anuncia
+enquanto nada esta selecionado.
+"""
+
+
+def entities_for_route(route: str) -> tuple[str, ...]:
+    """Entidades que `?sel=<id>` pode nomear nesta rota, em ordem de tentativa."""
+    return ENTITIES_BY_ROUTE.get(route, ("module",))
 
 
 def entity_for_route(route: str) -> str:
     """Entidade padrao do painel de contexto para a rota informada."""
-    return ENTITY_BY_ROUTE.get(route, "module")
+    return entities_for_route(route)[0]
 
 
 def context_template_for(entity: str) -> str:
@@ -810,7 +833,12 @@ def context_template_for(entity: str) -> str:
 
 
 async def load_entity(
-    container: Container, entity: str, entity_id: str, principal: Principal
+    container: Container,
+    entity: str,
+    entity_id: str,
+    principal: Principal,
+    *,
+    probing: bool = False,
 ) -> Any | None:
     """Carrega o item selecionado pelo painel de contexto, sempre por caso de uso.
 
@@ -830,7 +858,14 @@ async def load_entity(
     try:
         return await loader(container, identifier, principal)
     except LukatoError as exc:
-        _logger.info("ui_context_miss", entity=key, id=identifier, code=exc.code)
+        # `probing=True` marca uma tentativa de `resolve_selection`, que percorre as
+        # entidades da rota ate acertar: numa pagina com duas entidades, o acerto da
+        # segunda passa OBRIGATORIAMENTE por uma falha na primeira. Registrar essa
+        # falha em `info` transformaria o caminho feliz em alarme e apagaria o valor
+        # da linha, que e justamente flagrar o painel procurando a entidade errada.
+        # Quem fala pelo insucesso final e `ui_selection_miss`.
+        _log = _logger.debug if probing else _logger.info
+        _log("ui_context_miss", entity=key, id=identifier, code=exc.code, probing=probing)
         return None
     except Exception as exc:  # pragma: no cover - falha inesperada de leitura
         _logger.warning(
@@ -921,6 +956,50 @@ _ENTITY_LOADERS: Final[dict[str, Callable[[Container, str, Principal], Awaitable
 """Carregador de cada entidade suportada pelo painel de contexto."""
 
 
+@dataclass(frozen=True, slots=True)
+class Selection:
+    """O que `?sel=<id>` selecionou de fato — inclusive quando nao selecionou nada.
+
+    `id` e o identificador que o painel pode **afirmar** que esta mostrando: fica
+    `None` quando nada foi encontrado, para que a pagina nao ecoe uma selecao que
+    nao exibe. O id pedido e perdido nao some — vai para `missing`, e o painel o
+    devolve ao operador em um estado vazio honesto.
+    """
+
+    entity: str
+    id: str | None = None
+    item: Any | None = None
+    missing: str | None = None
+
+
+async def resolve_selection(
+    container: Container, route: str, selected_id: str | None, principal: Principal
+) -> Selection:
+    """Descobre a qual entidade da rota o `?sel=<id>` se refere, e carrega o item.
+
+    Este e o caminho **sem JavaScript**. Com JavaScript, o clique manda a entidade
+    junto (`data-context-entity` no link, lido por `context.js`, que pede
+    `GET /ui/context/{entity}/{id}`); sem JavaScript o navegador so leva o id na
+    URL. Para que as duas rotas mostrem o mesmo painel — exigencia da SPEC-0009
+    secao 7 e do criterio de aceite 4 — o servidor tenta aqui as entidades que a
+    pagina hospeda (:data:`ENTITIES_BY_ROUTE`) e fica com a primeira que carregar.
+
+    Nada encontrado nao vira "a entidade padrao com item vazio": vira
+    :class:`Selection` sem `id` e com `missing` preenchido. A diferenca importa —
+    e ela que separa "nada esta selecionado" de "o id pedido nao existe".
+    """
+    candidates = entities_for_route(route)
+    identifier = (selected_id or "").strip()
+    if not identifier:
+        return Selection(entity=candidates[0])
+    for entity in candidates:
+        item = await load_entity(container, entity, identifier, principal, probing=True)
+        if item is not None:
+            return Selection(entity=entity, id=identifier, item=item)
+    _logger.info("ui_selection_miss", route=route, id=identifier, tried=",".join(candidates))
+    return Selection(entity=entity_for_route(route), missing=identifier)
+
+
 # ---------------------------------------------------------------------------
 # Contexto base
 # ---------------------------------------------------------------------------
@@ -960,18 +1039,20 @@ async def base_context(
     Chaves entregues (SPEC-0009 secao 8): `nav_sections`, `active_route`,
     `breadcrumb`, `principal`, `settings_public`, `health`, `cost_summary`,
     `version`, `request_id`, `selected_id`. Alem delas, o painel de contexto
-    recebe `selected_entity`, `context_template` e `context_item`, resolvidos
-    aqui para que `?sel=<id>` funcione **sem JavaScript**.
+    recebe `selected_entity`, `context_template`, `context_item` e
+    `missing_selection`, resolvidos aqui para que `?sel=<id>` funcione **sem
+    JavaScript**.
+
+    `selected_id` so repete o id pedido quando ele carregou: id que nao existe sai
+    daqui como `missing_selection`, e a pagina mostra um estado vazio que diz isso.
     """
     principal = _principal_of(request)
     settings = container.settings
-    selection = (selected_id or "").strip() or None
-    entity = entity_for_route(active)
 
-    health, cost, item = await asyncio.gather(
+    health, cost, selection = await asyncio.gather(
         _degrade("health", _health_view(container), HealthView()),
         _degrade("cost", _cost_view(container, principal), CostView(available=False)),
-        (load_entity(container, entity, selection, principal) if selection else _resolved(None)),
+        resolve_selection(container, active, selected_id, principal),
     )
 
     return {
@@ -984,16 +1065,12 @@ async def base_context(
         "cost_summary": cost,
         "version": settings.app.version,
         "request_id": _request_id_of(request),
-        "selected_id": selection,
-        "selected_entity": entity,
-        "context_template": context_template_for(entity),
-        "context_item": item,
+        "selected_id": selection.id,
+        "selected_entity": selection.entity,
+        "context_template": context_template_for(selection.entity),
+        "context_item": selection.item,
+        "missing_selection": selection.missing,
         "now": utcnow(),
         "auth_enabled": settings.security.auth_enabled,
         "app_name": settings.app.name,
     }
-
-
-async def _resolved(value: _T) -> _T:
-    """Embrulha um valor pronto em um awaitable, para compor com `asyncio.gather`."""
-    return value

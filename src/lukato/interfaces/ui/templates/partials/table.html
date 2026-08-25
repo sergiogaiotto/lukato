@@ -31,6 +31,14 @@
   `row_attrs` marca a linha selecionada e liga os ganchos de `context.js`;
   `cell_link` gera o `<a href="?sel=…">` que faz o painel de contexto funcionar
   **sem JavaScript** (SPEC-0009 secao 7).
+
+  A entidade **nao** entra no `href`: a SPEC diz, literalmente, que o link sem
+  JavaScript e `<a href="?sel=<id>">`, e e essa mesma URL que `context.js` grava
+  com `history.replaceState` — um link colado em outro navegador precisa abrir o
+  mesmo painel. Quem descobre a entidade do id e o servidor, em
+  `context.resolve_selection`, tentando as entidades que a rota hospeda. O
+  parametro `entity` daqui serve ao caminho **com** JavaScript, que le
+  `data-context-entity` e pede o fragmento direto.
 -#}
 
 {% macro table(columns, clickable=false, extra_class='', caption='') -%}

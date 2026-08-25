@@ -1214,6 +1214,18 @@ class InvokeModule(_UseCase):
             )
         run.usage = total
         run.cost_usd = round(cost_total, COST_DIGITS)
+        desconhecidos = sorted({r.model for r in records if not calculator.is_known(r.model)})
+        if desconhecidos:
+            # O aviso pertence a AQUI, onde a lacuna nasce — uma vez por invocacao —
+            # e nao ao resumo de custo, que e lido a cada render de pagina pela barra
+            # de status e repetiria a mesma linha para sempre (SPEC-0005 secao 2).
+            _logger.warning(
+                "module_usage_unknown_model_price",
+                run_id=run.id,
+                module=definition.slug,
+                models=desconhecidos,
+                reason="modelo sem preco cadastrado: custo apurado com o preco default",
+            )
         return records
 
     def _append_step(

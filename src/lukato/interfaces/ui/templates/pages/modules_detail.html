@@ -431,7 +431,11 @@
 {% block context_title %}Detalhes do módulo{% endblock %}
 
 {% block context %}
-  {% if context_item and selected_entity != 'module' %}
+  {#- Esta tela hospeda duas entidades: o modulo (assunto da pagina, painel padrao)
+      e as execucoes dele, abertas por `?sel=<id>`. Um id que nao carregou vai para
+      `missing_selection` e tambem passa pelo painel — cair no modulo em silencio
+      esconderia do operador que o item pedido nao existe mais. -#}
+  {% if missing_selection or (context_item and selected_entity != 'module') %}
     {% include "partials/context_panel.html" %}
   {% else %}
     <div class="lk-context__title">

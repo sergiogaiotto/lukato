@@ -4,7 +4,6 @@
 SHELL      := /bin/bash
 PY         := .venv/bin/python
 PIP        := .venv/bin/pip
-UVICORN    := .venv/bin/uvicorn
 RUFF       := .venv/bin/ruff
 MYPY       := .venv/bin/mypy
 PYTEST     := .venv/bin/pytest
@@ -38,11 +37,11 @@ env: ## cria .env a partir do modelo
 
 # --- execucao ----------------------------------------------------------------
 .PHONY: run dev seed shell
-run: ## sobe a API + console
-	$(UVICORN) lukato.main:app --host 0.0.0.0 --port 8000
+run: ## sobe a API + console no host/porta do .env
+	$(PY) -m lukato.interfaces.cli serve
 
-dev: ## sobe com reload automatico
-	$(UVICORN) lukato.main:app --reload --host 127.0.0.1 --port 8000
+dev: ## sobe com reload automatico (bind em 127.0.0.1)
+	$(PY) -m lukato.interfaces.cli serve --reload --host 127.0.0.1
 
 seed: ## popula prompts, guardrails, modulos e catalogo de demonstracao
 	$(PY) -m lukato.interfaces.cli seed

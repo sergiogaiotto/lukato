@@ -3,12 +3,17 @@
 
   Ordem de resolucao:
 
-  1. existe `templates/context/<entidade>.html`  -> renderiza esse fragmento;
-  2. nao existe, mas ha item selecionado         -> retrato generico do item
+  1. pediram um id que nao existe                -> estado vazio que diz isso;
+  2. existe `templates/context/<entidade>.html`  -> renderiza esse fragmento;
+  3. nao existe, mas ha item selecionado         -> retrato generico do item
      (titulo, estado, identificadores e o JSON bruto colapsavel);
-  3. nao ha selecao                              -> convite a selecionar uma linha.
+  4. nao ha selecao                              -> convite a selecionar uma linha.
 
-  O passo 2 nao e enfeite: enquanto os fragmentos por entidade nao existem — ou
+  O passo 1 vem antes de tudo de proposito. `?sel=<id>` que nao carrega nada nao
+  pode cair no painel padrao da tela: o operador veria um item que nao foi o que
+  ele pediu, sem nenhum aviso de que o pedido se perdeu.
+
+  O passo 3 nao e enfeite: enquanto os fragmentos por entidade nao existem — ou
   quando uma entidade nova aparece — o painel continua util em vez de ficar em
   branco. `json_pretty` ja remove chaves sensiveis antes de imprimir.
 
@@ -20,8 +25,17 @@
 {%- from "partials/badge.html" import badge -%}
 
 {%- set fragment_template = context_template | default('', true) -%}
+{%- set missing = missing_selection | default('', true) -%}
 
-{% if fragment_template and template_exists(fragment_template) %}
+{% if missing %}
+  {{ empty(
+       'Item não encontrado',
+       'Nada nesta tela responde pelo identificador ' ~ missing ~ '. O item pode ter sido'
+       ' removido, ou o link veio de outra tela. Escolha uma linha da tabela para ver os'
+       ' detalhes aqui.',
+       name='info'
+     ) }}
+{% elif fragment_template and template_exists(fragment_template) %}
   {% include fragment_template %}
 {% elif context_item %}
   {%- set item = context_item -%}

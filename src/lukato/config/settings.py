@@ -124,6 +124,19 @@ class AppSettings(BaseModel):
     port: int = Field(default=8000, ge=1, le=65535)
     root_path: str = ""
     workers: int = Field(default=1, ge=1)
+    docs_assets_base: str = "https://cdn.jsdelivr.net/npm"
+    """Origem dos bundles do Swagger UI e do ReDoc.
+
+    O padrao e o CDN publico, que serve a maquina de quem so quer abrir
+    `/api/docs` e ler o contrato. Instalacao sem saida para a internet — o caso
+    de um cluster corporativo fechado — aponta isto para o espelho interno:
+
+        LUKATO_APP__DOCS_ASSETS_BASE=https://npm.interno.exemplo/npm
+
+    A CSP dessas duas rotas libera exatamente esta origem, e nenhuma outra. Sem
+    isto, a pagina responde 200 e fica em branco: a propria resposta proibiria o
+    script que ela manda o navegador carregar.
+    """
 
     @field_validator("env", mode="before")
     @classmethod

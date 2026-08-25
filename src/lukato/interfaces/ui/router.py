@@ -1088,23 +1088,29 @@ async def context_fragment(
     """Devolve **apenas** o miolo do painel direito, para troca por `fetch`.
 
     A mesma resolucao acontece no servidor quando a pagina e pedida com
-    `?sel=<id>`: com ou sem JavaScript, o usuario ve o mesmo painel.
+    `?sel=<id>`: com ou sem JavaScript, o usuario ve o mesmo painel — inclusive
+    quando o id nao existe, e o painel de ambos os caminhos diz isso em vez de
+    mostrar o estado vazio generico da entidade.
     """
     template = context_template_for(entity)
+    try:
+        item = await load_entity(container, entity, item_id, principal)
+    except Exception as exc:  # pragma: no cover - carregador ja degrada internamente
+        _logger.warning("ui_fragment_failed", entity=entity, error=f"{type(exc).__name__}: {exc}")
+        item = None
+
+    found = item is not None
     context: Json = {
         "request": request,
         "principal": principal,
         "selected_entity": entity,
-        "selected_id": item_id,
+        "selected_id": item_id if found else None,
         "context_template": template,
+        "context_item": item,
+        "missing_selection": None if found else item_id,
         "fragment": True,
         "version": container.settings.app.version,
     }
-    try:
-        context["context_item"] = await load_entity(container, entity, item_id, principal)
-    except Exception as exc:  # pragma: no cover - carregador ja degrada internamente
-        _logger.warning("ui_fragment_failed", entity=entity, error=f"{type(exc).__name__}: {exc}")
-        context["context_item"] = None
 
-    name = template if _template_exists(template) else "partials/context_panel.html"
+    name = template if found and _template_exists(template) else "partials/context_panel.html"
     return _render(request, name, context)

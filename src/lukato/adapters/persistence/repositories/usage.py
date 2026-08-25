@@ -176,6 +176,13 @@ class SqlAlchemyUsageRepository:
 
         `runs` conta execucoes distintas; registros sem `run_id` contam como uma
         execucao propria, exatamente como faz `CostCalculator.summarize`.
+
+        `unknown_models` sai **vazio por construcao**: a tabela de precos vive no
+        processo (`Settings` e `UpdatePrices`), nao no banco (SPEC-0011), entao
+        daqui nao ha como saber quais modelos ficaram sem preco. Quem preenche o
+        campo e `GetCostSummary._flag_unknown_models`, na aplicacao, que tem o
+        `CostCalculator` a mao — nao complete a lacuna aqui, seria arrastar a
+        tabela de precos para dentro do adaptador de persistencia.
         """
         clauses = _conditions(
             since=since, until=until, module_slug=module_slug, tenant_id=tenant_id

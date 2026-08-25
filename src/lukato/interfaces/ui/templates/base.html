@@ -35,6 +35,10 @@
   * `version`         versao da aplicacao. `request_id` correlaciona com o log.
   * `selected_id` / `selected_entity` / `context_template` / `context_item`
                       estado do painel de contexto (`?sel=<id>` sem JavaScript).
+                      `selected_id` so vem preenchido quando o item carregou: a
+                      tela nunca afirma uma selecao que nao esta exibindo.
+  * `missing_selection` id pedido em `?sel=` que nenhuma entidade da rota
+                      reconheceu; o painel mostra um estado vazio dizendo isso.
   * `page_title`      titulo da tela, definido pela rota.
 
   FILTROS pt-BR disponiveis: `money`, `tokens`, `duration`, `timeago`, `pct`,
