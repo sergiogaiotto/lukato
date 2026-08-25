@@ -224,7 +224,5 @@ class SqlAlchemyPromptRepository:
 
     async def _version_taken(self, slug: str, version: int) -> bool:
         """Informa se o par (`slug`, `version`) ja esta gravado."""
-        statement = select(PromptRow.id).where(
-            PromptRow.slug == slug, PromptRow.version == version
-        )
+        statement = select(PromptRow.id).where(PromptRow.slug == slug, PromptRow.version == version)
         return await _first(self._session, statement) is not None

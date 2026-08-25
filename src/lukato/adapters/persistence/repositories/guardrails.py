@@ -26,9 +26,7 @@ __all__ = ["SqlAlchemyGuardrailRepository"]
 _RowT = TypeVar("_RowT")
 
 _LIKE_ESCAPE: Final[str] = "\\"
-_FILTER_KEYS: Final[frozenset[str]] = frozenset(
-    {"stage", "is_active", "search", "limit", "offset"}
-)
+_FILTER_KEYS: Final[frozenset[str]] = frozenset({"stage", "is_active", "search", "limit", "offset"})
 
 
 def _like(term: str) -> str:
