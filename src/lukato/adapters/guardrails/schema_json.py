@@ -267,15 +267,12 @@ class JsonSchemaEvaluator:
         payload = extract_json(content) if coerce else content.strip()
 
         if not payload:
-            return self._finding(
-                rule, "Conteudo vazio: era esperado um documento JSON.", content
-            )
+            return self._finding(rule, "Conteudo vazio: era esperado um documento JSON.", content)
         try:
             instance = json.loads(payload)
         except json.JSONDecodeError as exc:
             message = (
-                f"Conteudo nao e JSON valido: {exc.msg} (linha {exc.lineno}, "
-                f"coluna {exc.colno})."
+                f"Conteudo nao e JSON valido: {exc.msg} (linha {exc.lineno}, coluna {exc.colno})."
             )
             return self._finding(rule, message, content)
 

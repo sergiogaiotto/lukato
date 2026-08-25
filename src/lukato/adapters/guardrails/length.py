@@ -94,8 +94,7 @@ class MaxLengthEvaluator:
         if rule.action in CONTENT_ACTIONS:
             truncated = truncate_words(content, limit)
             message = (
-                f"Conteudo truncado de {length} para {len(truncated)} caracteres "
-                f"(limite {limit})."
+                f"Conteudo truncado de {length} para {len(truncated)} caracteres (limite {limit})."
             )
             return build_finding(rule, message, evidence=truncated, span=span)
 

@@ -146,9 +146,7 @@ class KeywordBlockEvaluator:
         spans: list[tuple[int, int]] = []
         matched: list[str] = []
         for keyword in keywords:
-            found = keyword_spans(
-                content, keyword, normalize=normalize, whole_word=whole_word
-            )
+            found = keyword_spans(content, keyword, normalize=normalize, whole_word=whole_word)
             if found:
                 matched.append(keyword)
                 spans.extend(found)
@@ -161,8 +159,5 @@ class KeywordBlockEvaluator:
             evidence = redact_spans(content, merged, redaction_token(context))
         else:
             evidence = snippet(content[first[0] : first[1]])
-        message = (
-            f"Conteudo contem {len(matched)} termo(s) bloqueado(s): "
-            f"{', '.join(matched[:5])}."
-        )
+        message = f"Conteudo contem {len(matched)} termo(s) bloqueado(s): {', '.join(matched[:5])}."
         return build_finding(rule, message, evidence=evidence, span=first)

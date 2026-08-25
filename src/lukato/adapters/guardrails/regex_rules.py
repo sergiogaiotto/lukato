@@ -369,7 +369,9 @@ class RegexBlockEvaluator:
         matched: list[str] = []
         for pattern in patterns:
             regex = compile_pattern(pattern, flags)
-            found = [match.span() for match in regex.finditer(content) if match.end() > match.start()]
+            found = [
+                match.span() for match in regex.finditer(content) if match.end() > match.start()
+            ]
             if found:
                 matched.append(pattern)
                 spans.extend(found)
