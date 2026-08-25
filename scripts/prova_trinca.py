@@ -21,9 +21,6 @@ O LLM aqui e um `EchoLLM` instrumentado que conta chamadas: e ele que transforma
 
 import asyncio
 
-from lukato.config import get_settings, reset_settings_cache
-
-reset_settings_cache()
 from lukato.adapters.embeddings.factory import build_embedder
 from lukato.adapters.guardrails.composite import build_default_evaluators
 from lukato.adapters.guardrails.policies import default_policies
@@ -39,8 +36,19 @@ from lukato.adapters.security.hashing import BcryptHasher
 from lukato.adapters.security.tokens import JwtTokenService
 from lukato.application.container import Container
 from lukato.application.use_cases.modules import InvokeModule
-from lukato.domain.errors import GuardrailViolation
-from lukato.domain.models import *
+from lukato.config import get_settings, reset_settings_cache
+from lukato.domain.errors import ConflictError, ForbiddenError, GuardrailViolation
+from lukato.domain.models import (
+    ROLE_PERMISSIONS,
+    ModelPrice,
+    ModuleBinding,
+    ModuleDefinition,
+    ModuleKind,
+    ModuleStatus,
+    Principal,
+    PromptTemplate,
+    Role,
+)
 from lukato.domain.services.cost_calculator import CostCalculator
 from lukato.domain.services.guardrail_engine import GuardrailEngine
 from lukato.domain.services.module_composer import ModuleComposer
@@ -63,10 +71,11 @@ class EspiaoLLM(EchoLLM):
 
 
 async def main():
+    reset_settings_cache()
     s = get_settings()
     e = build_engine(s)
     await create_all(e, vector_dim=1024)
-    S = build_sessionmaker(e)
+    session_factory = build_sessionmaker(e)
     espiao = EspiaoLLM(s)
     registry.clear()
     registry.load_builtin()
@@ -75,10 +84,10 @@ async def main():
         settings=s,
         llm=espiao,
         embeddings=build_embedder(s),
-        vector_store=PgVectorStore(S, dimensions=1024),
+        vector_store=PgVectorStore(session_factory, dimensions=1024),
         guardrails=GuardrailEngine(build_default_evaluators(llm=espiao, settings=s)),
         tracer=build_tracer(s),
-        uow_factory=UnitOfWorkFactoryImpl(S, vector_dim=1024),
+        uow_factory=UnitOfWorkFactoryImpl(session_factory, vector_dim=1024),
         orchestrators=build_orchestrators(espiao, settings=s, tools=tools),
         registry=registry,
         cost_calculator=CostCalculator(
@@ -94,8 +103,8 @@ async def main():
     )
     pols = {p.slug: p for p in default_policies()}
     async with c.uow_factory() as uow:
-        pin = await uow.guardrails.add(pols["entrada-padrao"])
-        pout = await uow.guardrails.add(pols["saida-padrao"])
+        politica_entrada = await uow.guardrails.add(pols["entrada-padrao"])
+        politica_saida = await uow.guardrails.add(pols["saida-padrao"])
         prompt = await uow.prompts.add(
             PromptTemplate(
                 slug="atendimento",
@@ -120,9 +129,9 @@ async def main():
                 runtime="direct",
                 config={"module": "processing"},
                 binding=ModuleBinding(
-                    input_guardrail_id=pin.id,
+                    input_guardrail_id=politica_entrada.id,
                     system_prompt_id=prompt.id,
-                    output_guardrail_id=pout.id,
+                    output_guardrail_id=politica_saida.id,
                     model="echo",
                 ),
             )
@@ -136,9 +145,9 @@ async def main():
                 runtime="direct",
                 config={"module": "processing"},
                 binding=ModuleBinding(
-                    input_guardrail_id=pin.id,
+                    input_guardrail_id=politica_entrada.id,
                     system_prompt_id=prompt2.id,
-                    output_guardrail_id=pout.id,
+                    output_guardrail_id=politica_saida.id,
                     model="echo",
                 ),
             )
@@ -171,15 +180,13 @@ async def main():
 
     print("=== 2. entrada com CPF valido (guardrail de entrada) ===")
     antes = espiao.chamadas
-    r2 = await invoke.execute(
+    _ = await invoke.execute(
         "triagem",
         ModuleRequest(input="meu CPF e 529.982.247-25, cancele", variables={"empresa": "Claro"}),
         root,
     )
     print(f"  redigido? {'[REDIGIDO]' in str(espiao.vistos[-1])}")
-    print(
-        f"  chamadas novas: {espiao.chamadas - antes} | findings: {[f.rule_id for f in r2.findings]}"
-    )
+    print(f"  chamadas novas: {espiao.chamadas - antes}")
 
     print("=== 3. prompt injection (deve BLOQUEAR antes do provedor) ===")
     antes = espiao.chamadas
@@ -200,10 +207,10 @@ async def main():
         )
 
     print("=== 4. duas definicoes, MESMA classe, comportamentos diferentes ===")
-    a = await invoke.execute(
+    await invoke.execute(
         "triagem", ModuleRequest(input="posso cancelar?", variables={"empresa": "Claro"}), root
     )
-    b = await invoke.execute(
+    await invoke.execute(
         "juridico", ModuleRequest(input="posso cancelar?", variables={"empresa": "Claro"}), root
     )
     sa, sb = espiao.vistos[-2], espiao.vistos[-1]
@@ -212,7 +219,6 @@ async def main():
     print(f"  mesma classe 'processing', prompts diferentes: {sa != sb}")
 
     print("=== 5. modulo em DRAFT deve recusar ===")
-    from lukato.domain.errors import ConflictError, ForbiddenError
 
     try:
         await invoke.execute("rascunho", ModuleRequest(input="oi"), root)
