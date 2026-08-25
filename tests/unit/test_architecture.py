@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Final, NamedTuple
@@ -371,4 +372,41 @@ def test_nenhum_segredo_aparente() -> None:
     assert not achados, (
         "segredo aparente versionado; credencial so entra por Settings/ambiente:\n"
         + "\n".join(f"  - {achado}" for achado in achados)
+    )
+
+
+def test_todo_arquivo_de_codigo_esta_versionado() -> None:
+    """Nenhum modulo de `src/` pode estar fora do git (guarda de `.gitignore`).
+
+    Um padrao solto no `.gitignore` casa em qualquer profundidade: a linha
+    `media/`, escrita para arquivos de midia locais, engoliu o pacote inteiro
+    `src/lukato/adapters/media/` — oito modulos que existiam em disco, passavam
+    em todos os testes localmente e nunca chegaram ao repositorio. So a CI
+    percebeu, com `ModuleNotFoundError`, e depois de o projeto inteiro parecer
+    pronto.
+
+    Este teste fecha essa porta: se um arquivo de codigo nao esta rastreado, ele
+    nao existe para quem clona.
+    """
+    resultado = subprocess.run(
+        ["git", "ls-files", "--cached", "--", "src", "tests", "scripts"],
+        cwd=PROJETO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if resultado.returncode != 0:  # pragma: no cover - fora de um checkout git
+        pytest.skip("nao e um repositorio git")
+
+    rastreados = {PROJETO / linha for linha in resultado.stdout.splitlines() if linha}
+    em_disco = {
+        arquivo
+        for pasta in ("src", "tests", "scripts")
+        for arquivo in (PROJETO / pasta).rglob("*.py")
+        if "__pycache__" not in arquivo.parts
+    }
+    fora = sorted(str(arquivo.relative_to(PROJETO)) for arquivo in em_disco - rastreados)
+    assert not fora, (
+        "arquivos de codigo existem em disco mas nao estao no git — provavelmente "
+        "engolidos por um padrao do .gitignore:\n" + "\n".join(f"  - {a}" for a in fora)
     )
