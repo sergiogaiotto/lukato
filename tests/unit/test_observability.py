@@ -17,6 +17,7 @@ monta o seu e o registro global do `prometheus_client` nunca e tocado.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -132,9 +133,16 @@ def test_factory_devolve_noop_quando_faltam_as_credenciais() -> None:
 # LangfuseTracer com credenciais falsas
 # --------------------------------------------------------------------------- #
 @pytest.fixture
-def tracer_falso() -> LangfuseTracer:
-    """`LangfuseTracer` apontado para um host que recusa conexao, com esperas curtas."""
-    return LangfuseTracer(
+async def tracer_falso() -> AsyncIterator[LangfuseTracer]:
+    """`LangfuseTracer` apontado para um host que recusa conexao, com esperas curtas.
+
+    Fecha o cliente no teardown. Sem isso o SDK do Langfuse deixa viva a thread
+    exportadora do OpenTelemetry, que tenta despachar spans para um host morto e
+    despeja um traceback no encerramento do processo — depois do resumo do pytest,
+    onde parece falha e nao e. Producao ja fecha: `dispose_container` chama
+    `aclose()`; era so o teste que nao chamava.
+    """
+    tracer = LangfuseTracer(
         CHAVE_FALSA_PUBLICA,
         CHAVE_FALSA_SECRETA,
         HOST_INALCANCAVEL,
@@ -144,6 +152,10 @@ def tracer_falso() -> LangfuseTracer:
         flush_timeout_seconds=0.5,
         health_timeout_seconds=0.5,
     )
+    try:
+        yield tracer
+    finally:
+        await tracer.aclose()
 
 
 async def test_langfuse_com_credenciais_falsas_nao_levanta_em_nenhuma_operacao(

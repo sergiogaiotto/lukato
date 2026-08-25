@@ -18,7 +18,9 @@ O que este arquivo prova, subindo a `FastAPI` de verdade sobre SQLite em memoria
   a forma mascarada (secao 10);
 * **autoescape ligado**: um modulo chamado `<script>alert(1)</script>` aparece
   escapado, nunca como tag executavel (secao 10);
-* **erro vira pagina**, nao JSON, quando a rota existe e o identificador nao;
+* **erro vira pagina**, nao JSON, tanto para um identificador que nao existe
+  quanto para um caminho que rota nenhuma reclama — sem quebrar o cliente de
+  API, que continua recebendo o envelope `{"error": {...}}`;
 * **todo formulario de mutacao e `POST` com `action` preenchido**, verificado com
   o `html.parser` da biblioteca padrao — sem dependencia nova.
 
@@ -624,21 +626,15 @@ async def test_pagina_de_erro_preserva_a_moldura_do_console(
     assert not faltando, f"a pagina de erro perdeu partes da moldura: {faltando}"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "defeito real: um caminho desconhecido pedido por um navegador "
-        "(Accept: text/html) recebe o envelope JSON da API em vez de "
-        "pages/error.html. Contraria o contrato declarado em "
-        "src/lukato/interfaces/ui/router.py:11 ('Uma pagina nunca devolve JSON'): "
-        "_handle_http_exception, em src/lukato/interfaces/http/errors.py:187, "
-        "responde JSONResponse sem negociar conteudo."
-    ),
-    strict=False,
-)
 async def test_pagina_de_erro_renderiza_para_rota_inexistente(
     console: tuple[AsyncClient, dict[str, Id]],
 ) -> None:
-    """Um caminho que nao existe, pedido por navegador, deveria virar pagina de erro."""
+    """Caminho que nao existe, pedido por navegador, tambem vira pagina de erro.
+
+    O contrato "uma pagina nunca devolve JSON" vale ate para o caminho que rota
+    nenhuma reclama: quem manda `Accept: text/html` recebe `pages/error.html`
+    com a moldura do console e um caminho de volta, e nao texto cru.
+    """
     http, _ = console
     resposta = await http.get(
         "/rota-que-nunca-existiu", headers={"Accept": "text/html,application/xhtml+xml"}
@@ -648,6 +644,40 @@ async def test_pagina_de_erro_renderiza_para_rota_inexistente(
     assert resposta.headers["content-type"].startswith("text/html"), (
         f"o navegador recebeu {resposta.headers['content-type']}: {resposta.text[:120]}"
     )
+    corpo = resposta.text
+    assert "lk-error__title" in corpo
+    assert analisar(corpo).titulo.strip() == "Erro 404 · lukato"
+
+
+async def test_caminho_inexistente_de_api_continua_respondendo_no_envelope_json(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """A negociacao nao pode quebrar o cliente de API: sob `/api/`, 404 e JSON.
+
+    E o outro lado do teste anterior. Sem esta checagem, "toda pagina de erro e
+    HTML" poderia ter sido implementado devolvendo markup para todo mundo, e um
+    cliente que espera `{"error": {...}}` receberia HTML.
+    """
+    http, _ = console
+    resposta = await http.get(
+        "/api/v1/rota-que-nunca-existiu", headers={"Accept": "text/html,application/xhtml+xml"}
+    )
+
+    assert resposta.status_code == 404
+    assert resposta.headers["content-type"].startswith("application/json")
+    assert resposta.json()["error"]["code"] == "not_found"
+
+
+async def test_cliente_sem_preferencia_por_html_recebe_o_envelope_json(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """`Accept: */*` e cliente de programa, nao navegador: recebe JSON."""
+    http, _ = console
+    resposta = await http.get("/rota-que-nunca-existiu", headers={"Accept": "*/*"})
+
+    assert resposta.status_code == 404
+    assert resposta.headers["content-type"].startswith("application/json")
+    assert resposta.json()["error"]["code"] == "not_found"
 
 
 # --------------------------------------------------------------------------- #
