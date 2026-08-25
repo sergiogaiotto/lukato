@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lukato"
+version = "1.0.0"
+description = "Ecossistema modular de agentes de IA — Building Blocks, arquitetura hexagonal, guardrails parametrizaveis"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { text = "Proprietary" }
+authors = [{ name = "Sergio Felipe Bezerra Gaiotto" }]
+keywords = ["ai", "agents", "hexagonal", "fastapi", "langgraph", "guardrails", "finops"]
+classifiers = [
+  "Programming Language :: Python :: 3.11",
+  "Framework :: FastAPI",
+  "Private :: Do Not Upload",
+]
+dynamic = ["dependencies", "optional-dependencies"]
+
+[project.scripts]
+lukato = "lukato.interfaces.cli:main"
+
+[project.entry-points."lukato.modules"]
+auth = "lukato.modules.builtin.auth_module:AuthModule"
+processing = "lukato.modules.builtin.processing_module:ProcessingModule"
+finops = "lukato.modules.builtin.finops_module:FinOpsModule"
+knowledge = "lukato.modules.builtin.knowledge_module:KnowledgeModule"
+adwatch = "lukato.modules.builtin.adwatch_module:AdWatchModule"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lukato = ["interfaces/ui/templates/**/*.html", "interfaces/ui/static/**/*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies.dev = { file = ["requirements-dev.txt"] }
+optional-dependencies.media = { file = ["requirements-media.txt"] }
+
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [".venv", "migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "TID", "RUF", "ASYNC", "S"]
+ignore = [
+  "E501",    # comprimento tratado pelo formatador
+  "B008",    # Depends() no default e idiomatico em FastAPI
+  "S101",    # assert e permitido em testes
+  "RUF001", "RUF002", "RUF003",  # textos em portugues usam acentuacao
+  "N818",    # nomes de excecao do dominio nao usam sufixo Error obrigatorio
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B", "SIM"]
+"src/lukato/adapters/**" = ["S105", "S106"]
+"scripts/**" = ["S", "T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lukato"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"lukato.adapters".msg = "domain/application nao podem importar adapters (regra hexagonal)"
+
+# -----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "src"
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["lukato.domain.*", "lukato.application.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*"]
+ignore_errors = true
+
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra -q --strict-markers"
+markers = [
+  "unit: testes de unidade puros (sem I/O)",
+  "integration: testes que sobem a aplicacao ou o banco",
+  "contract: testes de contrato OpenAPI",
+  "slow: testes demorados",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src/lukato"]
+branch = true
+omit = ["*/migrations/*", "*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

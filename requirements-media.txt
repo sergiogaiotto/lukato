@@ -1,0 +1,16 @@
+# lukato 1.0.0 — dependencias OPCIONAIS do pipeline multimodal (modulo AdWatch)
+#
+# O modulo AdWatch funciona SEM estas bibliotecas: os adaptadores de midia
+# fazem deteccao de capacidade em tempo de execucao e degradam para os
+# adaptadores de importacao (transcricao/OCR/cenas em JSON). Instale este
+# arquivo apenas quando quiser processar arquivos de video de verdade.
+-r requirements.txt
+
+ffmpeg-python==0.2.0
+scenedetect[opencv]==0.6.7
+# ASR com timestamps por palavra (forced alignment)
+whisperx==3.4.4
+# OCR de frames (100+ idiomas)
+paddleocr==3.4.0
+# Indice vetorial local para catalogos grandes de comerciais
+faiss-cpu==1.13.0
