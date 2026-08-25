@@ -39,7 +39,7 @@ class GuardrailEngine:
         self,
         evaluators: Sequence[GuardrailRuleEvaluator],
         *,
-        redaction_token: str = "[REDIGIDO]",
+        redaction_token: str = "[REDIGIDO]",  # noqa: S107 - marcador publico, nao e segredo
         fail_open: bool = False,
     ) -> None:
         self._evaluators: dict[GuardrailRuleKind, GuardrailRuleEvaluator] = {}
@@ -122,7 +122,7 @@ class GuardrailEngine:
 
             try:
                 finding = await evaluator.evaluate(current, rule, evaluation_context)
-            except Exception as exc:
+            except Exception as exc:  # falha do avaliador vira politica explicita
                 if not fail_open:
                     raise GuardrailViolation(
                         f"Falha ao avaliar a regra '{rule.id}' ({rule.kind.value}) "

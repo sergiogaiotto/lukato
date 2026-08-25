@@ -150,10 +150,7 @@ class CostCalculator:
         """
         limit = float(budget.limit_usd)
         spent_value = float(spent)
-        if limit > 0.0:
-            ratio = spent_value / limit
-        else:
-            ratio = 1.0 if spent_value > 0.0 else 0.0
+        ratio = _consumption_ratio(spent_value, limit)
         active = budget.is_active
         return BudgetCheck(
             ok=(not active) or ratio < 1.0,
@@ -182,6 +179,13 @@ class CostCalculator:
             return found
         canonical = self._lowercase.get(key.lower())
         return self._prices.get(canonical) if canonical is not None else None
+
+
+def _consumption_ratio(spent: float, limit: float) -> float:
+    """Fracao consumida do orcamento; limite nao positivo conta como ja esgotado."""
+    if limit > 0.0:
+        return spent / limit
+    return 1.0 if spent > 0.0 else 0.0
 
 
 def _estimate_tokens(text: str) -> int:

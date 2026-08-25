@@ -520,17 +520,22 @@ class BoundaryRefiner:
         return new_start, new_end, refined
 
     def _snap(self, value: float, boundaries: Sequence[float]) -> float:
-        """Aproxima `value` da fronteira mais proxima dentro de `max_shift`."""
+        """Aproxima `value` da fronteira mais proxima dentro de `max_shift`.
+
+        Empates de distancia ficam com a fronteira anterior (mais cedo no tempo).
+        """
         position = bisect_left(boundaries, value)
         best = value
-        distance = self.max_shift
+        distance: float | None = None
         for index in (position - 1, position):
-            if 0 <= index < len(boundaries):
-                candidate = boundaries[index]
-                gap = abs(candidate - value)
-                if gap <= distance and (gap < distance or candidate < best):
-                    best = candidate
-                    distance = gap
+            if not 0 <= index < len(boundaries):
+                continue
+            candidate = boundaries[index]
+            gap = abs(candidate - value)
+            if gap > self.max_shift:
+                continue
+            if distance is None or gap < distance:
+                best, distance = candidate, gap
         return best
 
 
