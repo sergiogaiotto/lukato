@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lukato-config
+  labels:
+    app.kubernetes.io/name: lukato
+data:
+  # ---- aplicacao ----
+  LUKATO_APP__ENV: "prod"
+  LUKATO_APP__DEBUG: "false"
+  LUKATO_APP__HOST: "0.0.0.0"
+  LUKATO_APP__PORT: "8000"
+  LUKATO_APP__WORKERS: "2"
+
+  # ---- banco (a URL completa vem do Secret) ----
+  LUKATO_DB__AUTO_FALLBACK: "false"
+  LUKATO_DB__CREATE_ALL: "false"
+  LUKATO_DB__POOL_SIZE: "10"
+  LUKATO_DB__MAX_OVERFLOW: "20"
+  LUKATO_DB__RUN_MIGRATIONS: "false"   # migracao roda no Job dedicado
+
+  # ---- LLM (hub interno, API compativel com OpenAI) ----
+  LUKATO_LLM__PROVIDER: "openai_compatible"
+  LUKATO_LLM__BASE_URL: "https://hub-gpus-lab.usto.re/v1"
+  LUKATO_LLM__MODEL: "qwen-latest"
+  LUKATO_LLM__FALLBACK_MODEL: "openai/gpt-oss-20b"
+  LUKATO_LLM__TEMPERATURE: "0.2"
+  LUKATO_LLM__MAX_TOKENS: "2048"
+  LUKATO_LLM__TIMEOUT: "60"
+  LUKATO_LLM__MAX_RETRIES: "3"
+
+  # ---- embeddings ----
+  LUKATO_EMBEDDING__PROVIDER: "qwen"
+  LUKATO_EMBEDDING__BASE_URL: "https://hub-gpus.claro.com.br/embed06b/v1"
+  LUKATO_EMBEDDING__MODEL: "Qwen/Qwen3-Embedding-0.6B"
+  LUKATO_EMBEDDING__DIMENSIONS: "1024"
+  LUKATO_EMBEDDING__COLLECTION: "agente_evidence"
+
+  # ---- guardrails ----
+  LUKATO_GUARDRAILS__ENABLED: "true"
+  LUKATO_GUARDRAILS__FAIL_OPEN: "false"
+
+  # ---- observabilidade ----
+  LUKATO_OBSERVABILITY__LANGFUSE_ENABLED: "true"
+  LUKATO_OBSERVABILITY__LANGFUSE_HOST: "https://cloud.langfuse.com"
+  LUKATO_OBSERVABILITY__LOG_LEVEL: "INFO"
+  LUKATO_OBSERVABILITY__LOG_JSON: "true"
+  LUKATO_OBSERVABILITY__METRICS_ENABLED: "true"
+
+  # ---- seguranca ----
+  LUKATO_SECURITY__AUTH_ENABLED: "true"
+  LUKATO_SECURITY__CORS_ORIGINS: '["https://lukato.internal"]'

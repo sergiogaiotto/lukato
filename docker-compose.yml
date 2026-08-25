@@ -1,0 +1,93 @@
+# =============================================================================
+# lukato 1.0.0 — stack local completa
+#   docker compose up -d              (postgres + pgvector + api + console)
+#   docker compose --profile obs up -d  (inclui Langfuse local)
+# =============================================================================
+
+name: lukato
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lukato-postgres
+    environment:
+      POSTGRES_USER: lukato
+      POSTGRES_PASSWORD: lukato
+      POSTGRES_DB: lukato
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lukato -d lukato"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lukato:1.0.0
+    container_name: lukato-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LUKATO_APP__ENV: dev
+      LUKATO_APP__DEBUG: "true"
+      LUKATO_DB__URL: postgresql+asyncpg://lukato:lukato@postgres:5432/lukato
+      LUKATO_DB__AUTO_FALLBACK: "false"
+      LUKATO_OBSERVABILITY__LOG_LEVEL: INFO
+    ports: ["8000:8000"]
+    volumes:
+      - adwatch:/app/var
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    restart: unless-stopped
+
+  # ---- observabilidade opcional: docker compose --profile obs up -d ---------
+  langfuse-db:
+    image: postgres:16-alpine
+    profiles: ["obs"]
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes: [langfusedata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  langfuse:
+    image: langfuse/langfuse:2
+    profiles: ["obs"]
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: lukato-local-dev-secret
+      SALT: lukato-local-dev-salt
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      TELEMETRY_ENABLED: "false"
+    ports: ["3000:3000"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  langfusedata:
+  adwatch:

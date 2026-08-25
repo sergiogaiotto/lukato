@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lukato-dev
+
+resources:
+  - ../../base
+
+patches:
+  - target: { kind: Deployment, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+  - target: { kind: HorizontalPodAutoscaler, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+  - target: { kind: Ingress, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: lukato-dev.internal
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: lukato-dev.internal
+
+configMapGenerator:
+  - name: lukato-config
+    behavior: merge
+    literals:
+      - LUKATO_APP__ENV=dev
+      - LUKATO_APP__DEBUG=true
+      - LUKATO_APP__WORKERS=1
+      - LUKATO_SECURITY__AUTH_ENABLED=false
+      - LUKATO_OBSERVABILITY__LOG_JSON=false
+      - LUKATO_DB__CREATE_ALL=true
+
+generatorOptions:
+  disableNameSuffixHash: true

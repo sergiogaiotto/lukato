@@ -1,0 +1,55 @@
+# =============================================================================
+# lukato 1.0.0 — dependencias de runtime
+# Ecossistema modular de agentes de IA (Hexagonal / Ports & Adapters)
+# Instalacao:  pip install -r requirements.txt
+# Extras:      pip install -r requirements-dev.txt      (qualidade e testes)
+#              pip install -r requirements-media.txt    (pipeline de video AdWatch)
+# =============================================================================
+
+# --- Web / API (driving adapter) --------------------------------------------
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+itsdangerous==2.2.0
+
+# --- Configuracao e contratos ------------------------------------------------
+pydantic==2.13.4
+pydantic-settings==2.15.0
+email-validator==2.3.0
+orjson==3.12.0
+PyYAML==6.0.3
+
+# --- UI (template engine) ----------------------------------------------------
+Jinja2==3.1.6
+
+# --- Persistencia (driven adapter) -------------------------------------------
+SQLAlchemy==2.0.52
+alembic==1.19.1
+greenlet==3.5.5
+asyncpg==0.31.0
+aiosqlite==0.22.1
+pgvector==0.5.0
+
+# --- LLM / Agentes -----------------------------------------------------------
+httpx==0.28.1
+openai==3.3.1
+langgraph==1.2.11
+langchain-core==1.6.0
+langchain-openai==1.6.0
+deepagents==0.7.8
+
+# --- Observabilidade ---------------------------------------------------------
+langfuse==4.14.5
+structlog==26.1.0
+prometheus-client==0.26.0
+
+# --- Matching / numerico (AdWatch) -------------------------------------------
+rapidfuzz==3.14.5
+numpy==2.4.6
+
+# --- Seguranca ---------------------------------------------------------------
+PyJWT==2.13.0
+bcrypt==5.0.0
+
+# --- Resiliencia -------------------------------------------------------------
+tenacity==9.1.4
