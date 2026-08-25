@@ -20,6 +20,7 @@ O LLM aqui e um `EchoLLM` instrumentado que conta chamadas: e ele que transforma
 """
 
 import asyncio
+
 from lukato.config import get_settings, reset_settings_cache
 
 reset_settings_cache()
