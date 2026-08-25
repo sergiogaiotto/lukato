@@ -22,7 +22,18 @@ Dois esquemas, ambos declarados no OpenAPI:
   contra `hashed_secret` (bcrypt) em tempo constante.
 
 `security.auth_enabled=false` (padrao em dev) resolve `Principal.anonymous_root()`.
-Em producao (`app.env=prod`), `auth_enabled=false` e **erro de configuracao** no boot.
+
+Em producao (`app.env=prod`) o boot **falha** em dois casos, ambos verificados por
+`Settings`:
+
+| Condicao | Por que e fatal |
+| --- | --- |
+| `auth_enabled=false` | toda rota passaria a responder como root anonimo |
+| `jwt_secret` fraco ou com menos de **32 caracteres** | HMAC curto e quebravel por forca bruta; RFC 7518 secao 3.2 exige 32 bytes para HS256 |
+
+Uma lista de valores proibidos nao basta para o segredo: `JWT_SECRET=abc` nao esta em
+lista nenhuma e ainda assim e uma chave de 3 bytes. O criterio e **lista de proibidos
+E tamanho minimo**. Em `dev` e `staging` nada disso e imposto.
 
 ## 3. Senhas e segredos
 

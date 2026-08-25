@@ -1,0 +1,47 @@
+{#-
+  partials/hero.html — cabecalho gradiente do modulo (SPEC-0009 secao 6).
+
+      {% from "partials/hero.html" import hero %}
+
+      {% call hero(
+           'AdWatch',
+           subtitle='Catálogo de comerciais e detecção multimodal.',
+           metrics=[('Comerciais', commercials_total), ('Detecções', detections_total)]
+         ) %}
+        <a class="lk-btn lk-btn--outline" href="/adwatch/commercials">Abrir catálogo</a>
+      {% endcall %}
+
+  O conteudo do `{% call %}` vai para a area de acoes, a direita. Use
+  `.lk-btn--outline`, que dentro do hero herda a borda branca.
+
+  `metrics` aceita tuplas `(rotulo, valor)` ou dicionarios
+  `{'label': ..., 'value': ..., 'hint': ...}`. Os valores ja devem chegar
+  formatados (`| number`, `| money`, `| tokens`).
+-#}
+
+{% macro hero(title, subtitle='', metrics=none, badge_html=none) -%}
+<section class="lk-hero">
+  <div class="lk-grow">
+    <h1 class="lk-hero__title">
+      {{ title }}
+      {% if badge_html %}{{ badge_html }}{% endif %}
+    </h1>
+    {% if subtitle %}<p class="lk-hero__subtitle">{{ subtitle }}</p>{% endif %}
+
+    {% if metrics %}
+      <div class="lk-hero__metrics">
+        {% for metric in metrics %}
+          {%- set label = metric.label if metric.label is defined else metric[0] -%}
+          {%- set value = metric.value if metric.value is defined else metric[1] -%}
+          {%- set hint = metric.hint if metric.hint is defined else '' -%}
+          <span class="lk-hero__metric"{% if hint %} title="{{ hint }}"{% endif %}>
+            <b>{{ value }}</b><span>{{ label }}</span>
+          </span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="lk-hero__actions">{% if caller %}{{ caller() }}{% endif %}</div>
+</section>
+{%- endmacro %}

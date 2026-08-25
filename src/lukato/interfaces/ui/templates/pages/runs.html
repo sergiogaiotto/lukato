@@ -1,0 +1,136 @@
+{#-
+  pages/runs.html — historico de execucoes (SPEC-0009 secao 8, rota `GET /runs`).
+
+  Contexto entregue pela rota:
+    `runs`            `Page[AgentRun]` ja filtrada e paginada.
+    `statuses`        membros de `RunStatus`, para o filtro de desfecho.
+    `module_options`  `ModuleDefinition` disponiveis para o filtro de modulo.
+    `filters`         `{module, status, hours}` — os valores que o formulario reexibe.
+
+  Cada linha e selecionavel: o clique abre `context/run.html` na coluna da
+  direita. Sem JavaScript o mesmo clique navega para `?sel=<id>`, e o servidor
+  renderiza o painel — os filtros e a pagina atual sao preservados por
+  `query_url`.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set window_options = [
+      (1, 'última hora'),
+      (6, 'últimas 6 horas'),
+      (24, 'últimas 24 horas'),
+      (72, 'últimos 3 dias'),
+      (168, 'últimos 7 dias'),
+      (720, 'últimos 30 dias')
+    ] -%}
+
+{% block hero %}
+  {% call hero(
+       'Execuções',
+       subtitle='Toda invocação de módulo registrada com passos, consumo e custo.',
+       metrics=[
+         ('No recorte', runs.total | number),
+         ('Nesta página', runs.items | length | number),
+         ('Janela', filters.hours ~ ' h')
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/modules">Invocar um módulo</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/runs">
+    <div class="lk-field">
+      <label for="filter-module">Módulo</label>
+      <select class="lk-select" id="filter-module" name="module">
+        <option value="">Todos</option>
+        {% for option in module_options %}
+          <option value="{{ option.slug }}" {{ 'selected' if filters.module == option.slug else '' }}>
+            {{ option.name }} ({{ option.slug }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-status">Desfecho</label>
+      <select class="lk-select" id="filter-status" name="status">
+        <option value="">Todos</option>
+        {% for option in statuses %}
+          <option value="{{ option.value }}" {{ 'selected' if filters.status == option.value else '' }}>
+            {{ option.value }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-hours">Janela</label>
+      <select class="lk-select" id="filter-hours" name="hours">
+        {% for hours, label in window_options %}
+          <option value="{{ hours }}" {{ 'selected' if filters.hours == hours else '' }}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <span class="lk-field__hint">Contada a partir de agora, em UTC.</span>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/runs">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--runs lk-stack">
+    {% call card('Execuções', flush=true) %}
+      {% if runs.items %}
+        {% call table([
+             {'label': 'Execução', 'width': '18%'},
+             'Módulo',
+             {'label': 'Status'},
+             {'label': 'Tokens', 'align': 'num'},
+             {'label': 'Custo', 'align': 'num'},
+             {'label': 'Latência', 'align': 'num'},
+             {'label': 'Quando', 'align': 'right'}
+           ], clickable=true, caption='Execuções filtradas') %}
+          {% for run in runs.items %}
+            <tr {{ row_attrs('run', run.id, selected_id) }}>
+              <td class="lk-mono">{{ cell_link('run', run.id, run.id | truncate_mid(12)) }}</td>
+              <td>
+                <a class="lk-table__link" href="/runs/{{ run.id }}">{{ run.module_slug }}</a>
+              </td>
+              <td>{{ badge(run.status) }}</td>
+              <td class="lk-table__num">{{ run.usage.total_tokens | tokens }}</td>
+              <td class="lk-table__num">{{ run.cost_usd | money }}</td>
+              <td class="lk-table__num">{{ run.latency_ms | number(0) }} ms</td>
+              <td class="lk-right lk-nowrap" title="{{ run.created_at | datetime_br('%d/%m/%Y %H:%M:%S') }}">
+                {{ run.created_at | timeago }}
+              </td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma execução no recorte',
+             'Amplie a janela, remova os filtros ou invoque um módulo para produzir a primeira trilha.',
+             name='activity',
+             action_href='/modules',
+             action_label='Ver módulos'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {{ pagination(runs, label='execuções') }}
+  </div>
+{% endblock %}
+
+{% block context_title %}Execução{% endblock %}

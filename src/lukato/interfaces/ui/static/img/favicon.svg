@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  favicon.svg — a marca do lukato: quadrado vermelho com o "L".
+
+  O atributo `xmlns` abaixo e uma declaracao de namespace XML exigida pelo
+  parser para que um arquivo .svg autonomo seja reconhecido como SVG. Ele nao
+  e uma referencia de rede: nenhuma requisicao e feita para esse endereco, e o
+  arquivo continua valendo em rede fechada. E a unica ocorrencia de URL em todo
+  o pacote da UI, e ela e inevitavel em SVG servido como image/svg+xml.
+
+  O "L" e um caminho, e nao texto: um favicon nao pode depender de fonte.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="lukato">
+  <title>lukato</title>
+  <rect width="32" height="32" rx="7" fill="#c8102e"/>
+  <path d="M11 8h4.4v12.2H23V24H11z" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,271 @@
+/* tokens.css — paleta, medidas e tipografia do console lukato (SPEC-0009 secao 5).
+ *
+ * Regra de ouro deste arquivo: **nenhuma cor tem a sua unica definicao dentro de
+ * um bloco de tema**. Toda variavel de cor nasce em `:root` com o valor claro; os
+ * blocos escuros apenas **redefinem** exatamente o mesmo conjunto. Assim um tema
+ * jamais fica com um token indefinido, e a diferenca entre claro e escuro cabe em
+ * um diff legivel.
+ *
+ * Sao tres blocos, nesta ordem, e a ordem importa:
+ *   1. `:root`                                        -> tema claro, sempre completo;
+ *   2. `@media (prefers-color-scheme: dark)` guardado por `:root:not([data-theme="light"])`
+ *      -> segue o sistema, a menos que a pessoa tenha escolhido claro;
+ *   3. `:root[data-theme="dark"]`                     -> escolha explicita vence o sistema.
+ *
+ * As medidas (raios, alturas, espacamentos, fontes) nao mudam com o tema e por
+ * isso vivem so em `:root`.
+ *
+ * Contraste: `--lk-text` e `--lk-muted` passam AA sobre `--lk-bg` e `--lk-panel`
+ * nos dois temas. `--lk-faint` e apoio decorativo (placeholders, dicas), nunca
+ * texto principal.
+ *
+ * Offline-first: nenhuma `url()` remota, nenhuma `@import`, nenhuma fonte de CDN.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Marca */
+  --lk-accent: #c8102e;  /* vermelho da marca; acao primaria e item ativo */
+  --lk-accent-strong: #a30f1c;  /* estado pressionado e texto sobre fundo suave */
+  --lk-accent-deep: #7a0c16;  /* inicio do gradiente do hero */
+  --lk-accent-soft: #fdeef0;  /* fundo do item ativo da sidebar */
+  --lk-accent-contrast: #ffffff;  /* texto legivel sobre o vermelho solido */
+
+  /* Inteligencia artificial */
+  --lk-ai: #1a56db;  /* tudo que foi gerado por IA */
+  --lk-ai-soft: #eaf0fd;  /* fundo dos cartoes .lk-card--ai */
+
+  /* Semaforo */
+  --lk-ok: #17803d;
+  --lk-ok-soft: #e7f6ec;
+  --lk-warn: #b45309;
+  --lk-warn-soft: #fdf3e3;
+  --lk-danger: #b91c1c;
+  --lk-danger-soft: #fdecec;
+  --lk-info: #1a56db;
+  --lk-info-soft: #eaf0fd;
+  --lk-neutral: #5b6270;
+  --lk-neutral-soft: #eef0f3;
+
+  /* Superficies */
+  --lk-bg: #f6f7f9;  /* fundo da aplicacao */
+  --lk-panel: #ffffff;  /* cartoes, topbar, sidebar e aside */
+  --lk-panel-alt: #fbfcfd;  /* cabecalhos de tabela e barras de ferramentas */
+  --lk-elevated: #ffffff;  /* menus flutuantes e paleta de comandos */
+  --lk-zebra: #fafbfc;  /* listras da tabela */
+  --lk-code-bg: #f4f5f7;  /* blocos <pre> e identificadores monoespacados */
+  --lk-overlay: rgba(15, 17, 21, 0.45);  /* cortina da gaveta e da paleta */
+
+  /* Texto */
+  --lk-text: #0f1115;  /* texto principal (AA folgado sobre --lk-bg) */
+  --lk-muted: #5b6270;  /* texto secundario, ainda AA sobre --lk-panel */
+  --lk-faint: #8b909c;  /* apoio decorativo: rotulos de ajuda e placeholders */
+  --lk-inverse: #ffffff;  /* texto sobre superficies escuras */
+
+  /* Linhas e foco */
+  --lk-border: #e4e6eb;
+  --lk-border-strong: #cfd3da;
+  --lk-focus: #1a56db;  /* anel de foco visivel do teclado */
+
+  /* Sombras */
+  --lk-shadow: 0 1px 2px rgba(15, 17, 21, 0.06), 0 1px 8px rgba(15, 17, 21, 0.04);
+  --lk-shadow-lg: 0 8px 24px rgba(15, 17, 21, 0.12);
+
+  /* Hero */
+  --lk-hero-from: #7a0c16;
+  --lk-hero-to: #c8102e;
+  --lk-hero-text: #ffffff;
+
+  /* Series de custo (barra de status, graficos) */
+  --lk-series-1: #c8102e;
+  --lk-series-2: #1a56db;
+  --lk-series-3: #17803d;
+  --lk-series-4: #b45309;
+  --lk-series-5: #7c3aed;
+  --lk-series-6: #0e7490;
+  --lk-series-7: #be185d;
+  --lk-series-8: #4d7c0f;
+
+  /* -- Medidas (independentes de tema) ------------------------------------ */
+  --lk-radius: 10px;
+  --lk-radius-sm: 6px;
+  --lk-radius-pill: 999px;
+
+  --lk-topbar-h: 52px;
+  --lk-statusbar-h: 34px;
+  --lk-sidebar-w: 236px;
+  --lk-sidebar-w-expanded: 236px;
+  --lk-sidebar-w-collapsed: 60px;
+  --lk-aside-w: 320px;
+
+  --lk-space-1: 4px;
+  --lk-space-2: 8px;
+  --lk-space-3: 12px;
+  --lk-space-4: 16px;
+  --lk-space-5: 24px;
+  --lk-space-6: 32px;
+
+  --lk-control-h: 34px;
+  --lk-control-h-sm: 28px;
+
+  --lk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --lk-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --lk-fs-xs: 10px;
+  --lk-fs-sm: 11px;
+  --lk-fs-md: 13px;
+  --lk-fs-base: 14px;
+  --lk-fs-lg: 16px;
+  --lk-fs-xl: 20px;
+  --lk-fs-stat: 26px;
+
+  --lk-transition: 140ms ease;
+  --lk-z-drawer: 40;
+  --lk-z-overlay: 50;
+  --lk-z-palette: 60;
+  --lk-z-toast: 70;
+}
+
+/* Recolhida, a sidebar mede 60px: a largura da grade e um token, e o atributo
+   `data-sidebar` no <html> apenas troca o seu valor. */
+:root[data-sidebar="collapsed"] {
+  --lk-sidebar-w: var(--lk-sidebar-w-collapsed);
+}
+
+:root[data-sidebar="expanded"] {
+  --lk-sidebar-w: var(--lk-sidebar-w-expanded);
+}
+
+/* -- Tema escuro do sistema (a escolha explicita por tema claro vence) ----- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Marca */
+    --lk-accent: #ff5a70;
+    --lk-accent-strong: #ff8494;
+    --lk-accent-deep: #8c1020;
+    --lk-accent-soft: #2b1015;
+    --lk-accent-contrast: #1a0a0d;
+
+    /* Inteligencia artificial */
+    --lk-ai: #7aa2f7;
+    --lk-ai-soft: #14203a;
+
+    /* Semaforo */
+    --lk-ok: #4ade80;
+    --lk-ok-soft: #10251a;
+    --lk-warn: #fbbf24;
+    --lk-warn-soft: #2a1f0c;
+    --lk-danger: #fb7185;
+    --lk-danger-soft: #2b1218;
+    --lk-info: #7aa2f7;
+    --lk-info-soft: #14203a;
+    --lk-neutral: #a2a9b8;
+    --lk-neutral-soft: #1d222b;
+
+    /* Superficies */
+    --lk-bg: #0d0f13;
+    --lk-panel: #14171d;
+    --lk-panel-alt: #171b22;
+    --lk-elevated: #1b1f27;
+    --lk-zebra: #171a21;
+    --lk-code-bg: #11141a;
+    --lk-overlay: rgba(0, 0, 0, 0.62);
+
+    /* Texto */
+    --lk-text: #eef0f4;
+    --lk-muted: #a2a9b8;
+    --lk-faint: #8a93a3;
+    --lk-inverse: #0d0f13;
+
+    /* Linhas e foco */
+    --lk-border: #262b34;
+    --lk-border-strong: #39414d;
+    --lk-focus: #7aa2f7;
+
+    /* Sombras */
+    --lk-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 8px rgba(0, 0, 0, 0.35);
+    --lk-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55);
+
+    /* Hero */
+    --lk-hero-from: #5c0a13;
+    --lk-hero-to: #a81026;
+    --lk-hero-text: #ffffff;
+
+    /* Series de custo (barra de status, graficos) */
+    --lk-series-1: #ff5a70;
+    --lk-series-2: #7aa2f7;
+    --lk-series-3: #4ade80;
+    --lk-series-4: #fbbf24;
+    --lk-series-5: #c4a6ff;
+    --lk-series-6: #5eead4;
+    --lk-series-7: #f9a8d4;
+    --lk-series-8: #bef264;
+  }
+}
+
+/* -- Tema escuro escolhido na topbar -------------------------------------- */
+:root[data-theme="dark"] {
+  /* Marca */
+  --lk-accent: #ff5a70;
+  --lk-accent-strong: #ff8494;
+  --lk-accent-deep: #8c1020;
+  --lk-accent-soft: #2b1015;
+  --lk-accent-contrast: #1a0a0d;
+
+  /* Inteligencia artificial */
+  --lk-ai: #7aa2f7;
+  --lk-ai-soft: #14203a;
+
+  /* Semaforo */
+  --lk-ok: #4ade80;
+  --lk-ok-soft: #10251a;
+  --lk-warn: #fbbf24;
+  --lk-warn-soft: #2a1f0c;
+  --lk-danger: #fb7185;
+  --lk-danger-soft: #2b1218;
+  --lk-info: #7aa2f7;
+  --lk-info-soft: #14203a;
+  --lk-neutral: #a2a9b8;
+  --lk-neutral-soft: #1d222b;
+
+  /* Superficies */
+  --lk-bg: #0d0f13;
+  --lk-panel: #14171d;
+  --lk-panel-alt: #171b22;
+  --lk-elevated: #1b1f27;
+  --lk-zebra: #171a21;
+  --lk-code-bg: #11141a;
+  --lk-overlay: rgba(0, 0, 0, 0.62);
+
+  /* Texto */
+  --lk-text: #eef0f4;
+  --lk-muted: #a2a9b8;
+  --lk-faint: #8a93a3;
+  --lk-inverse: #0d0f13;
+
+  /* Linhas e foco */
+  --lk-border: #262b34;
+  --lk-border-strong: #39414d;
+  --lk-focus: #7aa2f7;
+
+  /* Sombras */
+  --lk-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 8px rgba(0, 0, 0, 0.35);
+  --lk-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55);
+
+  /* Hero */
+  --lk-hero-from: #5c0a13;
+  --lk-hero-to: #a81026;
+  --lk-hero-text: #ffffff;
+
+  /* Series de custo (barra de status, graficos) */
+  --lk-series-1: #ff5a70;
+  --lk-series-2: #7aa2f7;
+  --lk-series-3: #4ade80;
+  --lk-series-4: #fbbf24;
+  --lk-series-5: #c4a6ff;
+  --lk-series-6: #5eead4;
+  --lk-series-7: #f9a8d4;
+  --lk-series-8: #bef264;
+}

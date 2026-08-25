@@ -15,11 +15,13 @@ htmlcov
 !.env.example
 *.db
 *.sqlite*
-var/
-data/
-media/
-logs/
-tmp/
+# Ancorados na raiz: um padrao solto casa em qualquer profundidade e excluiria
+# src/lukato/adapters/media/ da imagem — o mesmo erro que o .gitignore cometeu.
+/var/
+/data/
+/media/
+/logs/
+/tmp/
 docs/
 specs/
 tests/

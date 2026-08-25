@@ -1,0 +1,288 @@
+{#-
+  pages/identity.html — usuarios, papeis e chaves de API (`GET /identity`).
+
+  Contexto entregue pela rota:
+    `users`     `Page[User]`.
+    `api_keys`  `Page[ApiKey]` na forma publica — sem segredo e sem hash.
+    `roles`     membros de `Role`, para os seletores de papel.
+
+  Opcional (preenchido pela resposta da criacao de uma chave):
+    `created_api_key`  `{name, prefix, role, secret, warning, ...}`.
+
+  Regra que organiza a tela: **o segredo aparece uma unica vez**. A listagem
+  mostra prefixo, papel e validade; o segredo inteiro so existe no instante da
+  criacao, em destaque, com o aviso de que nao sera exibido de novo — porque nao
+  e recuperavel: o banco guarda apenas o prefixo e o hash.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set created = created_api_key | default(none, true) -%}
+{%- set active_users = users.items | selectattr('is_active') | list | length -%}
+{%- set active_keys = api_keys.items | selectattr('is_active') | list | length -%}
+
+{% block hero %}
+  {% call hero(
+       'Identidade e acesso',
+       subtitle='Quem entra, com qual papel e por qual credencial.',
+       metrics=[
+         ('Usuários', users.total | number),
+         ('Ativos', active_users | number),
+         ('Chaves de API', api_keys.total | number),
+         ('Autenticação', 'ligada' if auth_enabled else 'desligada')
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/settings">Ver configuração</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--identity lk-stack">
+    {% if created %}
+      {% call card('Chave criada — copie agora', dot='warn') %}
+        <p class="lk-finding lk-finding--block">
+          {{ created.get('warning', 'Guarde a chave agora: ela não será exibida novamente.') }}
+        </p>
+        <p class="lk-label">Segredo</p>
+        <pre class="lk-mono">{{ created.get('secret', '') }}</pre>
+        <dl class="lk-kv">
+          <dt>Nome</dt>
+          <dd>{{ created.get('name', '—') }}</dd>
+          <dt>Prefixo</dt>
+          <dd class="lk-mono">{{ created.get('prefix', '—') }}</dd>
+          <dt>Papel</dt>
+          <dd>{{ created.get('role', '—') }}</dd>
+        </dl>
+        <p class="lk-hint">
+          Envie a chave no cabeçalho de API desta instalação. Ela não é recuperável: perdida,
+          o caminho é rotacionar, o que invalida a anterior no mesmo instante.
+        </p>
+      {% endcall %}
+    {% endif %}
+
+    {% if not auth_enabled %}
+      {% call card('Autenticação desligada', dot='warn') %}
+        <p class="lk-finding">
+          Esta instalação resolve um operador root anônimo para toda requisição. Usuários e
+          chaves continuam sendo cadastrados e listados, mas nada é exigido para entrar.
+        </p>
+        <p class="lk-hint">
+          A autenticação é ligada por variável de ambiente e não por esta tela.
+        </p>
+      {% endcall %}
+    {% endif %}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card('Usuários', flush=true) %}
+        {% if users.items %}
+          {% call table([
+               'Nome',
+               'E-mail',
+               {'label': 'Papel'},
+               {'label': 'Situação'},
+               {'label': 'Criado', 'align': 'right'},
+               {'label': 'Ações', 'width': '14%'}
+             ], clickable=true, caption='Usuários cadastrados') %}
+            {% for item in users.items %}
+              <tr {{ row_attrs('user', item.id, selected_id) }}>
+                <td>{{ cell_link('user', item.id, item.name) }}</td>
+                <td class="lk-mono lk-truncate">{{ item.email }}</td>
+                <td>{{ item.role.value }}</td>
+                <td>
+                  {{ badge('active' if item.is_active else 'paused',
+                           label='ativo' if item.is_active else 'inativo') }}
+                </td>
+                <td class="lk-right lk-nowrap">{{ item.created_at | timeago }}</td>
+                <td>
+                  <form method="post" action="/api/v1/identity/users/{{ item.id }}">
+                    <input type="hidden" name="_method" value="delete" />
+                    <button
+                      class="lk-btn lk-btn--danger lk-btn--sm"
+                      type="submit"
+                      data-confirm="Remover o usuário {{ item.email }}?"
+                    >
+                      Remover
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        {% else %}
+          {{ empty(
+               'Nenhum usuário cadastrado',
+               'Cadastre o primeiro operador ao lado. Sem usuário, só a chave de API abre a porta.',
+               name='users'
+             ) }}
+        {% endif %}
+      {% endcall %}
+
+      {% call card('Novo usuário') %}
+        <form class="lk-stack" method="post" action="/api/v1/identity/users">
+          <div class="lk-field">
+            <label for="user-name">Nome</label>
+            <input class="lk-input" id="user-name" name="name" type="text" required />
+          </div>
+
+          <div class="lk-field">
+            <label for="user-email">E-mail</label>
+            <input class="lk-input lk-input--mono" id="user-email" name="email" type="email" required />
+          </div>
+
+          <div class="lk-field">
+            <label for="user-role">Papel</label>
+            <select class="lk-select" id="user-role" name="role">
+              {% for role in roles %}
+                <option value="{{ role.value }}" {{ 'selected' if role.value == 'viewer' else '' }}>
+                  {{ role.value }}
+                </option>
+              {% endfor %}
+            </select>
+            <span class="lk-field__hint">
+              <span class="lk-mono">viewer</span> só lê; <span class="lk-mono">operator</span>
+              invoca módulos e escreve conhecimento; <span class="lk-mono">admin</span> e
+              <span class="lk-mono">root</span> recebem tudo.
+            </span>
+          </div>
+
+          <div class="lk-field">
+            <label for="user-password">Senha</label>
+            <input
+              class="lk-input"
+              id="user-password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              required
+            />
+            <span class="lk-field__hint">Guardada apenas como hash; nunca é exibida.</span>
+          </div>
+
+          <button class="lk-btn lk-btn--primary" type="submit">Cadastrar usuário</button>
+        </form>
+      {% endcall %}
+    </div>
+
+    {{ pagination(users, label='usuários') }}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card('Chaves de API', flush=true) %}
+        {% if api_keys.items %}
+          {% call table([
+               'Nome',
+               {'label': 'Prefixo'},
+               {'label': 'Papel'},
+               {'label': 'Situação'},
+               {'label': 'Último uso', 'align': 'right'},
+               {'label': 'Expira', 'align': 'right'},
+               {'label': 'Ações', 'width': '16%'}
+             ], clickable=true, caption='Chaves de API — o segredo não é armazenado') %}
+            {% for item in api_keys.items %}
+              <tr {{ row_attrs('apikey', item.id, selected_id) }}>
+                <td>{{ cell_link('apikey', item.id, item.name) }}</td>
+                <td class="lk-mono">{{ item.prefix }}</td>
+                <td>{{ item.role.value }}</td>
+                <td>
+                  {{ badge('active' if item.is_active else 'paused',
+                           label='ativa' if item.is_active else 'revogada') }}
+                </td>
+                <td class="lk-right lk-nowrap">
+                  {% if item.last_used_at %}{{ item.last_used_at | timeago }}
+                  {% else %}<span class="lk-hint">nunca</span>{% endif %}
+                </td>
+                <td class="lk-right lk-nowrap">
+                  {% if item.expires_at %}{{ item.expires_at | datetime_br('%d/%m/%Y') }}
+                  {% else %}<span class="lk-hint">sem prazo</span>{% endif %}
+                </td>
+                <td>
+                  <span class="lk-row lk-row--wrap">
+                    <form method="post" action="/api/v1/identity/api-keys/{{ item.id }}/rotate">
+                      <button
+                        class="lk-btn lk-btn--ghost lk-btn--sm"
+                        type="submit"
+                        data-confirm="Rotacionar {{ item.name }}? A chave atual deixa de valer imediatamente."
+                      >
+                        Rotacionar
+                      </button>
+                    </form>
+                    <form method="post" action="/api/v1/identity/api-keys/{{ item.id }}">
+                      <input type="hidden" name="_method" value="delete" />
+                      <button
+                        class="lk-btn lk-btn--danger lk-btn--sm"
+                        type="submit"
+                        data-confirm="Revogar {{ item.name }}?"
+                      >
+                        Revogar
+                      </button>
+                    </form>
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        {% else %}
+          {{ empty(
+               'Nenhuma chave de API',
+               'Crie uma chave para integrações que não têm sessão de usuário.',
+               name='plug'
+             ) }}
+        {% endif %}
+        <p class="lk-card__foot">
+          A tabela não mostra segredo algum: apenas o prefixo, que identifica a chave sem
+          revelá-la.
+        </p>
+      {% endcall %}
+
+      {% call card('Nova chave de API') %}
+        <form class="lk-stack" method="post" action="/api/v1/identity/api-keys">
+          <div class="lk-field">
+            <label for="key-name">Nome</label>
+            <input
+              class="lk-input"
+              id="key-name"
+              name="name"
+              type="text"
+              placeholder="Integração ERP"
+              required
+            />
+            <span class="lk-field__hint">Diga para que serve: é por este nome que ela é revogada.</span>
+          </div>
+
+          <div class="lk-field">
+            <label for="key-role">Papel</label>
+            <select class="lk-select" id="key-role" name="role">
+              {% for role in roles %}
+                <option value="{{ role.value }}" {{ 'selected' if role.value == 'operator' else '' }}>
+                  {{ role.value }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lk-field">
+            <label for="key-expires">Validade</label>
+            <input class="lk-input lk-input--mono" id="key-expires" name="expires_at" type="date" />
+            <span class="lk-field__hint">Em branco, a chave não expira.</span>
+          </div>
+
+          <button class="lk-btn lk-btn--primary" type="submit">Criar chave</button>
+
+          <p class="lk-finding">
+            O segredo é exibido uma única vez, logo após a criação, no topo desta tela. Ele não
+            é armazenado e não pode ser recuperado depois.
+          </p>
+        </form>
+      {% endcall %}
+    </div>
+
+    {{ pagination(api_keys, label='chaves') }}
+  </div>
+{% endblock %}
+
+{% block context_title %}Identidade{% endblock %}

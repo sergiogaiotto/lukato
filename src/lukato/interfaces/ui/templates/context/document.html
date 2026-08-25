@@ -1,0 +1,76 @@
+{#-
+  context/document.html — detalhe de um documento da base de conhecimento.
+
+  `context_item` e um `Document`. O conteudo inteiro nao cabe na coluna: o painel
+  mostra um trecho inicial e guarda o texto completo no bloco colapsavel.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhum documento selecionado',
+       'Escolha um documento na tabela para ver aqui a coleção, a origem e o checksum que sustenta a ingestão idempotente.',
+       name='book',
+       action_href='/knowledge',
+       action_label='Ver conhecimento'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.title }}</span>
+    {{ badge('info', label=item.collection, title='Coleção do documento.') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Coleção</dt>
+    <dd class="lk-mono">{{ item.collection }}</dd>
+    <dt>Origem</dt>
+    <dd class="lk-mono">{{ item.source if item.source else '(manual)' }}</dd>
+    <dt>Tamanho</dt>
+    <dd class="lk-mono">{{ item.content | length | number }} caracteres</dd>
+    <dt>Checksum</dt>
+    <dd class="lk-mono">{{ item.checksum | default('—', true) | truncate_mid(18) }}</dd>
+    <dt>Ingerido</dt>
+    <dd>{{ item.created_at | timeago }}</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__section">
+    <p class="lk-label">Trecho</p>
+    <p class="lk-hit__snippet">{{ item.content | truncate(360) }}</p>
+  </div>
+
+  {% if item.metadata %}
+    <div class="lk-context__section">
+      <p class="lk-label">Metadados</p>
+      <dl class="lk-kv">
+        {% for key, value in item.metadata.items() %}
+          <dt>{{ key }}</dt>
+          <dd class="lk-mono">{{ value }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="/knowledge?collection={{ item.collection }}">
+      Ver a coleção
+    </a>
+    <form method="post" action="/api/v1/knowledge/documents/{{ item.id }}/reindex">
+      <button class="lk-btn lk-btn--ghost lk-btn--sm" type="submit">Reindexar</button>
+    </form>
+  </div>
+
+  <details class="lk-details">
+    <summary>Conteúdo completo</summary>
+    <pre>{{ item.content }}</pre>
+  </details>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

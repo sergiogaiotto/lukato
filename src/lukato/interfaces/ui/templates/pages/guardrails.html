@@ -1,0 +1,597 @@
+{#-
+  pages/guardrails.html — politicas, editor de regras e testador de veredito
+  (SPEC-0009 secao 8, rota `GET /guardrails`).
+
+  Contexto entregue por `router.guardrails_page`, alem da moldura de `base_context`:
+
+  | Chave        | Tipo                     | Uso na tela |
+  | ------------ | ------------------------ | ----------- |
+  | `policies`   | Page[GuardrailPolicy]    | lista, paginacao e alvo do editor |
+  | `rule_kinds` | list[Json]               | catalogo `{kind, descricao, config_schema, acoes_suportadas}` |
+  | `stages`     | list[GuardrailStage]     | opcoes de estagio |
+  | `filters`    | dict `{q, stage, active}`| estado da barra de filtros |
+
+  Opcionais, entregues pelo manipulador do POST do testador: `verdict`
+  (`GuardrailVerdict`) e `tested_content` (o texto submetido).
+
+  A politica em edicao e a selecionada por `?sel=<id>` — o mesmo parametro do
+  painel de contexto, entao a lista alimenta o editor sem JavaScript.
+
+  FORMULARIOS
+
+  * filtros — `GET /guardrails`.
+  * editor  — politica nova vai para `POST /api/v1/guardrails`; politica em
+              edicao vai para `/api/v1/guardrails/{id}` com `_method=put`.
+              Campos da politica: `slug`, `name`, `description`, `stage`,
+              `is_active`, `fail_open`.
+              As regras viajam em **listas paralelas**: `rule_id`, `rule_kind`,
+              `rule_action`, `rule_severity`, `rule_order`, `rule_enabled`,
+              `rule_message` e `rule_config` repetem-se uma vez por regra, na mesma
+              ordem. O manipulador junta os campos pelo indice e descarta as linhas
+              sem `rule_id` — e assim que a linha em branco do fim vira regra nova.
+              `rule_enabled` e um `<select>`, e nao uma caixa de marcar: caixa
+              desmarcada nao e enviada e desalinharia as listas.
+  * testador — `POST /api/v1/guardrails/test`, com `content`, `policy` e `stage`.
+
+  `_method` e o campo oculto que o console usa quando o verbo da API nao existe em
+  HTML — formulario so sabe `GET` e `POST`.
+
+  As gravidades sao o enum normativo `GuardrailSeverity` (SPEC-0000 secao 6.3), que
+  a rota nao entrega; as acoes saem do catalogo de tipos de regra quando ele existe.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card, card_foot -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+{%- from "partials/pagination.html" import pagination with context -%}
+{%- from "partials/table.html" import cell_link, row_attrs, table with context -%}
+
+{%- set gravidades = ['low', 'medium', 'high', 'critical'] -%}
+{%- set acoes_catalogo = rule_kinds | map(attribute='acoes_suportadas') | sum(start=[]) | unique | list -%}
+{%- set acoes = acoes_catalogo if acoes_catalogo else ['allow', 'warn', 'redact', 'transform', 'block'] -%}
+{%- set tipos = rule_kinds | map(attribute='kind') | list -%}
+{%- set verdict = verdict | default(none) -%}
+{%- set tested_content = tested_content | default('') -%}
+{%- set selecionadas = policies.items | selectattr('id', 'equalto', selected_id) | list -%}
+{%- set policy_atual = selecionadas[0] if selecionadas else none -%}
+
+{% block hero %}
+  {% call hero(
+       'Guardrails',
+       subtitle='Uma política é um conjunto ordenado de regras. Nada entra no modelo nem sai dele sem passar por elas.',
+       metrics=[
+         ('Nesta busca', policies.total | number),
+         ('Tipos de regra', rule_kinds | length),
+         ('Em edição', policy_atual.slug if policy_atual else '—'),
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="{{ query_url(request, sel=none) }}#editor">Nova política</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/guardrails" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filtro-busca">Busca</label>
+      <input
+        class="lk-input"
+        type="search"
+        id="filtro-busca"
+        name="q"
+        value="{{ filters.q }}"
+        placeholder="slug, nome ou descrição"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filtro-estagio">Estágio</label>
+      <select class="lk-select" id="filtro-estagio" name="stage">
+        <option value="">todos</option>
+        {% for stage in stages %}
+          <option value="{{ stage.value }}" {{ 'selected' if filters.stage == stage.value }}>
+            {{ 'entrada' if stage.value == 'input' else 'saída' }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filtro-ativa">Situação</label>
+      <select class="lk-select" id="filtro-ativa" name="active">
+        <option value="">todas</option>
+        <option value="sim" {{ 'selected' if filters.active == 'sim' }}>ativas</option>
+        <option value="nao" {{ 'selected' if filters.active == 'nao' }}>inativas</option>
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/guardrails">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="lk-stack">
+  {% call card('Políticas', flush=true) %}
+    {% if policies.items %}
+      {% call table([
+           'Nome',
+           'Slug',
+           {'label': 'Estágio'},
+           {'label': 'Regras', 'align': 'num'},
+           {'label': 'Falha'},
+           {'label': 'Situação'},
+           {'label': 'Atualizado', 'align': 'right'},
+         ], clickable=true, caption='Políticas de guardrail cadastradas') %}
+        {% for policy in policies.items %}
+          <tr {{ row_attrs('guardrail', policy.id, selected_id) }}>
+            <td>{{ cell_link('guardrail', policy.id, policy.name or policy.slug) }}</td>
+            <td class="lk-mono">{{ policy.slug }}</td>
+            <td>{{ 'entrada' if policy.stage.value == 'input' else 'saída' }}</td>
+            <td class="lk-table__num">{{ policy.rules | length }}</td>
+            <td>
+              {{ badge('warn' if policy.fail_open else 'ok',
+                       label='fail-open' if policy.fail_open else 'fail-closed',
+                       title='fail-closed bloqueia quando a própria regra falha') }}
+            </td>
+            <td>{{ badge('true' if policy.is_active else 'false', label='ativa' if policy.is_active else 'inativa') }}</td>
+            <td class="lk-right lk-nowrap">{{ policy.updated_at | timeago }}</td>
+          </tr>
+        {% endfor %}
+      {% endcall %}
+      {{ pagination(policies, label='políticas') }}
+    {% elif filters.q or filters.stage or filters.active %}
+      {{ empty(
+           'Nenhuma política com esses filtros',
+           'Ajuste a busca, o estágio ou a situação para encontrar a política que procura.',
+           name='filter',
+           action_href='/guardrails',
+           action_label='Limpar filtros'
+         ) }}
+    {% else %}
+      {{ empty(
+           'Nenhuma política cadastrada',
+           'Sem política, o estágio fica permissivo: tudo passa. Crie a primeira no editor abaixo e vincule-a a um módulo.',
+           name='shield',
+           action_href='#editor',
+           action_label='Criar a primeira'
+         ) }}
+    {% endif %}
+  {% endcall %}
+
+  {#- ------------------------------------------------------------------ EDITOR -#}
+  {% set editor_actions %}
+    {% if policy_atual %}
+      <a class="lk-btn lk-btn--ghost lk-btn--sm" href="{{ query_url(request, sel=none) }}#editor">
+        Nova
+      </a>
+    {% endif %}
+  {% endset %}
+  {% call card(
+       'Editor · ' ~ (policy_atual.slug if policy_atual else 'nova política'),
+       actions=editor_actions,
+       id='editor'
+     ) %}
+    <form
+      method="post"
+      action="/api/v1/guardrails{{ '/' ~ policy_atual.id if policy_atual else '' }}"
+      class="lk-stack"
+    >
+      {% if policy_atual %}
+        <input type="hidden" name="_method" value="put" />
+      {% endif %}
+
+      <div class="lk-form-grid">
+        <div class="lk-field">
+          <label for="policy-nome">Nome</label>
+          <input
+            class="lk-input"
+            type="text"
+            id="policy-nome"
+            name="name"
+            value="{{ policy_atual.name if policy_atual else '' }}"
+            placeholder="Entrada padrão"
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="policy-slug">Slug</label>
+          <input
+            class="lk-input lk-input--mono"
+            type="text"
+            id="policy-slug"
+            name="slug"
+            required
+            value="{{ policy_atual.slug if policy_atual else '' }}"
+            {{ 'readonly' if policy_atual }}
+            placeholder="entrada-padrao"
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="policy-estagio">Estágio</label>
+          <select class="lk-select" id="policy-estagio" name="stage">
+            {% for stage in stages %}
+              <option
+                value="{{ stage.value }}"
+                {{ 'selected' if (policy_atual.stage.value if policy_atual else 'input') == stage.value }}
+              >
+                {{ 'entrada' if stage.value == 'input' else 'saída' }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="lk-field">
+        <label for="policy-descricao">Descrição</label>
+        <input
+          class="lk-input"
+          type="text"
+          id="policy-descricao"
+          name="description"
+          value="{{ policy_atual.description if policy_atual else '' }}"
+          placeholder="O que esta política protege."
+        />
+      </div>
+
+      <div class="lk-row lk-row--wrap">
+        <label class="lk-row">
+          <input
+            type="checkbox"
+            name="is_active"
+            value="true"
+            {{ 'checked' if (policy_atual.is_active if policy_atual else true) }}
+          />
+          <span>Política ativa</span>
+        </label>
+        <label class="lk-row">
+          <input
+            type="checkbox"
+            name="fail_open"
+            value="true"
+            {{ 'checked' if (policy_atual.fail_open if policy_atual else false) }}
+          />
+          <span>fail-open — erro interno da regra deixa passar</span>
+        </label>
+      </div>
+
+      <p class="lk-label">Regras</p>
+      {% if not policy_atual or not policy_atual.rules %}
+        <p class="lk-hint">
+          Nenhuma regra ainda. A linha em branco abaixo cria a primeira; a ordem define a
+          sequência de avaliação.
+        </p>
+      {% endif %}
+
+      {% for rule in (policy_atual.rules if policy_atual else []) %}
+        <details class="lk-details">
+          <summary>
+            {{ rule.id }} · {{ rule.kind.value }} · {{ rule.action.value }}
+            {{ '(desligada)' if not rule.enabled else '' }}
+          </summary>
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="regra-id-{{ loop.index }}">Identificador</label>
+              <input
+                class="lk-input lk-input--mono"
+                type="text"
+                id="regra-id-{{ loop.index }}"
+                name="rule_id"
+                value="{{ rule.id }}"
+              />
+              <span class="lk-field__hint">Apagar o identificador remove a regra ao salvar.</span>
+            </div>
+
+            <div class="lk-field">
+              <label for="regra-tipo-{{ loop.index }}">Tipo</label>
+              <select class="lk-select" id="regra-tipo-{{ loop.index }}" name="rule_kind">
+                {% for tipo in tipos %}
+                  <option value="{{ tipo }}" {{ 'selected' if tipo == rule.kind.value }}>
+                    {{ tipo }}
+                  </option>
+                {% endfor %}
+                {% if rule.kind.value not in tipos %}
+                  <option value="{{ rule.kind.value }}" selected>{{ rule.kind.value }}</option>
+                {% endif %}
+              </select>
+            </div>
+
+            <div class="lk-field">
+              <label for="regra-acao-{{ loop.index }}">Ação</label>
+              <select class="lk-select" id="regra-acao-{{ loop.index }}" name="rule_action">
+                {% for acao in acoes %}
+                  <option value="{{ acao }}" {{ 'selected' if acao == rule.action.value }}>
+                    {{ acao }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="lk-field">
+              <label for="regra-gravidade-{{ loop.index }}">Gravidade</label>
+              <select class="lk-select" id="regra-gravidade-{{ loop.index }}" name="rule_severity">
+                {% for gravidade in gravidades %}
+                  <option value="{{ gravidade }}" {{ 'selected' if gravidade == rule.severity.value }}>
+                    {{ gravidade }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="lk-field">
+              <label for="regra-ordem-{{ loop.index }}">Ordem</label>
+              <input
+                class="lk-input"
+                type="number"
+                id="regra-ordem-{{ loop.index }}"
+                name="rule_order"
+                step="1"
+                value="{{ rule.order }}"
+              />
+            </div>
+
+            <div class="lk-field">
+              <label for="regra-ligada-{{ loop.index }}">Situação</label>
+              <select class="lk-select" id="regra-ligada-{{ loop.index }}" name="rule_enabled">
+                <option value="true" {{ 'selected' if rule.enabled }}>ligada</option>
+                <option value="false" {{ 'selected' if not rule.enabled }}>desligada</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-mensagem-{{ loop.index }}">Mensagem</label>
+            <input
+              class="lk-input"
+              type="text"
+              id="regra-mensagem-{{ loop.index }}"
+              name="rule_message"
+              value="{{ rule.message }}"
+              placeholder="Texto mostrado quando a regra dispara."
+            />
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-config-{{ loop.index }}">Configuração (JSON)</label>
+            <textarea
+              class="lk-textarea"
+              id="regra-config-{{ loop.index }}"
+              name="rule_config"
+              rows="3"
+              spellcheck="false"
+            >{{ rule.config | json_pretty }}</textarea>
+          </div>
+        </details>
+      {% endfor %}
+
+      <details class="lk-details" open>
+        <summary>Nova regra</summary>
+        <div class="lk-form-grid">
+          <div class="lk-field">
+            <label for="regra-nova-id">Identificador</label>
+            <input
+              class="lk-input lk-input--mono"
+              type="text"
+              id="regra-nova-id"
+              name="rule_id"
+              value=""
+              placeholder="pii"
+            />
+            <span class="lk-field__hint">Em branco, a linha é ignorada ao salvar.</span>
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-nova-tipo">Tipo</label>
+            <select class="lk-select" id="regra-nova-tipo" name="rule_kind">
+              {% for tipo in tipos %}
+                <option value="{{ tipo }}">{{ tipo }}</option>
+              {% endfor %}
+              {% if not tipos %}
+                <option value="">catálogo indisponível</option>
+              {% endif %}
+            </select>
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-nova-acao">Ação</label>
+            <select class="lk-select" id="regra-nova-acao" name="rule_action">
+              {% for acao in acoes %}
+                <option value="{{ acao }}" {{ 'selected' if acao == 'block' }}>{{ acao }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-nova-gravidade">Gravidade</label>
+            <select class="lk-select" id="regra-nova-gravidade" name="rule_severity">
+              {% for gravidade in gravidades %}
+                <option value="{{ gravidade }}" {{ 'selected' if gravidade == 'medium' }}>
+                  {{ gravidade }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-nova-ordem">Ordem</label>
+            <input
+              class="lk-input"
+              type="number"
+              id="regra-nova-ordem"
+              name="rule_order"
+              step="1"
+              value="{{ (policy_atual.rules | length) + 1 if policy_atual else 1 }}"
+            />
+          </div>
+
+          <div class="lk-field">
+            <label for="regra-nova-ligada">Situação</label>
+            <select class="lk-select" id="regra-nova-ligada" name="rule_enabled">
+              <option value="true" selected>ligada</option>
+              <option value="false">desligada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="lk-field">
+          <label for="regra-nova-mensagem">Mensagem</label>
+          <input
+            class="lk-input"
+            type="text"
+            id="regra-nova-mensagem"
+            name="rule_message"
+            value=""
+            placeholder="Texto mostrado quando a regra dispara."
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="regra-nova-config">Configuração (JSON)</label>
+          <textarea
+            class="lk-textarea"
+            id="regra-nova-config"
+            name="rule_config"
+            rows="3"
+            spellcheck="false"
+          >{}</textarea>
+        </div>
+      </details>
+
+      <div class="lk-row lk-row--wrap">
+        <button class="lk-btn lk-btn--primary" type="submit">
+          {{ 'Salvar política' if policy_atual else 'Criar política' }}
+        </button>
+        <span class="lk-hint">
+          Salvar substitui o conjunto inteiro de regras. Os módulos vinculados passam a
+          usar as novas na próxima execução.
+        </span>
+      </div>
+    </form>
+
+    {% if rule_kinds %}
+      <details class="lk-details">
+        <summary>Catálogo de tipos de regra</summary>
+        <dl class="lk-kv">
+          {% for entry in rule_kinds %}
+            <dt class="lk-mono">{{ entry.kind }}</dt>
+            <dd>
+              {{ entry.descricao }}
+              <span class="lk-capabilities">
+                {% for acao in entry.acoes_suportadas %}
+                  <span class="lk-capability">{{ acao }}</span>
+                {% endfor %}
+              </span>
+              {% if entry.config_schema %}
+                <details class="lk-details">
+                  <summary>config</summary>
+                  <pre>{{ entry.config_schema | json_pretty }}</pre>
+                </details>
+              {% endif %}
+            </dd>
+          {% endfor %}
+        </dl>
+      </details>
+    {% endif %}
+  {% endcall %}
+
+  {#- ---------------------------------------------------------------- TESTADOR -#}
+  {% call card('Testador', dot='ai') %}
+    <form method="post" action="/api/v1/guardrails/test" class="lk-stack">
+      <div class="lk-form-grid">
+        <div class="lk-field">
+          <label for="teste-politica">Política</label>
+          <select class="lk-select" id="teste-politica" name="policy">
+            <option value="">nenhuma (caminho permissivo)</option>
+            {% for policy in policies.items %}
+              <option
+                value="{{ policy.slug }}"
+                {{ 'selected' if policy_atual and policy.id == policy_atual.id }}
+              >
+                {{ policy.name or policy.slug }} · {{ 'entrada' if policy.stage.value == 'input' else 'saída' }}
+              </option>
+            {% endfor %}
+          </select>
+          <span class="lk-field__hint">Testar não grava nada e não altera a política.</span>
+        </div>
+
+        <div class="lk-field">
+          <label for="teste-estagio">Estágio</label>
+          <select class="lk-select" id="teste-estagio" name="stage">
+            {% for stage in stages %}
+              <option
+                value="{{ stage.value }}"
+                {{ 'selected' if (policy_atual.stage.value if policy_atual else 'input') == stage.value }}
+              >
+                {{ 'entrada' if stage.value == 'input' else 'saída' }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="lk-field">
+        <label for="teste-conteudo">Conteúdo</label>
+        <textarea
+          class="lk-textarea"
+          id="teste-conteudo"
+          name="content"
+          rows="5"
+          required
+          placeholder="Cole aqui o texto que a política deveria barrar ou redigir."
+        >{{ tested_content }}</textarea>
+      </div>
+
+      <div class="lk-row">
+        <button class="lk-btn lk-btn--outline" type="submit">Testar</button>
+      </div>
+    </form>
+
+    {% if verdict %}
+      <div class="lk-context__section">
+        <div class="lk-row lk-row--wrap">
+          {{ badge('allow' if verdict.allowed else 'block',
+                   label='permitido' if verdict.allowed else 'bloqueado') }}
+          <span class="lk-capability">{{ 'entrada' if verdict.stage.value == 'input' else 'saída' }}</span>
+          <span class="lk-hint">{{ verdict.latency_ms | number(1) }} ms</span>
+          {% if verdict.content != verdict.original_content %}
+            <span class="lk-capability">conteúdo alterado</span>
+          {% endif %}
+        </div>
+
+        <p class="lk-label">Conteúdo final</p>
+        <pre class="lk-result">{{ verdict.content }}</pre>
+
+        {% if verdict.findings %}
+          <p class="lk-label">Achados</p>
+          <div class="lk-findings">
+            {% for finding in verdict.findings %}
+              <div class="lk-finding {{ 'lk-finding--block' if finding.action.value == 'block' }}">
+                <span class="lk-grow">
+                  <b>{{ finding.rule_id }}</b> · {{ finding.kind.value }} —
+                  {{ finding.message or 'sem mensagem' }}
+                  {% if finding.evidence %}
+                    <span class="lk-hint lk-mono">evidência: {{ finding.evidence | truncate_mid(72) }}</span>
+                  {% endif %}
+                </span>
+                {{ badge(finding.action) }}
+                <span class="lk-capability">{{ finding.severity.value }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="lk-hint">Nenhuma regra disparou sobre este conteúdo.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      {% call card_foot() %}
+        O resultado mostra permitido ou bloqueado, o conteúdo final já redigido e cada achado
+        com regra, ação, gravidade e evidência.
+      {% endcall %}
+    {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

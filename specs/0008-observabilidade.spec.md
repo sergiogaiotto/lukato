@@ -66,6 +66,10 @@ valor concreto.
 ## 6. Criterios de aceite
 
 1. Sem credenciais Langfuse, a aplicacao sobe e `/readyz` reporta `tracer: degraded`.
-2. Toda invocacao devolve `X-Trace-Id`.
+2. Toda invocacao devolve `X-Run-Id`. `X-Trace-Id` sai **quando ha tracer ativo** —
+   com o `NoopTracer` nao existe trace, e devolver um id inventado mandaria quem
+   opera procurar um rastro que nunca foi gravado. O `AgentRun` e persistido em
+   toda invocacao (inclusive nas bloqueadas), entao `X-Run-Id` e o identificador
+   de correlacao que nunca falta.
 3. `/metrics` expoe todas as metricas da secao 4 apos uma invocacao.
 4. Erro do provedor de telemetria nao altera o status HTTP da requisicao de negocio.

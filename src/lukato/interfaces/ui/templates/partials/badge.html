@@ -1,0 +1,27 @@
+{#-
+  partials/badge.html — pill de estado (SPEC-0009 secao 6).
+
+      {% from "partials/badge.html" import badge, dot %}
+      {{ badge(run.status) }}
+      {{ badge(module.status, label='Publicado') }}
+
+  A variante de cor sai do filtro `badge_class`, que conhece os enums de dominio
+  (`RunStatus`, `ModuleStatus`, `GuardrailAction`, `DetectionStatus`, saude). Um
+  valor desconhecido cai em `--neutral` em vez de ficar sem estilo.
+-#}
+
+{% macro badge(value, label=none, title='') -%}
+{%- set text = label if label is not none else (value.value if value is not string and value is not none and value.value is defined else value) -%}
+<span class="lk-badge {{ value | badge_class }}"{% if title %} title="{{ title }}"{% endif %}>
+  {{- text if text is not none else '—' -}}
+</span>
+{%- endmacro %}
+
+{#- Ponto colorido isolado, para cabecalhos de cartao e legendas. -#}
+{% macro dot(kind='neutral', title='') -%}
+<span
+  class="lk-dot lk-dot--{{ kind }}"
+  {% if title %}title="{{ title }}"{% endif %}
+  aria-hidden="true"
+></span>
+{%- endmacro %}

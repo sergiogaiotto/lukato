@@ -1,0 +1,77 @@
+{#-
+  context/guardrail.html — detalhe de uma politica de guardrail no painel direito.
+
+  `context_item` e uma `GuardrailPolicy`. As regras aparecem em lista compacta:
+  o que importa na coluna e saber **o que dispara** e **o que acontece** quando
+  dispara, nao a configuracao completa de cada avaliador (essa fica no JSON).
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhuma política selecionada',
+       'Escolha uma política na tabela para ver aqui o estágio, as regras e o modo de falha.',
+       name='shield',
+       action_href='/guardrails',
+       action_label='Ver guardrails'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.name }}</span>
+    {{ badge('active' if item.is_active else 'paused',
+             label='ativa' if item.is_active else 'inativa') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Slug</dt>
+    <dd class="lk-mono">{{ item.slug }}</dd>
+    <dt>Estágio</dt>
+    <dd>{{ 'entrada' if item.stage.value == 'input' else 'saída' }}</dd>
+    <dt>Regras</dt>
+    <dd class="lk-mono">{{ item.rules | length | number }}</dd>
+    <dt>Modo de falha</dt>
+    <dd>{{ 'fail-open' if item.fail_open else 'fail-closed' }}</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  {% if item.description %}
+    <div class="lk-context__section">
+      <p class="lk-label">Descrição</p>
+      <p class="lk-muted">{{ item.description }}</p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__section">
+    <p class="lk-label">Regras</p>
+    {% if item.rules %}
+      <dl class="lk-kv">
+        {% for rule in item.rules | sort(attribute='order') %}
+          <dt class="lk-mono">{{ rule.id | truncate_mid(16) }}</dt>
+          <dd>
+            <span class="lk-mono">{{ rule.kind.value }}</span>
+            {{ badge(rule.action.value) }}
+            <span class="lk-hint">
+              {{ rule.severity.value }}{{ ' · desligada' if not rule.enabled else '' }}
+            </span>
+          </dd>
+        {% endfor %}
+      </dl>
+    {% else %}
+      <p class="lk-hint">Política sem regras: nada é avaliado neste estágio.</p>
+    {% endif %}
+  </div>
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="/guardrails?sel={{ item.id }}">Abrir no editor</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs?status=blocked">Bloqueios recentes</a>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

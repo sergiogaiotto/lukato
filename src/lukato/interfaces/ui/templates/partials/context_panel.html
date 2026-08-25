@@ -1,0 +1,75 @@
+{#-
+  partials/context_panel.html — corpo padrao do painel de contexto (SPEC-0009 secao 7).
+
+  Ordem de resolucao:
+
+  1. existe `templates/context/<entidade>.html`  -> renderiza esse fragmento;
+  2. nao existe, mas ha item selecionado         -> retrato generico do item
+     (titulo, estado, identificadores e o JSON bruto colapsavel);
+  3. nao ha selecao                              -> convite a selecionar uma linha.
+
+  O passo 2 nao e enfeite: enquanto os fragmentos por entidade nao existem — ou
+  quando uma entidade nova aparece — o painel continua util em vez de ficar em
+  branco. `json_pretty` ja remove chaves sensiveis antes de imprimir.
+
+  Este mesmo arquivo responde ao fragmento `GET /ui/context/{entity}/{id}` quando
+  o template especifico ainda nao existe, entao ele nunca pode depender das
+  variaveis de pagina (`nav_sections`, `health`, ...).
+-#}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/badge.html" import badge -%}
+
+{%- set fragment_template = context_template | default('', true) -%}
+
+{% if fragment_template and template_exists(fragment_template) %}
+  {% include fragment_template %}
+{% elif context_item %}
+  {%- set item = context_item -%}
+  {%- set title =
+        item.name if item.name is defined and item.name
+        else (item.title if item.title is defined and item.title
+        else (item.slug if item.slug is defined and item.slug
+        else (item.code if item.code is defined and item.code
+        else (item.email if item.email is defined and item.email
+        else (item.id if item.id is defined else selected_id))))) -%}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ title }}</span>
+    {% if item.status is defined %}{{ badge(item.status) }}{% endif %}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Entidade</dt>
+    <dd class="lk-mono">{{ selected_entity | default('—', true) }}</dd>
+    {% if item.id is defined %}
+      <dt>Id</dt>
+      <dd class="lk-mono">{{ item.id }}</dd>
+    {% endif %}
+    {% if item.slug is defined and item.slug %}
+      <dt>Slug</dt>
+      <dd class="lk-mono">{{ item.slug }}</dd>
+    {% endif %}
+    {% if item.version is defined %}
+      <dt>Versão</dt>
+      <dd>{{ item.version }}</dd>
+    {% endif %}
+    {% if item.created_at is defined %}
+      <dt>Criado</dt>
+      <dd>{{ item.created_at | timeago }}</dd>
+    {% endif %}
+    {% if item.updated_at is defined %}
+      <dt>Atualizado</dt>
+      <dd>{{ item.updated_at | timeago }}</dd>
+    {% endif %}
+  </dl>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% else %}
+  {{ empty(
+       'Nenhum item selecionado',
+       'Clique em uma linha da tabela ou em um cartão para ver os detalhes aqui. O painel também abre por link direto, com ?sel=<id> na URL.',
+       name='info'
+     ) }}
+{% endif %}

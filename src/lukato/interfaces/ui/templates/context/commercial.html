@@ -1,0 +1,113 @@
+{#-
+  context/commercial.html — detalhe de um comercial do catalogo (SPEC-0010 secao 3.2).
+
+  `context_item` e um `Commercial`. Alem do cadastro, o painel mostra o
+  **fingerprint** do comercial — palavras-chave, frases-chave e duracao esperada:
+  sao esses tres campos que o motor de matching usa como ancora, e quem edita o
+  catalogo precisa ve-los ao lado do texto.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhum comercial selecionado',
+       'Escolha uma peça do catálogo para ver aqui o texto conhecido e a assinatura usada na detecção.',
+       name='film',
+       action_href='/adwatch/commercials',
+       action_label='Ver catálogo'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate lk-mono">{{ item.commercial_id }}</span>
+    {{ badge('active' if item.is_active else 'paused',
+             label='ativo' if item.is_active else 'inativo') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Campanha</dt>
+    <dd>{{ item.campaign if item.campaign else '—' }}</dd>
+    <dt>Marca</dt>
+    <dd>{{ item.brand if item.brand else '—' }}</dd>
+    <dt>Idioma</dt>
+    <dd class="lk-mono">{{ item.language }}</dd>
+    <dt>Cadastrado</dt>
+    <dd>{{ item.created_at | timeago }}</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__section">
+    <p class="lk-label">Fingerprint</p>
+    <dl class="lk-kv">
+      <dt>Duração esperada</dt>
+      <dd class="lk-timecode">{{ item.duration_expected | duration }}</dd>
+      <dt>Palavras-chave</dt>
+      <dd>
+        {% if item.keywords %}
+          <span class="lk-capabilities">
+            {% for keyword in item.keywords %}
+              <span class="lk-capability">{{ keyword }}</span>
+            {% endfor %}
+          </span>
+        {% else %}
+          <span class="lk-hint">derivadas do texto na indexação</span>
+        {% endif %}
+      </dd>
+      <dt>Frases-chave</dt>
+      <dd>
+        {% if item.key_phrases %}
+          <span class="lk-capabilities">
+            {% for phrase in item.key_phrases %}
+              <span class="lk-capability">{{ phrase }}</span>
+            {% endfor %}
+          </span>
+        {% else %}
+          <span class="lk-hint">n-gramas mais distintivos do próprio texto</span>
+        {% endif %}
+      </dd>
+    </dl>
+    <p class="lk-hint">
+      A assinatura é reconstruída sempre que o texto do comercial muda; as frases-chave
+      também definem a ordem temporal exigida dentro da janela.
+    </p>
+  </div>
+
+  <div class="lk-context__section">
+    <p class="lk-label">Texto conhecido</p>
+    <p class="lk-hit__snippet">{{ item.text | truncate(360) }}</p>
+  </div>
+
+  {% if item.metadata %}
+    <div class="lk-context__section">
+      <p class="lk-label">Metadados</p>
+      <dl class="lk-kv">
+        {% for key, value in item.metadata.items() %}
+          <dt>{{ key }}</dt>
+          <dd class="lk-mono">{{ value }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--primary lk-btn--sm" href="/adwatch/commercials?sel={{ item.id }}">
+      Editar
+    </a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch/detections?commercial={{ item.id }}">
+      Detecções
+    </a>
+  </div>
+
+  <details class="lk-details">
+    <summary>Texto completo</summary>
+    <pre>{{ item.text }}</pre>
+  </details>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

@@ -22,6 +22,38 @@ POST {base_url}/embeddings
 serve para desenvolvimento e testes, e **sempre** se identifica como `hashing` em
 `/health` e no console.
 
+### 1.1 Por que embeddings NAO degradam automaticamente
+
+O adaptador de LLM cai para `echo` sozinho quando falta credencial. **Embeddings nao
+fazem isso, e a diferenca e deliberada.**
+
+Uma resposta de LLM degradada e transitoria: some no proximo request. Um embedding
+degradado e **persistido**. `HashingEmbedder` e `Qwen3-Embedding-0.6B` produzem vetores
+de 1024 dimensoes em espacos semanticos completamente diferentes; gravar os dois na
+mesma colecao pgvector nao da erro em lugar nenhum — a busca simplesmente passa a
+devolver resultados errados, para sempre, sem sinal. Trocar de embedder em silencio
+por causa de uma indisponibilidade temporaria do hub corromperia a colecao de forma
+irreversivel.
+
+Por isso: com `provider=qwen` configurado, o hub fora do ar e **erro** (`ProviderError`),
+nunca degradacao silenciosa. O modo hashing so entra quando alguem o pede
+explicitamente (`LUKATO_EMBEDDING__PROVIDER=hashing`) ou quando nao ha `base_url`.
+Desenvolvimento e testes devem pedir hashing explicitamente.
+
+### 1.2 Guarda de compatibilidade da colecao (obrigatoria)
+
+Como o dano e silencioso, a plataforma nao confia na disciplina de quem configura:
+
+* Toda colecao registra o `provider`, o `model` e as `dimensions` que a produziram
+  (chaves `embedding_provider`, `embedding_model`, `embedding_dimensions` no
+  `metadata` dos chunks, e derivados na resposta de `GET /knowledge/collections`).
+* Gravar em uma colecao com provider/model/dimensao diferente do configurado e
+  **recusado** com `ValidationError` explicando a divergencia e o que fazer
+  (re-embeddar a colecao inteira ou voltar a configuracao anterior).
+* `POST /knowledge/search` em colecao produzida por outro embedder devolve o mesmo
+  erro, em vez de resultados sem sentido.
+* `GET /knowledge/health` mostra o embedder corrente e, por colecao, o que a produziu.
+
 ## 2. Ingestao
 
 ```text

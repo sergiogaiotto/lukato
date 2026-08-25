@@ -1,0 +1,253 @@
+{#-
+  pages/modules_list.html — catalogo de definicoes de modulo (SPEC-0009 secao 8,
+  rota `GET /modules`).
+
+  Contexto entregue por `router.modules_list`, alem da moldura de `base_context`:
+
+  | Chave         | Tipo                    | Uso na tela |
+  | ------------- | ----------------------- | ----------- |
+  | `modules`     | Page[ModuleDefinition]  | tabela e paginacao |
+  | `filters`     | dict `{q, kind, status}`| estado dos campos da barra de filtros |
+  | `kinds`       | list[ModuleKind]        | opcoes do filtro de tipo |
+  | `statuses`    | list[ModuleStatus]      | opcoes do filtro de ciclo de vida |
+  | `descriptors` | list[ModuleDescriptor]  | building blocks registrados (sugestao de slug) |
+
+  FORMULARIOS
+
+  * filtros — `GET /modules`, sem JavaScript nenhum;
+  * novo modulo — `POST /api/v1/modules`, com os nomes de campo do corpo
+    `ModuleCreate`: `slug`, `name`, `kind`, `runtime`, `status`, `description`.
+    O console fala com a propria API v1 (SPEC-0009 secao 1.5).
+
+  A coluna de execucoes leva para `/runs?module=<slug>`: a listagem de definicoes
+  nao carrega historico de execucao, e uma consulta por linha viraria N+1 na
+  abertura da tela.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+{%- from "partials/pagination.html" import pagination with context -%}
+{%- from "partials/table.html" import cell_link, row_attrs, table with context -%}
+
+{% block hero %}
+  {% call hero(
+       'Módulos',
+       subtitle='Cada definição amarra a trinca obrigatória: guardrail de entrada, system prompt e guardrail de saída.',
+       metrics=[
+         ('Nesta busca', modules.total | number),
+         ('Registrados', descriptors | length),
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="#novo-modulo">Novo módulo</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/modules" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filtro-busca">Busca</label>
+      <input
+        class="lk-input"
+        type="search"
+        id="filtro-busca"
+        name="q"
+        value="{{ filters.q }}"
+        placeholder="slug, nome ou descrição"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filtro-tipo">Tipo</label>
+      <select class="lk-select" id="filtro-tipo" name="kind">
+        <option value="">todos</option>
+        {% for kind in kinds %}
+          <option value="{{ kind.value }}" {{ 'selected' if filters.kind == kind.value }}>
+            {{ kind.value }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filtro-status">Status</label>
+      <select class="lk-select" id="filtro-status" name="status">
+        <option value="">todos</option>
+        {% for status in statuses %}
+          <option value="{{ status.value }}" {{ 'selected' if filters.status == status.value }}>
+            {{ status.value }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/modules">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="lk-stack">
+  {% call card('Definições', flush=true) %}
+    {% if modules.items %}
+      {% call table([
+           'Slug',
+           'Nome',
+           {'label': 'Tipo'},
+           {'label': 'Runtime'},
+           {'label': 'Status'},
+           {'label': 'Trinca'},
+           {'label': 'Execuções', 'align': 'right'},
+         ], clickable=true, caption='Definições de módulo cadastradas') %}
+        {% for item in modules.items %}
+          <tr {{ row_attrs('module', item.slug, selected_id) }}>
+            <td class="lk-mono">{{ cell_link('module', item.slug, item.slug) }}</td>
+            <td>
+              <a href="/modules/{{ item.slug }}">{{ item.name or item.slug }}</a>
+              {% if item.description %}
+                <span class="lk-hint lk-truncate" title="{{ item.description }}">
+                  {{ item.description }}
+                </span>
+              {% endif %}
+            </td>
+            <td>{{ item.kind.value }}</td>
+            <td class="lk-mono">{{ item.runtime }}</td>
+            <td>{{ badge(item.status) }}</td>
+            <td>
+              <span class="lk-row lk-row--wrap">
+                {% if item.binding.input_guardrail_id %}
+                  {{ badge('ok', label='entrada', title='Guardrail de entrada vinculado') }}
+                {% else %}
+                  {{ badge('draft', label='sem entrada', title='Nenhum guardrail de entrada') }}
+                {% endif %}
+                {% if item.binding.system_prompt_id %}
+                  {{ badge('ok', label='prompt', title='System prompt vinculado') }}
+                {% else %}
+                  {{ badge('draft', label='sem prompt', title='Nenhum system prompt') }}
+                {% endif %}
+                {% if item.binding.output_guardrail_id %}
+                  {{ badge('ok', label='saída', title='Guardrail de saída vinculado') }}
+                {% else %}
+                  {{ badge('draft', label='sem saída', title='Nenhum guardrail de saída') }}
+                {% endif %}
+              </span>
+            </td>
+            <td class="lk-right lk-nowrap">
+              <a href="/runs?module={{ item.slug }}" title="Execuções deste módulo">ver execuções</a>
+            </td>
+          </tr>
+        {% endfor %}
+      {% endcall %}
+      {{ pagination(modules, label='módulos') }}
+    {% elif filters.q or filters.kind or filters.status %}
+      {{ empty(
+           'Nenhum módulo com esses filtros',
+           'Ajuste a busca, o tipo ou o status. Os filtros ficam na URL, então este endereço pode ser compartilhado.',
+           name='filter',
+           action_href='/modules',
+           action_label='Limpar filtros'
+         ) }}
+    {% else %}
+      {{ empty(
+           'Nenhuma definição de módulo ainda',
+           'Um building block registrado só entra em operação depois que existe uma definição apontando para ele. Crie a primeira no formulário abaixo.',
+           name='blocks',
+           action_href='#novo-modulo',
+           action_label='Criar o primeiro'
+         ) }}
+    {% endif %}
+  {% endcall %}
+
+  {% call card('Novo módulo', id='novo-modulo') %}
+    <form method="post" action="/api/v1/modules" class="lk-stack">
+      <div class="lk-form-grid">
+        <div class="lk-field">
+          <label for="novo-slug">Slug</label>
+          <input
+            class="lk-input lk-input--mono"
+            type="text"
+            id="novo-slug"
+            name="slug"
+            list="blocos-registrados"
+            required
+            pattern="[a-z0-9][a-z0-9-]*"
+            placeholder="triagem-atendimento"
+          />
+          <span class="lk-field__hint">
+            Minúsculas, números e hífen. Use o slug de um building block registrado para
+            herdar o schema de configuração dele.
+          </span>
+        </div>
+
+        <div class="lk-field">
+          <label for="novo-nome">Nome</label>
+          <input class="lk-input" type="text" id="novo-nome" name="name" placeholder="Triagem de atendimento" />
+        </div>
+
+        <div class="lk-field">
+          <label for="novo-tipo">Tipo</label>
+          <select class="lk-select" id="novo-tipo" name="kind">
+            {% for kind in kinds %}
+              <option value="{{ kind.value }}" {{ 'selected' if kind.value == 'agent' }}>
+                {{ kind.value }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="lk-field">
+          <label for="novo-runtime">Runtime</label>
+          <input
+            class="lk-input lk-input--mono"
+            type="text"
+            id="novo-runtime"
+            name="runtime"
+            value="langgraph"
+          />
+          <span class="lk-field__hint">Orquestrador que executa o módulo.</span>
+        </div>
+
+        <div class="lk-field">
+          <label for="novo-status">Status inicial</label>
+          <select class="lk-select" id="novo-status" name="status">
+            {% for status in statuses %}
+              <option value="{{ status.value }}" {{ 'selected' if status.value == 'draft' }}>
+                {{ status.value }}
+              </option>
+            {% endfor %}
+          </select>
+          <span class="lk-field__hint">Somente <b>active</b> pode ser invocado.</span>
+        </div>
+      </div>
+
+      <div class="lk-field">
+        <label for="nova-descricao">Descrição</label>
+        <textarea
+          class="lk-textarea"
+          id="nova-descricao"
+          name="description"
+          rows="2"
+          placeholder="Para que serve este módulo."
+        ></textarea>
+      </div>
+
+      <datalist id="blocos-registrados">
+        {% for descriptor in descriptors %}
+          <option value="{{ descriptor.slug }}">{{ descriptor.name }}</option>
+        {% endfor %}
+      </datalist>
+
+      <div class="lk-row">
+        <button class="lk-btn lk-btn--primary" type="submit">Criar módulo</button>
+        <span class="lk-hint">
+          A trinca é configurada logo depois, na tela de operação do módulo.
+        </span>
+      </div>
+    </form>
+  {% endcall %}
+</div>
+{% endblock %}

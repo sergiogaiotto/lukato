@@ -1,0 +1,208 @@
+{#-
+  pages/observability.html — estado do tracing e ultimos traces (`GET /observability`).
+
+  Contexto entregue pela rota:
+    `runs`         `Page[AgentRun]` recentes (traçadas ou nao).
+    `traced_runs`  subconjunto que carrega `trace_id`.
+    `tracing`      `{enabled, langfuse_enabled, langfuse_host, log_level, log_json,
+                    metrics_enabled, traced_ratio}`.
+
+  Quando o tracer esta em modo noop a tela **explica o que isso significa** em vez
+  de mostrar uma lista vazia: o console continua com a trilha de passos de cada
+  execucao, que e a fonte de verdade auditavel; o que falta e a correlacao entre
+  servicos. O endereco do coletor aparece como texto, nunca como link — a UI e
+  offline-first e nao emite requisicao para fora da propria origem.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge, dot %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/stat.html" import progress, stat, stats_close, stats_open %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set tracer_health = health.get('tracer') -%}
+{%- set langfuse_health = health.get('langfuse') -%}
+{%- set tone_by_status = {'ok': 'ok', 'degraded': 'warn', 'down': 'danger'} -%}
+
+{% block hero %}
+  {% call hero(
+       'Observabilidade',
+       subtitle='Tracing distribuído, telemetria e a correlação entre execução, log e trace.',
+       metrics=[
+         ('Tracer', 'ativo' if tracing.enabled else 'noop'),
+         ('Traces recentes', traced_runs | length | number),
+         ('Cobertura', tracing.traced_ratio | pct),
+         ('Nível de log', tracing.log_level)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/settings">Ver configuração</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--observability lk-stack">
+    {{ stats_open() }}
+      {{ stat(
+           'Tracer',
+           'ativo' if tracing.enabled else 'noop',
+           info='O tracer noop aceita as chamadas e não exporta nada.',
+           primary=tracing.enabled
+         ) }}
+      {{ stat('Langfuse', 'ligado' if tracing.langfuse_enabled else 'desligado') }}
+      {{ stat('Métricas', 'expostas' if tracing.metrics_enabled else 'desligadas') }}
+      {{ stat(
+           'Execuções com trace',
+           tracing.traced_ratio | pct,
+           delta=(traced_runs | length | number) ~ ' de ' ~ (runs.items | length | number) ~ ' recentes'
+         ) }}
+    {{ stats_close() }}
+
+    {% if not tracing.enabled %}
+      {% call card('Tracing em modo noop', dot='warn') %}
+        <p class="lk-finding">
+          Nenhum trace está sendo exportado nesta instalação. As chamadas de instrumentação
+          são aceitas e descartadas, então nada quebra — e nada chega a um coletor.
+        </p>
+        <p class="lk-muted">
+          O que continua funcionando: a trilha de passos de cada execução, o consumo por passo,
+          o custo por módulo e o identificador de requisição que correlaciona a tela com o log.
+          O que falta: seguir uma mesma operação através de serviços diferentes.
+        </p>
+        <p class="lk-muted">
+          Para ligar, defina as variáveis de ambiente do exportador e reinicie o processo. A
+          configuração não é editável por esta tela.
+        </p>
+        <p class="lk-row lk-row--wrap">
+          <a class="lk-btn lk-btn--outline lk-btn--sm" href="/settings">Configuração efetiva</a>
+          <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs">Trilhas de execução</a>
+        </p>
+      {% endcall %}
+    {% endif %}
+
+    <div class="lk-grid lk-grid--2">
+      {% call card('Provedores de telemetria') %}
+        <div class="lk-health">
+          <div class="lk-health__item">
+            <span class="lk-health__name">otel</span>
+            {{ dot(tone_by_status.get(tracer_health.status, 'warn'), title=tracer_health.detail) }}
+            <span class="lk-health__detail">{{ tracer_health.detail }}</span>
+          </div>
+          <div class="lk-health__item">
+            <span class="lk-health__name">langfuse</span>
+            {{ dot(tone_by_status.get(langfuse_health.status, 'warn'), title=langfuse_health.detail) }}
+            <span class="lk-health__detail">{{ langfuse_health.detail }}</span>
+          </div>
+        </div>
+
+        <dl class="lk-kv">
+          <dt>Coletor Langfuse</dt>
+          <dd class="lk-mono">{{ tracing.langfuse_host if tracing.langfuse_host else '(não configurado)' }}</dd>
+          <dt>Nível de log</dt>
+          <dd class="lk-mono">{{ tracing.log_level }}</dd>
+          <dt>Formato do log</dt>
+          <dd>{{ 'JSON estruturado' if tracing.log_json else 'texto legível' }}</dd>
+          <dt>Métricas</dt>
+          <dd>{{ badge('ok' if tracing.metrics_enabled else 'neutral',
+                       label='expostas' if tracing.metrics_enabled else 'desligadas') }}</dd>
+        </dl>
+      {% endcall %}
+
+      {% call card('Cobertura de tracing') %}
+        {{ progress(
+             tracing.traced_ratio,
+             label=tracing.traced_ratio | pct,
+             tone='ok' if tracing.traced_ratio >= 0.9 else ('warn' if tracing.traced_ratio > 0 else 'danger')
+           ) }}
+        <p class="lk-hint">
+          Fração das execuções recentes que carregam um <span class="lk-mono">trace_id</span>.
+          Cobertura parcial normalmente significa que o tracer foi ligado depois que as
+          primeiras execuções já haviam sido gravadas.
+        </p>
+        <dl class="lk-kv">
+          <dt>Com trace</dt>
+          <dd class="lk-mono">{{ traced_runs | length | number }}</dd>
+          <dt>Analisadas</dt>
+          <dd class="lk-mono">{{ runs.items | length | number }}</dd>
+          <dt>Total no histórico</dt>
+          <dd class="lk-mono">{{ runs.total | number }}</dd>
+        </dl>
+      {% endcall %}
+    </div>
+
+    {% call card('Últimos traces', flush=true) %}
+      {% if traced_runs %}
+        {% call table([
+             'Trace',
+             'Execução',
+             'Módulo',
+             {'label': 'Status'},
+             {'label': 'Custo', 'align': 'num'},
+             {'label': 'Latência', 'align': 'num'},
+             {'label': 'Quando', 'align': 'right'}
+           ], clickable=true, caption='Execuções com trace emitido') %}
+          {% for run in traced_runs %}
+            <tr {{ row_attrs('run', run.id, selected_id) }}>
+              <td class="lk-mono">{{ cell_link('run', run.id, run.trace_id | truncate_mid(16)) }}</td>
+              <td class="lk-mono">
+                <a class="lk-table__link" href="/runs/{{ run.id }}">{{ run.id | truncate_mid(12) }}</a>
+              </td>
+              <td>{{ run.module_slug }}</td>
+              <td>{{ badge(run.status) }}</td>
+              <td class="lk-table__num">{{ run.cost_usd | money }}</td>
+              <td class="lk-table__num">{{ run.latency_ms | number(0) }} ms</td>
+              <td class="lk-right lk-nowrap">{{ run.created_at | timeago }}</td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhum trace emitido',
+             'As execuções recentes não carregam trace. Com o tracer em noop isso é o esperado: use a trilha de passos de cada execução.',
+             name='pulse',
+             action_href='/runs',
+             action_label='Ver execuções'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {% call card('Execuções recentes', flush=true) %}
+      {% if runs.items %}
+        {% call table([
+             'Execução',
+             'Módulo',
+             {'label': 'Status'},
+             {'label': 'Trace'},
+             {'label': 'Quando', 'align': 'right'}
+           ], clickable=true, caption='Execuções recentes e seu estado de tracing') %}
+          {% for run in runs.items %}
+            <tr {{ row_attrs('run', run.id, selected_id) }}>
+              <td class="lk-mono">{{ cell_link('run', run.id, run.id | truncate_mid(12)) }}</td>
+              <td>{{ run.module_slug }}</td>
+              <td>{{ badge(run.status) }}</td>
+              <td>
+                {% if run.trace_id %}
+                  <span class="lk-mono">{{ run.trace_id | truncate_mid(16) }}</span>
+                {% else %}
+                  {{ badge('neutral', label='sem trace') }}
+                {% endif %}
+              </td>
+              <td class="lk-right lk-nowrap">{{ run.created_at | timeago }}</td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma execução registrada',
+             'Invoque um módulo para produzir a primeira trilha — e o primeiro trace, se o exportador estiver ligado.',
+             name='activity',
+             action_href='/modules',
+             action_label='Ver módulos'
+           ) }}
+      {% endif %}
+    {% endcall %}
+  </div>
+{% endblock %}
+
+{% block context_title %}Execução{% endblock %}

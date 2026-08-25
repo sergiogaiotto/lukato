@@ -1,0 +1,81 @@
+{#-
+  context/prompt.html — detalhe de um prompt versionado no painel direito.
+
+  `context_item` e um `PromptTemplate`. O corpo do template vai para um bloco
+  colapsavel: ele costuma ser longo e a coluna tem 320px.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhum prompt selecionado',
+       'Escolha um prompt na tabela para ver aqui a versão ativa, as variáveis exigidas e o texto renderizado.',
+       name='message',
+       action_href='/prompts',
+       action_label='Ver prompts'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.name }}</span>
+    {{ badge('active' if item.is_active else 'paused',
+             label='ativo' if item.is_active else 'inativo') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Slug</dt>
+    <dd class="lk-mono">{{ item.slug }}</dd>
+    <dt>Papel</dt>
+    <dd>{{ item.role.value }}</dd>
+    <dt>Versão</dt>
+    <dd class="lk-mono">v{{ item.version }}</dd>
+    <dt>Tamanho</dt>
+    <dd class="lk-mono">{{ item.template | length | number }} caracteres</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  {% if item.description %}
+    <div class="lk-context__section">
+      <p class="lk-label">Descrição</p>
+      <p class="lk-muted">{{ item.description }}</p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__section">
+    <p class="lk-label">Variáveis exigidas</p>
+    {% if item.variables %}
+      <p class="lk-capabilities">
+        {% for name in item.variables %}<span class="lk-capability">{{ name }}</span>{% endfor %}
+      </p>
+    {% else %}
+      <p class="lk-hint">Nenhuma: o texto é usado literalmente.</p>
+    {% endif %}
+  </div>
+
+  {% if item.labels %}
+    <div class="lk-context__section">
+      <p class="lk-label">Rótulos</p>
+      <p class="lk-capabilities">
+        {% for label in item.labels %}<span class="lk-capability">{{ label }}</span>{% endfor %}
+      </p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="/prompts?sel={{ item.id }}">Abrir no editor</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/modules">Vincular a um módulo</a>
+  </div>
+
+  <details class="lk-details">
+    <summary>Texto do prompt</summary>
+    <pre>{{ item.template }}</pre>
+  </details>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

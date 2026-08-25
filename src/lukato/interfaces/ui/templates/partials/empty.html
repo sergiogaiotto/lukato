@@ -1,0 +1,27 @@
+{#-
+  partials/empty.html — estado vazio (SPEC-0009 secao 6): icone, frase e a acao sugerida.
+
+      {% from "partials/empty.html" import empty %}
+
+      {{ empty(
+           'Nenhuma execução na janela',
+           'Invoque um módulo para ver a trilha completa aqui.',
+           action_href='/modules',
+           action_label='Ver módulos'
+         ) }}
+
+  Uma tela vazia sem saida e um beco: sempre que existir um proximo passo obvio,
+  passe `action_href` e `action_label`.
+-#}
+{%- from "partials/sidebar.html" import icon -%}
+
+{% macro empty(title, message='', name='spark', action_href=none, action_label='') -%}
+<div class="lk-empty">
+  <span class="lk-empty__icon" aria-hidden="true">{{ icon(name, 28) }}</span>
+  <p class="lk-empty__title">{{ title }}</p>
+  {% if message %}<p class="lk-empty__message">{{ message }}</p>{% endif %}
+  {% if action_href and action_label %}
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="{{ action_href }}">{{ action_label }}</a>
+  {% endif %}
+</div>
+{%- endmacro %}

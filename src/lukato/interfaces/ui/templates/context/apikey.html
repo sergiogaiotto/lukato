@@ -1,0 +1,85 @@
+{#-
+  context/apikey.html — detalhe de uma chave de API no painel direito.
+
+  `context_item` e uma `ApiKey` vinda da listagem publica. **O segredo nao existe
+  aqui**: o banco guarda apenas o prefixo e o hash bcrypt, e o hash e removido
+  por `json_pretty` antes de imprimir. A chave inteira so aparece uma vez, na
+  resposta da criacao.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhuma chave selecionada',
+       'Escolha uma chave na tabela para ver aqui o prefixo, o papel e a validade. O segredo não é recuperável.',
+       name='plug',
+       action_href='/identity',
+       action_label='Ver identidade'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.name }}</span>
+    {{ badge('active' if item.is_active else 'paused',
+             label='ativa' if item.is_active else 'revogada') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Prefixo</dt>
+    <dd class="lk-mono">{{ item.prefix }}</dd>
+    <dt>Segredo</dt>
+    <dd class="lk-secret">não recuperável</dd>
+    <dt>Papel</dt>
+    <dd>{{ item.role.value }}</dd>
+    <dt>Tenant</dt>
+    <dd class="lk-mono">{{ item.tenant_id }}</dd>
+    <dt>Expira</dt>
+    <dd>
+      {% if item.expires_at %}{{ item.expires_at | datetime_br }}
+      {% else %}<span class="lk-hint">sem prazo</span>{% endif %}
+    </dd>
+    <dt>Último uso</dt>
+    <dd>
+      {% if item.last_used_at %}{{ item.last_used_at | timeago }}
+      {% else %}<span class="lk-hint">nunca usada</span>{% endif %}
+    </dd>
+    <dt>Criada</dt>
+    <dd>{{ item.created_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__section">
+    <p class="lk-hint">
+      Envie a chave no cabeçalho configurado da instalação. Perdeu o segredo? Rotacione:
+      a chave anterior deixa de valer no mesmo instante.
+    </p>
+  </div>
+
+  <div class="lk-context__actions">
+    <form method="post" action="/api/v1/identity/api-keys/{{ item.id }}/rotate">
+      <button
+        class="lk-btn lk-btn--outline lk-btn--sm"
+        type="submit"
+        data-confirm="Rotacionar esta chave? A chave atual deixa de valer imediatamente."
+      >
+        Rotacionar
+      </button>
+    </form>
+    <form method="post" action="/api/v1/identity/api-keys/{{ item.id }}">
+      <input type="hidden" name="_method" value="delete" />
+      <button
+        class="lk-btn lk-btn--danger lk-btn--sm"
+        type="submit"
+        data-confirm="Revogar esta chave de API?"
+      >
+        Revogar
+      </button>
+    </form>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

@@ -58,10 +58,18 @@ class Budget(Entity):
 
 
 class CostSummary(DomainModel):
-    """Agregado de custo por periodo, modulo e modelo."""
+    """Agregado de custo por periodo, modulo e modelo.
+
+    `unknown_models` (SPEC-0005 secao 2) nomeia os modelos que nao estavam na
+    tabela de precos e por isso foram custeados pelo valor padrao — em geral
+    zero. Sem esse campo, um modelo novo em producao apareceria com custo
+    `0.00` no console e no `/finops/summary`, indistinguivel de um modelo
+    realmente gratuito: a conta fecharia certinho e estaria errada.
+    """
 
     total_usd: float = 0.0
     total_tokens: int = 0
     runs: int = 0
     by_module: dict[str, float] = Field(default_factory=dict)
     by_model: dict[str, float] = Field(default_factory=dict)
+    unknown_models: list[str] = Field(default_factory=list)

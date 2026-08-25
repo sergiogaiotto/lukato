@@ -1,0 +1,303 @@
+/* base.css — reset enxuto, tipografia e utilitarios do console lukato.
+ *
+ * Depende de tokens.css. Aqui nao existe nenhuma cor literal: tudo sai de uma
+ * variavel, para que trocar o tema seja trocar tokens e nada mais.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--lk-bg);
+  color: var(--lk-text);
+  font-family: var(--lk-font);
+  font-size: var(--lk-fs-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--lk-accent-strong);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--lk-mono);
+  font-size: 0.92em;
+}
+
+pre {
+  margin: 0;
+  padding: var(--lk-space-3);
+  overflow-x: auto;
+  background: var(--lk-code-bg);
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+hr {
+  height: 1px;
+  margin: var(--lk-space-4) 0;
+  border: 0;
+  background: var(--lk-border);
+}
+
+/* -- Foco visivel ---------------------------------------------------------
+   Requisito de acessibilidade da SPEC-0009 secao 1: quem navega por teclado
+   precisa enxergar onde esta. O anel usa `:focus-visible` para nao poluir o
+   clique de mouse, e o `:focus` cru fica como reserva em navegadores antigos. */
+:focus-visible {
+  outline: 2px solid var(--lk-focus);
+  outline-offset: 2px;
+  border-radius: var(--lk-radius-sm);
+}
+
+::selection {
+  background: var(--lk-accent-soft);
+  color: var(--lk-accent-strong);
+}
+
+/* -- Utilitarios ---------------------------------------------------------- */
+
+/* Conteudo lido por leitor de tela e invisivel na tela. */
+.lk-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Pular para o conteudo: primeiro tab da pagina. */
+.lk-skip {
+  position: absolute;
+  top: -100px;
+  left: var(--lk-space-3);
+  z-index: var(--lk-z-toast);
+  padding: var(--lk-space-2) var(--lk-space-3);
+  background: var(--lk-panel);
+  border: 1px solid var(--lk-border-strong);
+  border-radius: var(--lk-radius-sm);
+  box-shadow: var(--lk-shadow);
+  transition: top var(--lk-transition);
+}
+
+.lk-skip:focus {
+  top: var(--lk-space-2);
+}
+
+/* Toda tabela larga vive dentro deste contentor: o body nunca rola na horizontal. */
+.lk-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lk-scroll-y {
+  overflow-y: auto;
+}
+
+.lk-mono {
+  font-family: var(--lk-mono);
+}
+
+.lk-muted {
+  color: var(--lk-muted);
+}
+
+.lk-faint {
+  color: var(--lk-faint);
+}
+
+.lk-nowrap {
+  white-space: nowrap;
+}
+
+.lk-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lk-right {
+  text-align: right;
+}
+
+.lk-center {
+  text-align: center;
+}
+
+.lk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lk-space-2);
+}
+
+.lk-row--wrap {
+  flex-wrap: wrap;
+}
+
+.lk-row--between {
+  justify-content: space-between;
+}
+
+.lk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lk-space-3);
+}
+
+.lk-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lk-label {
+  font-size: var(--lk-fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lk-muted);
+}
+
+.lk-hint {
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-faint);
+}
+
+/* Ponto colorido reutilizado por cartoes, badges e barra de status. */
+.lk-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lk-neutral);
+}
+
+.lk-dot--ok {
+  background: var(--lk-ok);
+}
+
+.lk-dot--warn {
+  background: var(--lk-warn);
+}
+
+.lk-dot--danger {
+  background: var(--lk-danger);
+}
+
+.lk-dot--info {
+  background: var(--lk-info);
+}
+
+.lk-dot--accent {
+  background: var(--lk-accent);
+}
+
+.lk-dot--ai {
+  background: var(--lk-ai);
+}
+
+.lk-dot--s1 {
+  background: var(--lk-series-1);
+}
+
+.lk-dot--s2 {
+  background: var(--lk-series-2);
+}
+
+.lk-dot--s3 {
+  background: var(--lk-series-3);
+}
+
+.lk-dot--s4 {
+  background: var(--lk-series-4);
+}
+
+.lk-dot--s5 {
+  background: var(--lk-series-5);
+}
+
+.lk-dot--s6 {
+  background: var(--lk-series-6);
+}
+
+.lk-dot--s7 {
+  background: var(--lk-series-7);
+}
+
+.lk-dot--s8 {
+  background: var(--lk-series-8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

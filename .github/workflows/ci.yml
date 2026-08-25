@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONPATH: src
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  qualidade:
+    name: lint · tipos · testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check src tests
+
+      - name: Formatacao (ruff)
+        run: ruff format --check src tests
+
+      - name: Tipos (mypy)
+        run: mypy src/lukato
+
+      - name: Testes
+        # A suite roda offline: sem PostgreSQL, sem rede e sem GPU.
+        run: pytest --cov=src/lukato --cov-report=xml --cov-report=term-missing
+
+      - name: Contrato OpenAPI
+        run: python -m lukato.interfaces.cli openapi --out /tmp/openapi.json && test -s /tmp/openapi.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  integracao-postgres:
+    name: integracao com PostgreSQL + pgvector
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: lukato
+          POSTGRES_PASSWORD: lukato
+          POSTGRES_DB: lukato
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lukato"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      LUKATO_DB__URL: postgresql+asyncpg://lukato:lukato@localhost:5432/lukato
+      LUKATO_DB__AUTO_FALLBACK: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Migracoes
+        run: alembic upgrade head
+      - name: Testes de integracao
+        run: pytest -m integration
+
+  imagem:
+    name: build da imagem
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: lukato:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Subir e checar /healthz
+        run: |
+          docker run -d --name lukato-ci -p 8000:8000 \
+            -e LUKATO_DB__URL=sqlite+aiosqlite:///./var/lukato.db \
+            -e LUKATO_DB__CREATE_ALL=true \
+            -e LUKATO_DB__RUN_MIGRATIONS=false \
+            lukato:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/healthz; then echo; echo OK; exit 0; fi
+            sleep 2
+          done
+          echo "a aplicacao nao respondeu"; docker logs lukato-ci; exit 1
+      - if: always()
+        run: docker rm -f lukato-ci || true
+
+  manifestos:
+    name: validacao dos manifestos Kubernetes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: kustomize build
+        run: |
+          kubectl kustomize deploy/k8s/overlays/dev  > /tmp/dev.yaml
+          kubectl kustomize deploy/k8s/overlays/prod > /tmp/prod.yaml
+          test -s /tmp/dev.yaml && test -s /tmp/prod.yaml
+      - name: Nenhum segredo real versionado
+        run: |
+          # O corpus do detector de segredos e a UNICA excecao: para testar que o
+          # guardrail reconhece 'sk-...', 'AKIA...' e chaves PEM, o teste precisa
+          # conter um exemplo de cada. Sao valores publicos e obviamente falsos
+          # (um deles e o proprio exemplo da documentacao da AWS). A exclusao
+          # e por ARQUIVO, nao por diretorio: um segredo de verdade em qualquer
+          # outro teste continua sendo pego.
+          if grep -rniE '(sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' \
+               --exclude-dir=.git \
+               --exclude=test_guardrail_rules.py \
+               . ; then
+            echo "::error::segredo aparente encontrado no repositorio"; exit 1
+          fi
+          echo "nenhum segredo aparente"

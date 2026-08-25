@@ -70,8 +70,15 @@ class LLMPort(Protocol):
         """Executa uma chamada de chat e devolve a resposta consolidada."""
         ...
 
-    async def stream(self, messages: Sequence[ChatMessage], **kwargs: Any) -> AsyncIterator[str]:
-        """Devolve um iterador assincrono com os fragmentos incrementais da resposta."""
+    def stream(self, messages: Sequence[ChatMessage], **kwargs: Any) -> AsyncIterator[str]:
+        """Devolve um iterador assincrono com os fragmentos incrementais da resposta.
+
+        Declarado como ``def`` (e nao ``async def``) de proposito: um ``async def``
+        anotado com ``AsyncIterator`` tem tipo ``Coroutine[..., AsyncIterator[str]]``,
+        o que recusaria a implementacao idiomatica por gerador assincrono. Com esta
+        assinatura o adaptador escreve ``async def stream(...)`` com ``yield`` e o
+        consumidor escreve ``async for chunk in llm.stream(...)``.
+        """
         ...
 
     async def list_models(self) -> list[str]:

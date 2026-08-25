@@ -1,0 +1,78 @@
+{#-
+  partials/table.html — tabela do console e a linha que abre o painel de contexto.
+
+      {% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+  O `with context` e obrigatorio: `cell_link` usa o global `query_url(request, …)`
+  para preservar filtros e paginacao ao trocar apenas `?sel=`.
+
+      {% call table([
+           'Módulo',
+           {'label': 'Status'},
+           {'label': 'Custo', 'align': 'num'},
+           {'label': 'Quando', 'align': 'right'}
+         ], clickable=true) %}
+        {% for run in runs.items %}
+          <tr {{ row_attrs('run', run.id, selected_id) }}>
+            <td>{{ cell_link('run', run.id, run.module_slug) }}</td>
+            <td>{{ badge(run.status) }}</td>
+            <td class="lk-table__num">{{ run.cost_usd | money }}</td>
+            <td class="lk-right">{{ run.created_at | timeago }}</td>
+          </tr>
+        {% endfor %}
+      {% endcall %}
+
+  Colunas aceitam string (vira o rotulo) ou dicionario com `label`, `align`
+  (`left` | `right` | `center` | `num`), `width` e `class`.
+
+  A tabela sai sempre dentro de `.lk-scroll-x`: em tela estreita ela rola dentro
+  do proprio contentor, e o corpo da pagina nunca ganha barra horizontal.
+
+  `row_attrs` marca a linha selecionada e liga os ganchos de `context.js`;
+  `cell_link` gera o `<a href="?sel=…">` que faz o painel de contexto funcionar
+  **sem JavaScript** (SPEC-0009 secao 7).
+-#}
+
+{% macro table(columns, clickable=false, extra_class='', caption='') -%}
+<div class="lk-scroll-x">
+  <table class="lk-table{{ ' lk-table--clickable' if clickable else '' }} {{ extra_class }}">
+    {% if caption %}<caption class="lk-sr-only">{{ caption }}</caption>{% endif %}
+    <thead>
+      <tr>
+        {% for column in columns %}
+          {%- set label = column.label if column.label is defined else column -%}
+          {%- set align = column.align if column.align is defined else 'left' -%}
+          {%- set width = column.width if column.width is defined else none -%}
+          <th
+            scope="col"
+            class="{{ 'lk-table__num' if align == 'num' else ('lk-right' if align == 'right' else ('lk-center' if align == 'center' else '')) }} {{ column['class'] if column['class'] is defined else '' }}"
+            {% if width %}style="width: {{ width }}"{% endif %}
+          >
+            {{ label }}
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {{ caller() }}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}
+
+{#- Atributos da linha: selecao visual + ganchos lidos por `context.js`. -#}
+{% macro row_attrs(entity, item_id, selected=none) -%}
+{%- if selected and selected == item_id -%}
+class="is-selected" aria-selected="true"
+{%- endif %} data-context-entity="{{ entity }}" data-context-id="{{ item_id }}"
+{%- endmacro %}
+
+{#- Celula-ancora: navega por `?sel=<id>` (sem JS) e e interceptada com JS. -#}
+{% macro cell_link(entity, item_id, text) -%}
+<a
+  class="lk-table__link"
+  href="{{ query_url(request, sel=item_id) }}"
+  data-context-entity="{{ entity }}"
+  data-context-id="{{ item_id }}"
+>{{ text }}</a>
+{%- endmacro %}

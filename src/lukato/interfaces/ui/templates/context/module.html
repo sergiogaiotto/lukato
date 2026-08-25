@@ -1,0 +1,106 @@
+{#-
+  context/module.html — detalhe de uma definicao de modulo no painel direito.
+
+  `context_item` e um `ModuleDefinition` carregado por `context.load_entity`
+  (sempre via caso de uso). Sem selecao, o fragmento convida a escolher uma linha
+  em vez de ficar em branco.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhum módulo selecionado',
+       'Escolha um building block na tabela para ver aqui a trinca vinculada, o runtime e os atalhos de operação.',
+       name='blocks',
+       action_href='/modules',
+       action_label='Ver módulos'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.name }}</span>
+    {{ badge(item.status) }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Slug</dt>
+    <dd class="lk-mono">{{ item.slug }}</dd>
+    <dt>Tipo</dt>
+    <dd>{{ item.kind.value }}</dd>
+    <dt>Runtime</dt>
+    <dd class="lk-mono">{{ item.runtime }}</dd>
+    <dt>Versão</dt>
+    <dd class="lk-mono">{{ item.version }}</dd>
+    <dt>Dono</dt>
+    <dd>{{ item.owner if item.owner else '—' }}</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  {% if item.description %}
+    <div class="lk-context__section">
+      <p class="lk-label">Descrição</p>
+      <p class="lk-muted">{{ item.description }}</p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__section">
+    <p class="lk-label">Trinca obrigatória</p>
+    <p class="lk-pipeline">
+      <span class="lk-pipeline__step">guardrail de entrada</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">›</span>
+      <span class="lk-pipeline__step">system prompt</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">›</span>
+      <span class="lk-pipeline__step">guardrail de saída</span>
+    </p>
+    <dl class="lk-kv">
+      <dt>Guardrail in</dt>
+      <dd class="lk-mono">
+        {{ item.binding.input_guardrail_id | default('—', true) | truncate_mid(18) }}
+      </dd>
+      <dt>Prompt</dt>
+      <dd class="lk-mono">
+        {{ item.binding.system_prompt_id | default('—', true) | truncate_mid(18) }}
+      </dd>
+      <dt>Guardrail out</dt>
+      <dd class="lk-mono">
+        {{ item.binding.output_guardrail_id | default('—', true) | truncate_mid(18) }}
+      </dd>
+      <dt>Modelo</dt>
+      <dd class="lk-mono">{{ item.binding.model if item.binding.model else '(padrão)' }}</dd>
+      <dt>Tempo limite</dt>
+      <dd class="lk-mono">{{ item.binding.timeout_seconds | number(0) }}s</dd>
+    </dl>
+  </div>
+
+  {% if item.tags %}
+    <div class="lk-context__section">
+      <p class="lk-label">Etiquetas</p>
+      <p class="lk-capabilities">
+        {% for tag in item.tags %}<span class="lk-capability">{{ tag }}</span>{% endfor %}
+      </p>
+    </div>
+  {% endif %}
+
+  {% if item.binding.tools %}
+    <div class="lk-context__section">
+      <p class="lk-label">Ferramentas</p>
+      <p class="lk-capabilities">
+        {% for tool in item.binding.tools %}<span class="lk-capability">{{ tool }}</span>{% endfor %}
+      </p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--primary lk-btn--sm" href="/modules/{{ item.slug }}">Operar módulo</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs?module={{ item.slug }}">Execuções</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/finops?module={{ item.slug }}">Custo</a>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

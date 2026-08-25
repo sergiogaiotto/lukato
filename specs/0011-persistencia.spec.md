@@ -147,7 +147,22 @@ migrations/versions/0002_pgvector_indexes.py
 * `env.py` deve funcionar em modo online assincrono (`connectable.run_sync`).
 * Em SQLite as migracoes rodam com `render_as_batch=True`.
 
-## 9. Criterios de aceite
+## 9. Armadilha do SQLite: chaves estrangeiras
+
+O SQLite **ignora `ON DELETE CASCADE` por padrao**. As cascatas so funcionam com
+`PRAGMA foreign_keys=ON` ligado em **cada conexao**, o que `build_engine` faz por um
+listener de `connect`.
+
+Consequencia pratica, e obrigatoria para quem escreve teste: **sempre obtenha o engine
+por `build_engine`/`resolve_engine`**, nunca por `create_async_engine` direto. Um
+engine criado a mao passa por todos os testes de CRUD e falha silenciosamente nos de
+cascata — apagar uma midia deixa deteccoes orfas, e o teste acusa o codigo de producao
+por um defeito que esta no proprio teste. Em PostgreSQL o mesmo codigo cascateia
+normalmente, entao a divergencia so aparece no ambiente local e no CI.
+
+A fixture `engine` de `tests/conftest.py` deve usar `build_engine`.
+
+## 10. Criterios de aceite
 
 * `pytest tests/integration/test_persistence.py` passa em SQLite sem servico externo.
 * `alembic upgrade head` funciona em PostgreSQL e em SQLite.

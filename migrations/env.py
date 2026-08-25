@@ -6,12 +6,13 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import JSON, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from lukato.adapters.persistence.base import Base
 from lukato.adapters.persistence import orm as _orm  # noqa: F401  (registra as tabelas)
+from lukato.adapters.persistence.base import Base
+from lukato.adapters.persistence.types import VectorType
 from lukato.config import get_settings
 
 config = context.config
@@ -35,6 +36,37 @@ def _is_sqlite(url: str) -> bool:
     return url.startswith("sqlite")
 
 
+def _render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Emite o import de VectorType nas migracoes autogeradas.
+
+    Sem isto o Alembic escreve ``lukato.adapters.persistence.types.VectorType(...)``
+    no arquivo mas nao acrescenta o import correspondente, e a migracao quebra com
+    NameError. VectorType e um TypeDecorator: resolve para ``Vector(dim)`` no
+    PostgreSQL e para ``JSON`` nos demais dialetos em tempo de execucao, entao a
+    mesma migracao serve para os dois bancos.
+    """
+    if type_ != "type":
+        return False
+
+    imports = getattr(autogen_context, "imports", None)
+
+    if isinstance(obj, VectorType):
+        if imports is not None:
+            imports.add("from lukato.adapters.persistence.types import VectorType")
+        return f"VectorType(dim={obj.dim})"
+
+    # JSONType e `JSON().with_variant(JSONB, "postgresql")`. O render padrao do
+    # Alembic expande a variante como `postgresql.JSONB(astext_type=Text())` sem
+    # importar `Text`, produzindo uma migracao que quebra com NameError. Emitir o
+    # proprio JSONType mantem a migracao portatil e correta nos dois dialetos.
+    if isinstance(obj, JSON) and getattr(obj, "_variant_mapping", None):
+        if imports is not None:
+            imports.add("from lukato.adapters.persistence.types import JSONType")
+        return "JSONType"
+
+    return False
+
+
 def run_migrations_offline() -> None:
     """Gera SQL sem conectar ao banco."""
     url = _database_url()
@@ -46,6 +78,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=_is_sqlite(url),
+        render_item=_render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -60,6 +93,7 @@ def _do_run_migrations(connection: Connection) -> None:
         compare_server_default=True,
         render_as_batch=_is_sqlite(url),
         include_schemas=False,
+        render_item=_render_item,
     )
     with context.begin_transaction():
         context.run_migrations()

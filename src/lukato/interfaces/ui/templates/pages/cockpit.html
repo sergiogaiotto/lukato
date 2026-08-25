@@ -1,0 +1,254 @@
+{#-
+  pages/cockpit.html — visao geral da instalacao (SPEC-0009 secao 8, rota `GET /`).
+
+  Contexto entregue por `router.cockpit`, alem da moldura de `base_context`:
+
+  | Chave            | Tipo                | Uso na tela |
+  | ---------------- | ------------------- | ----------- |
+  | `total_modules`  | int                 | definicoes cadastradas |
+  | `active_modules` | int                 | definicoes `active` (as unicas invocaveis) |
+  | `runs_24h`       | int                 | execucoes da janela |
+  | `blocked_24h`    | int                 | execucoes barradas por guardrail |
+  | `failed_24h`     | int                 | execucoes com falha |
+  | `recent_runs`    | list[AgentRun]      | tabela das ultimas execucoes |
+  | `series`         | list[Json]          | `{bucket, cost_usd, tokens, runs}` por hora |
+
+  A saude e o custo vem da moldura (`health`, `cost_summary`) — o cockpit mostra o
+  relatorio completo, enquanto a barra de status mostra so o resumo.
+
+  O grafico da serie e progressivo: `charts.js` troca o texto pelo SVG. Sem
+  JavaScript, o proprio texto ja informa o periodo e o pico.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card, card_foot -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+{%- from "partials/stat.html" import progress, stat, stats_close, stats_open -%}
+{%- from "partials/table.html" import cell_link, row_attrs, table with context -%}
+
+{% block hero %}
+  {% call hero(
+       'Cockpit',
+       subtitle='Panorama das últimas 24 horas: módulos publicados, execuções, custo e saúde dos provedores.',
+       metrics=[
+         ('Definições', total_modules | number),
+         ('Execuções 24h', runs_24h | number),
+         ('Custo 24h', cost_summary.total_usd | money),
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/modules">Operar um módulo</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="lk-page--cockpit lk-stack">
+  {{ stats_open() }}
+    {{ stat(
+         'Módulos ativos',
+         active_modules | number,
+         info='Somente definições com status active podem ser invocadas.',
+         delta=(total_modules | number) ~ ' no catálogo',
+         href='/modules?status=active'
+       ) }}
+    {{ stat(
+         'Execuções 24h',
+         runs_24h | number,
+         delta=(failed_24h | number) ~ ' com falha',
+         href='/runs'
+       ) }}
+    {{ stat(
+         'Custo 24h',
+         cost_summary.total_usd | money,
+         info='Soma do consumo apurado pelo FinOps na janela.',
+         delta=(cost_summary.total_tokens | tokens) ~ ' tokens',
+         primary=true,
+         href='/finops'
+       ) }}
+    {{ stat(
+         'Bloqueios de guardrail',
+         blocked_24h | number,
+         info='Execuções barradas pela política de entrada ou de saída.',
+         href='/runs?status=blocked'
+       ) }}
+  {{ stats_close() }}
+
+  {% set health_actions %}
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/settings">Configurações</a>
+  {% endset %}
+  {% call card('Saúde dos provedores', dot='ok', actions=health_actions) %}
+    {% if health.components %}
+      <div class="lk-health">
+        {% for key, indicator in health.components.items() %}
+          <div class="lk-health__item">
+            <span
+              class="lk-dot {{ 'lk-dot--ok' if indicator.status == 'ok' else ('lk-dot--warn' if indicator.status == 'degraded' else 'lk-dot--danger') }}"
+              aria-hidden="true"
+            ></span>
+            <span class="lk-health__name">{{ indicator.label }}</span>
+            {{ badge(indicator.status, title=key) }}
+            <span class="lk-health__detail lk-truncate" title="{{ indicator.detail }}">
+              {{ indicator.detail }}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+      {% call card_foot() %}
+        Estado geral: {{ health.status }}. A leitura é armazenada por alguns segundos —
+        recarregue a página para sondar de novo.
+      {% endcall %}
+    {% else %}
+      {{ empty(
+           'Sem leitura de saúde',
+           'A sondagem dos provedores não respondeu nesta requisição. A página continua utilizável; tente recarregar.',
+           name='pulse'
+         ) }}
+    {% endif %}
+  {% endcall %}
+
+  <div class="lk-grid lk-grid--sidebar">
+    {% set runs_actions %}
+      <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs">Ver todas</a>
+    {% endset %}
+    {% call card('Últimas execuções', flush=true, actions=runs_actions) %}
+      {% if recent_runs %}
+        {% call table([
+             'Módulo',
+             {'label': 'Status'},
+             {'label': 'Tokens', 'align': 'num'},
+             {'label': 'Custo', 'align': 'num'},
+             {'label': 'Quando', 'align': 'right'},
+           ], clickable=true, caption='Execuções das últimas 24 horas') %}
+          {% for run in recent_runs %}
+            <tr {{ row_attrs('run', run.id, selected_id) }}>
+              <td>{{ cell_link('run', run.id, run.module_slug) }}</td>
+              <td>{{ badge(run.status) }}</td>
+              <td class="lk-table__num">{{ run.usage.total_tokens | tokens }}</td>
+              <td class="lk-table__num">{{ run.cost_usd | money }}</td>
+              <td class="lk-right lk-nowrap">{{ run.created_at | timeago }}</td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma execução nas últimas 24 horas',
+             'Abra um módulo ativo e use o cartão INVOCAR para produzir a primeira trilha de execução.',
+             name='activity',
+             action_href='/modules?status=active',
+             action_label='Escolher um módulo'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {% call card('Custo por módulo', dot='ai') %}
+      {% if cost_summary.available and cost_summary.modules %}
+        <div class="lk-stack">
+          {% for entry in cost_summary.modules %}
+            <div>
+              <div class="lk-row lk-row--between">
+                <span class="lk-row">
+                  <span class="lk-dot {{ entry.series_class }}" aria-hidden="true"></span>
+                  <a class="lk-truncate" href="/modules/{{ entry.key }}">{{ entry.label }}</a>
+                </span>
+                <span class="lk-cost__value">{{ entry.usd | money }}</span>
+              </div>
+              {{ progress(entry.share, label=entry.share | pct) }}
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if series %}
+          <div
+            class="lk-chart-card"
+            data-chart="area"
+            data-format="money"
+            data-series="{{ series | map(attribute='cost_usd') | join(',') }}"
+            data-labels="{{ series[0].bucket | datetime_br('%d/%m %Hh') }},{{ series[-1].bucket | datetime_br('%d/%m %Hh') }}"
+            data-title="Custo por hora nas últimas 24 horas"
+            data-caption="Custo por hora"
+          >
+            <p class="lk-hint">
+              Custo por hora de {{ series[0].bucket | datetime_br('%d/%m %Hh') }} a
+              {{ series[-1].bucket | datetime_br('%d/%m %Hh') }}, em {{ series | length }} intervalos.
+            </p>
+          </div>
+        {% endif %}
+
+        {% call card_foot() %}
+          Janela de {{ cost_summary.window_hours }} horas · {{ cost_summary.runs | number }} execuções ·
+          total {{ cost_summary.total_usd | money }}.
+        {% endcall %}
+      {% elif not cost_summary.available %}
+        {{ empty(
+             'FinOps desligado',
+             'A apuração de custo está desabilitada nesta instalação. Ligue o FinOps para ver consumo por módulo e por modelo.',
+             name='coins',
+             action_href='/settings',
+             action_label='Ver configuração'
+           ) }}
+      {% else %}
+        {{ empty(
+             'Nenhum custo apurado na janela',
+             'O custo aparece assim que a primeira execução consumir tokens de um provedor.',
+             name='coins',
+             action_href='/finops',
+             action_label='Abrir FinOps'
+           ) }}
+      {% endif %}
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}
+
+{% block context_title %}Ambiente{% endblock %}
+
+{% block context %}
+  {% if context_item %}
+    {% include "partials/context_panel.html" %}
+  {% else %}
+    <div class="lk-context__title">
+      <span class="lk-truncate">{{ app_name }}</span>
+      {{ badge(health.status, title='Pior estado entre os componentes') }}
+    </div>
+
+    <dl class="lk-kv">
+      <dt>Versão</dt>
+      <dd class="lk-mono">{{ version }}</dd>
+      <dt>Autenticação</dt>
+      <dd>{{ 'ligada' if auth_enabled else 'desligada' }}</dd>
+      <dt>Perfil</dt>
+      <dd>{{ principal.role }}</dd>
+      <dt>Tenant</dt>
+      <dd class="lk-mono">{{ principal.tenant_id }}</dd>
+      <dt>Agora</dt>
+      <dd>{{ now | datetime_br }}</dd>
+    </dl>
+
+    {% for section in settings_public if section.key in ('llm', 'embedding') %}
+      <div class="lk-context__section">
+        <p class="lk-label">{{ section.title }}</p>
+        <dl class="lk-kv">
+          {% for item in section.items if not item.secret %}
+            <dt>{{ item.label }}</dt>
+            <dd class="lk-truncate" title="{{ item.value }}">{{ item.value }}</dd>
+          {% endfor %}
+        </dl>
+      </div>
+    {% endfor %}
+
+    <div class="lk-context__section">
+      <p class="lk-label">Atalhos</p>
+      <div class="lk-context__actions">
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/modules">Módulos</a>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/prompts">Prompts</a>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/guardrails">Guardrails</a>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/registry">Registry</a>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/observability">Observabilidade</a>
+      </div>
+      <p class="lk-hint">
+        Clique em uma execução da tabela para ver os detalhes dela aqui.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

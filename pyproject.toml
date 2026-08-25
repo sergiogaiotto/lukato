@@ -60,15 +60,23 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "B", "SIM"]
-"src/lukato/adapters/**" = ["S105", "S106"]
-"scripts/**" = ["S", "T201"]
+"tests/**" = ["S", "B", "SIM", "TID251"]
+"src/lukato/adapters/**" = ["S105", "S106", "TID251"]
+"src/lukato/interfaces/**" = ["TID251"]
+"src/lukato/composition.py" = ["TID251"]
+"src/lukato/main.py" = ["TID251"]
+"migrations/**" = ["TID251"]
+"scripts/**" = ["S", "T201", "TID251"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lukato"]
 
+# Guarda estatica da regra hexagonal: domain/ e application/ nao podem importar
+# adapters. As camadas que PODEM (o proprio adapters, interfaces e o composition
+# root) estao isentas acima. A verificacao completa, por diretorio e incluindo
+# imports dentro de funcoes, fica em tests/unit/test_architecture.py.
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"lukato.adapters".msg = "domain/application nao podem importar adapters (regra hexagonal)"
+"lukato.adapters".msg = "domain/ e application/ nao podem importar adapters (regra hexagonal)"
 
 # -----------------------------------------------------------------------------
 [tool.mypy]

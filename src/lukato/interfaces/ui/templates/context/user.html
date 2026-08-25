@@ -1,0 +1,59 @@
+{#-
+  context/user.html — detalhe de um usuario no painel direito.
+
+  `context_item` e um `User`. O hash de senha existe no modelo, mas nunca chega a
+  tela: `json_pretty` substitui `password_hash` por `***` antes de imprimir.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhum usuário selecionado',
+       'Escolha um usuário na tabela para ver aqui o papel, o tenant e as permissões que ele carrega.',
+       name='users',
+       action_href='/identity',
+       action_label='Ver identidade'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ item.name }}</span>
+    {{ badge('active' if item.is_active else 'paused',
+             label='ativo' if item.is_active else 'inativo') }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>E-mail</dt>
+    <dd class="lk-mono">{{ item.email }}</dd>
+    <dt>Papel</dt>
+    <dd>{{ item.role.value }}</dd>
+    <dt>Tenant</dt>
+    <dd class="lk-mono">{{ item.tenant_id }}</dd>
+    <dt>Senha</dt>
+    <dd class="lk-secret">definida</dd>
+    <dt>Criado</dt>
+    <dd>{{ item.created_at | timeago }}</dd>
+    <dt>Atualizado</dt>
+    <dd>{{ item.updated_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__section">
+    <p class="lk-hint">
+      O papel define as permissões verificadas pelos casos de uso. Papéis
+      <span class="lk-mono">root</span> e <span class="lk-mono">admin</span> recebem
+      <span class="lk-mono">admin:*</span>; <span class="lk-mono">viewer</span> só lê.
+    </p>
+  </div>
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="/identity?sel={{ item.id }}">Editar</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs">Execuções do tenant</a>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

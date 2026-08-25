@@ -1,0 +1,168 @@
+{#-
+  pages/settings.html — configuracao efetiva da instalacao (`GET /settings`).
+
+  Contexto entregue pela rota:
+    `runtimes`           orquestradores disponiveis neste processo.
+    `registered_modules` quantidade de building blocks descobertos.
+    `discover_errors`    falhas de descoberta, se houver.
+    `principal_role`     papel de quem esta olhando.
+  Da moldura: `settings_public` (secoes ja mascaradas) e `health`.
+
+  Esta tela e **somente leitura, por decisao de projeto**. A configuracao vem de
+  variaveis de ambiente e vale para o processo inteiro; deixa-la editavel pela
+  interface criaria dois lugares para a mesma verdade — e o que estivesse na tela
+  seria perdido no proximo deploy.
+
+  Nenhum segredo chega aqui em texto claro: `context.settings_public` mascara
+  `SecretStr` como `sk-…1234` e remove a senha das URLs de conexao **antes** de o
+  template existir. Um valor sensivel recebe a marca visual `.lk-secret`.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge, dot %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/stat.html" import stat, stats_close, stats_open %}
+
+{%- set tone_by_status = {'ok': 'ok', 'degraded': 'warn', 'down': 'danger'} -%}
+{%- set highlighted = ('llm', 'embedding', 'guardrails', 'adwatch') -%}
+{%- set sections_by_key = {} -%}
+{%- for section in settings_public -%}
+  {%- set _ = sections_by_key.update({section.key: section}) -%}
+{%- endfor -%}
+
+{% macro settings_card(section) -%}
+  {% call card(section.title) %}
+    <dl class="lk-kv">
+      {% for item in section.items %}
+        <dt>{{ item.label }}</dt>
+        <dd class="{{ 'lk-secret' if item.secret else 'lk-mono' }}">
+          {{ item.value }}
+          {% if item.hint %}<span class="lk-hint">{{ item.hint }}</span>{% endif %}
+        </dd>
+      {% endfor %}
+    </dl>
+  {% endcall %}
+{%- endmacro %}
+
+{% block hero %}
+  {% call hero(
+       'Configurações',
+       subtitle='Retrato da configuração efetiva deste processo — somente leitura, com todo segredo mascarado.',
+       metrics=[
+         ('Seções', settings_public | length | number),
+         ('Módulos registrados', registered_modules | number),
+         ('Runtimes', runtimes | length | number),
+         ('Saúde', health.status)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/registry">Ver registry</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--settings lk-stack">
+    {% call card('Esta tela não edita nada', dot='warn') %}
+      <p class="lk-finding">
+        A configuração do lukato vem de <b>variáveis de ambiente</b> e não é editável pela
+        interface. O que está abaixo é o valor que este processo carregou no boot.
+      </p>
+      <p class="lk-muted">
+        Para mudar qualquer item, altere a variável correspondente no ambiente (arquivo
+        <span class="lk-mono">.env</span>, manifesto de deploy ou segredo do orquestrador) e
+        reinicie o processo. Assim existe um único lugar onde a verdade mora, e o valor
+        sobrevive ao próximo deploy.
+      </p>
+      <p class="lk-hint">
+        Você está vendo esta tela como <span class="lk-mono">{{ principal_role.value }}</span>.
+        Segredos aparecem sempre mascarados, qualquer que seja o papel.
+      </p>
+    {% endcall %}
+
+    {{ stats_open() }}
+      {{ stat('Provedor de LLM',
+              sections_by_key.get('llm').items[0].value if sections_by_key.get('llm') else '—',
+              info='Provedor efetivamente carregado.') }}
+      {{ stat('Embeddings',
+              sections_by_key.get('embedding').items[0].value if sections_by_key.get('embedding') else '—') }}
+      {{ stat('Guardrails',
+              sections_by_key.get('guardrails').items[0].value if sections_by_key.get('guardrails') else '—',
+              primary=true) }}
+      {{ stat('Saúde geral', health.status, delta=(health.components | length | number) ~ ' componentes') }}
+    {{ stats_close() }}
+
+    <h2 class="lk-section__title">Provedores, guardrails e AdWatch</h2>
+    <div class="lk-settings-grid">
+      {% for key in highlighted %}
+        {% set section = sections_by_key.get(key) %}
+        {% if section %}{{ settings_card(section) }}{% endif %}
+      {% endfor %}
+    </div>
+
+    {% call card('Saúde dos componentes') %}
+      <div class="lk-health">
+        {% for component in health.components.values() %}
+          <div class="lk-health__item">
+            <span class="lk-health__name">{{ component.label }}</span>
+            {{ dot(tone_by_status.get(component.status, 'warn'), title=component.detail) }}
+            <span class="lk-health__detail">{{ component.detail }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <p class="lk-card__foot">
+        A leitura é feita a cada poucos segundos e nunca derruba uma página: um componente
+        fora do ar aparece como <span class="lk-mono">down</span> e o console continua de pé.
+      </p>
+    {% endcall %}
+
+    {% call card('Runtimes e descoberta de módulos') %}
+      <dl class="lk-kv">
+        <dt>Runtimes</dt>
+        <dd>
+          {% if runtimes %}
+            <span class="lk-capabilities">
+              {% for runtime in runtimes %}<span class="lk-capability">{{ runtime }}</span>{% endfor %}
+            </span>
+          {% else %}
+            <span class="lk-hint">nenhum orquestrador disponível neste processo</span>
+          {% endif %}
+        </dd>
+        <dt>Módulos registrados</dt>
+        <dd class="lk-mono">{{ registered_modules | number }}</dd>
+        <dt>Autenticação</dt>
+        <dd>{{ badge('ok' if auth_enabled else 'warn',
+                     label='ligada' if auth_enabled else 'desligada') }}</dd>
+      </dl>
+
+      {% if discover_errors %}
+        <div class="lk-context__section">
+          <p class="lk-label">Falhas de descoberta</p>
+          <div class="lk-findings">
+            {% for failure in discover_errors %}
+              <p class="lk-finding lk-finding--block">{{ failure }}</p>
+            {% endfor %}
+          </div>
+          <p class="lk-hint">
+            Um building block que falhou ao ser importado não entra no registry — e a sidebar
+            e o catálogo seguem sem ele em vez de quebrarem.
+          </p>
+        </div>
+      {% else %}
+        <p class="lk-card__foot">Nenhuma falha na descoberta de building blocks.</p>
+      {% endif %}
+    {% endcall %}
+
+    <h2 class="lk-section__title">Demais seções</h2>
+    {% set remaining = settings_public | rejectattr('key', 'in', highlighted) | list %}
+    {% if remaining %}
+      <div class="lk-settings-grid">
+        {% for section in remaining %}{{ settings_card(section) }}{% endfor %}
+      </div>
+    {% else %}
+      {{ empty('Nenhuma seção adicional', name='sliders') }}
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block context_title %}Configuração{% endblock %}

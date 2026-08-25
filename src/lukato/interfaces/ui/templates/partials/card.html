@@ -1,0 +1,44 @@
+{#-
+  partials/card.html — o cartao do console (SPEC-0009 secao 6).
+
+      {% from "partials/card.html" import card %}
+
+      {% call card('Execuções recentes', dot='accent') %}
+        <table class="lk-table">…</table>
+      {% endcall %}
+
+      {% call card('Resumo do agente', ai=true) %}…{% endcall %}
+
+  Parametros:
+    label     rotulo em caixa alta do cabecalho (11px, letter-spacing .06em).
+    dot       cor do ponto que precede o rotulo: accent | ai | ok | warn |
+              danger | info | neutral.
+    ai        `true` marca o cartao como gerado por IA (fio azul no topo).
+    flush     `true` remove o padding do corpo — use com tabelas.
+    actions   HTML ja renderizado para o canto direito do cabecalho (macros de
+              botao, por exemplo). Passe `none` para nao ter acoes.
+    id        ancora opcional do cartao.
+-#}
+
+{% macro card(label='', dot='accent', ai=false, flush=false, actions=none, extra_class='', id=none) -%}
+<section
+  class="lk-card{{ ' lk-card--ai' if ai else '' }}{{ ' lk-card--flush' if flush else '' }} {{ extra_class }}"
+  {% if id %}id="{{ id }}"{% endif %}
+>
+  {% if label or actions %}
+    <div class="lk-card__head">
+      <h2 class="lk-card__label">
+        {% if dot %}<span class="lk-dot lk-dot--{{ 'ai' if ai else dot }}" aria-hidden="true"></span>{% endif %}
+        {{ label }}
+      </h2>
+      {% if actions %}<div class="lk-row">{{ actions }}</div>{% endif %}
+    </div>
+  {% endif %}
+  <div class="lk-card__body">{{ caller() }}</div>
+</section>
+{%- endmacro %}
+
+{#- Rodape opcional do cartao, para notas e contagens. -#}
+{% macro card_foot() -%}
+<p class="lk-card__foot">{{ caller() }}</p>
+{%- endmacro %}

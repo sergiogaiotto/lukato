@@ -1,0 +1,87 @@
+{#-
+  context/default.html — painel de contexto sem item selecionado (SPEC-0009 secao 7).
+
+  Mostra o resumo da tela corrente e os atalhos para as operacoes vizinhas, para
+  que a coluna da direita informe alguma coisa mesmo antes do primeiro clique.
+
+  Este fragmento tambem responde a `GET /ui/context/{entidade}/{id}` quando a
+  entidade nao e uma das suportadas, e nesse caso chega **sem** as variaveis de
+  pagina. Por isso tudo aqui e lido com `default`.
+-#}
+{%- from "partials/badge.html" import badge, dot -%}
+
+{%- set route = active_route | default('/', true) -%}
+{%- set costs = cost_summary | default(none) -%}
+{%- set state = health | default(none) -%}
+
+<div class="lk-context__title">
+  <span class="lk-truncate">{{ page_title | default('Console', true) }}</span>
+  {% if state %}{{ badge(state.status, title='Pior estado entre os componentes.') }}{% endif %}
+</div>
+
+<p class="lk-hint">
+  Selecione uma linha da tabela ou um cartão para ver aqui os detalhes do item. O painel
+  também abre por link direto: acrescente <span class="lk-mono">?sel=&lt;id&gt;</span> à URL.
+</p>
+
+<dl class="lk-kv">
+  <dt>Tela</dt>
+  <dd class="lk-mono">{{ route }}</dd>
+  <dt>Entidade</dt>
+  <dd class="lk-mono">{{ selected_entity | default('—', true) }}</dd>
+  <dt>Versão</dt>
+  <dd class="lk-mono">{{ version | default('—', true) }}</dd>
+  {% if principal is defined and principal %}
+    <dt>Operador</dt>
+    <dd>{{ principal.subject }} · {{ principal.role.value }}</dd>
+  {% endif %}
+</dl>
+
+{% if costs and costs.available %}
+  <div class="lk-context__section">
+    <p class="lk-label">Consumo nas últimas {{ costs.window_hours }} h</p>
+    <dl class="lk-kv">
+      <dt>Custo</dt>
+      <dd class="lk-mono">{{ costs.total_usd | money }}</dd>
+      <dt>Tokens</dt>
+      <dd class="lk-mono">{{ costs.total_tokens | tokens }}</dd>
+      <dt>Execuções</dt>
+      <dd class="lk-mono">{{ costs.runs | number }}</dd>
+    </dl>
+    {% if costs.modules %}
+      <p class="lk-legend">
+        {% for entry in costs.modules[:4] %}
+          <span class="lk-legend__item">
+            <span class="lk-dot {{ entry.series_class }}" aria-hidden="true"></span>
+            {{ entry.label }} · {{ entry.usd | money }}
+          </span>
+        {% endfor %}
+      </p>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if state and state.components %}
+  <div class="lk-context__section">
+    <p class="lk-label">Saúde dos provedores</p>
+    <dl class="lk-kv">
+      {% for component in state.components.values() %}
+        <dt>{{ component.label }}</dt>
+        <dd>
+          {{ dot(
+               'ok' if component.status == 'ok' else ('warn' if component.status == 'degraded' else 'danger'),
+               title=component.detail
+             ) }}
+          <span class="lk-muted">{{ component.detail }}</span>
+        </dd>
+      {% endfor %}
+    </dl>
+  </div>
+{% endif %}
+
+<div class="lk-context__actions">
+  <a class="lk-btn lk-btn--outline lk-btn--sm" href="/modules">Módulos</a>
+  <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs">Execuções</a>
+  <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/finops">FinOps</a>
+  <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch">AdWatch</a>
+</div>

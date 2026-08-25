@@ -129,7 +129,14 @@ class OcrText(DomainModel):
 
 
 class DetectionEvidence(DomainModel):
-    """Evidencias por modalidade que sustentam um candidato a deteccao."""
+    """Evidencias por modalidade que sustentam um candidato a deteccao.
+
+    `visual_from_proxy` existe porque a evidencia precisa ser autoexplicativa. Sem
+    juiz multimodal, `visual_match` herda `speech_match` (SPEC-0010 secao 3.5) — e
+    um `0.91` herdado e visualmente identico a um `0.91` que o VLM realmente
+    afirmou. Quem audita uma deteccao lendo so a evidencia nao poderia distinguir
+    os dois casos, e concluiria que houve confirmacao visual onde nao houve.
+    """
 
     speech_match: float = 0.0
     semantic_match: float = 0.0
@@ -139,6 +146,11 @@ class DetectionEvidence(DomainModel):
     order_ok: bool = True
     brand_detected: str | None = None
     matched_text: str = ""
+    visual_from_proxy: bool = False
+    """True quando `visual_match` foi herdado da fala por falta de juiz multimodal."""
+    ocr_available: bool = False
+    """False quando nao havia texto de OCR na janela: `ocr_match=0.0` e ausencia,
+    nao evidencia contraria."""
 
 
 class DetectionStatus(StrEnum):

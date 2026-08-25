@@ -1,0 +1,198 @@
+{#-
+  pages/adwatch_detections.html — deteccoes e revisao humana (`GET /adwatch/detections`).
+
+  Contexto entregue pela rota:
+    `detections`          `Page[Detection]` filtrada.
+    `statuses`            membros de `DetectionStatus`.
+    `media_options`       ativos de midia disponiveis no filtro.
+    `commercial_options`  comerciais disponiveis no filtro.
+    `thresholds`          `{accept, review}` vigentes.
+    `filters`             `{media, commercial, status}`.
+
+  A confianca aparece como barra porque o numero sozinho nao diz de que lado do
+  limiar a deteccao caiu. A decomposicao por modalidade — locucao, semantica,
+  OCR, visual e duracao — fica no painel de contexto, que abre ao clicar na linha.
+
+  As acoes de revisao sao POST: aceitar ou rejeitar muda o que a operacao conta
+  como veiculacao, e uma mudanca dessas nao pode acontecer por um GET que um
+  prefetch de navegador dispararia sozinho.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge, dot %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/stat.html" import progress %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set status_labels = {
+      'accepted': 'aceita',
+      'needs_review': 'em revisão',
+      'rejected': 'rejeitada'
+    } -%}
+{%- set review_count = detections.items | selectattr('status.value', 'equalto', 'needs_review') | list | length -%}
+
+{% block hero %}
+  {% call hero(
+       'Detecções',
+       subtitle='Cada linha é uma veiculação localizada no tempo, com a evidência que sustentou a decisão.',
+       metrics=[
+         ('No recorte', detections.total | number),
+         ('Nesta página', detections.items | length | number),
+         ('Em revisão', review_count | number),
+         ('Aceite', thresholds.accept | pct)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/adwatch">Voltar ao pipeline</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/adwatch/detections">
+    <div class="lk-field lk-grow">
+      <label for="filter-media">Mídia</label>
+      <select class="lk-select" id="filter-media" name="media">
+        <option value="">Todas</option>
+        {% for asset in media_options %}
+          <option value="{{ asset.id }}" {{ 'selected' if filters.media == asset.id else '' }}>
+            {{ asset.title if asset.title else asset.uri }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field lk-grow">
+      <label for="filter-commercial">Comercial</label>
+      <select class="lk-select" id="filter-commercial" name="commercial">
+        <option value="">Todos</option>
+        {% for item in commercial_options %}
+          <option value="{{ item.id }}" {{ 'selected' if filters.commercial == item.id else '' }}>
+            {{ item.commercial_id }} — {{ item.campaign if item.campaign else item.brand }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-status">Desfecho</label>
+      <select class="lk-select" id="filter-status" name="status">
+        <option value="">Todos</option>
+        {% for option in statuses %}
+          <option value="{{ option.value }}" {{ 'selected' if filters.status == option.value else '' }}>
+            {{ status_labels.get(option.value, option.value) }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/adwatch/detections">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--adwatch lk-stack">
+    {% call card('Detecções', flush=true) %}
+      {% if detections.items %}
+        {% call table([
+             {'label': 'Faixa', 'width': '17%'},
+             'Comercial',
+             'Campanha',
+             {'label': 'Confiança', 'width': '20%'},
+             {'label': 'Desfecho'},
+             {'label': 'Ações', 'width': '17%'}
+           ], clickable=true, caption='Detecções com evidência e revisão') %}
+          {% for item in detections.items %}
+            {%- set tone =
+                  'ok' if item.confidence >= thresholds.accept
+                  else ('warn' if item.confidence >= thresholds.review else 'danger') -%}
+            <tr {{ row_attrs('detection', item.id, selected_id) }}>
+              <td class="lk-timecode">
+                <p>{{ cell_link('detection', item.id, (item.start | duration) ~ ' → ' ~ (item.end | duration)) }}</p>
+                <p class="lk-hint">{{ (item.end - item.start) | number(1) }} s</p>
+              </td>
+              <td class="lk-mono">{{ item.commercial_code }}</td>
+              <td class="lk-truncate">
+                <p>{{ item.campaign if item.campaign else '—' }}</p>
+                {% if item.brand %}<p class="lk-hint">{{ item.brand }}</p>{% endif %}
+              </td>
+              <td>{{ progress(item.confidence, label=item.confidence | pct, tone=tone) }}</td>
+              <td>
+                {{ badge(item.status, label=status_labels.get(item.status.value, item.status.value)) }}
+                {% if item.verified_by_vlm %}
+                  {{ dot('ai', title='Confirmada pelo juiz multimodal.') }}
+                {% endif %}
+                {% if item.refined_by_scene %}
+                  {{ dot('ok', title='Fronteira refinada por corte de cena.') }}
+                {% endif %}
+              </td>
+              <td>
+                <span class="lk-row lk-row--wrap">
+                  <form method="post" action="/api/v1/adwatch/detections/{{ item.id }}">
+                    <input type="hidden" name="_method" value="patch" />
+                    <input type="hidden" name="status" value="accepted" />
+                    <button
+                      class="lk-btn lk-btn--primary lk-btn--sm"
+                      type="submit"
+                      {{ 'disabled' if item.status.value == 'accepted' else '' }}
+                    >
+                      Aceitar
+                    </button>
+                  </form>
+                  <form method="post" action="/api/v1/adwatch/detections/{{ item.id }}">
+                    <input type="hidden" name="_method" value="patch" />
+                    <input type="hidden" name="status" value="rejected" />
+                    <button
+                      class="lk-btn lk-btn--danger lk-btn--sm"
+                      type="submit"
+                      data-confirm="Rejeitar a detecção de {{ item.commercial_code }}?"
+                      {{ 'disabled' if item.status.value == 'rejected' else '' }}
+                    >
+                      Rejeitar
+                    </button>
+                  </form>
+                </span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma detecção neste recorte',
+             'Importe uma transcrição e execute a detecção sobre uma mídia para produzir os primeiros resultados.',
+             name='film',
+             action_href='/adwatch',
+             action_label='Ir para o pipeline'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {{ pagination(detections, label='detecções') }}
+
+    {% call card('Como ler a confiança') %}
+      <p class="lk-legend">
+        <span class="lk-legend__item">
+          {{ dot('ok') }} a partir de {{ thresholds.accept | pct }} — aceita sem juiz multimodal
+        </span>
+        <span class="lk-legend__item">
+          {{ dot('warn') }} entre {{ thresholds.review | pct }} e {{ thresholds.accept | pct }} —
+          faixa de dúvida, vai ao juiz multimodal e pode ficar em revisão
+        </span>
+        <span class="lk-legend__item">
+          {{ dot('danger') }} abaixo de {{ thresholds.review | pct }} — rejeitada
+        </span>
+      </p>
+      <p class="lk-hint">
+        A confiança é a fusão ponderada de locução, semântica, OCR, sinal visual e duração,
+        penalizada quando as frases-chave aparecem fora da ordem esperada. Clique em uma linha
+        para ver a decomposição completa no painel de contexto.
+      </p>
+    {% endcall %}
+  </div>
+{% endblock %}
+
+{% block context_title %}Detecção{% endblock %}
