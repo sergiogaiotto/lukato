@@ -52,7 +52,7 @@ configMapGenerator:
 
       # ---- seguranca ----
       - LUKATO_SECURITY__AUTH_ENABLED=true
-      - LUKATO_SECURITY__CORS_ORIGINS=["https://<PREENCHER: FQDN publico do lukato>"]
+      - 'LUKATO_SECURITY__CORS_ORIGINS=["https://<PREENCHER: FQDN publico do lukato>"]'
 
       # ---- guardrails ----
       - LUKATO_GUARDRAILS__ENABLED=true
@@ -66,7 +66,7 @@ configMapGenerator:
       # LANGFUSE_ENABLED=true e chaves vazias o tracer vira no-op e /readyz
       # reporta tracer=degraded (esperado, nao derruba readiness).
       - LUKATO_OBSERVABILITY__LANGFUSE_ENABLED=false
-      - LUKATO_OBSERVABILITY__LANGFUSE_HOST=<PREENCHER: https://cloud.langfuse.com ou host interno>
+      - "LUKATO_OBSERVABILITY__LANGFUSE_HOST=<PREENCHER: https://cloud.langfuse.com ou host interno>"
 
       # ---- banco ----
       # A URL completa (com usuario/senha) vem do Secret lukato-secrets.
@@ -78,8 +78,8 @@ configMapGenerator:
       # Os defaults do base apontam para hub-gpus-lab.usto.re (LLM) e
       # hub-gpus.claro.com.br/embed06b (embeddings). Confirme se sao os hosts de
       # PRODUCAO — nenhum dos dois foi exercitado a partir deste ambiente.
-      - LUKATO_LLM__BASE_URL=<PREENCHER: URL do hub de LLM em prod, terminando em /v1>
-      - LUKATO_EMBEDDING__BASE_URL=<PREENCHER: URL do hub de embeddings em prod, terminando em /v1>
+      - "LUKATO_LLM__BASE_URL=<PREENCHER: URL do hub de LLM em prod, terminando em /v1>"
+      - "LUKATO_EMBEDDING__BASE_URL=<PREENCHER: URL do hub de embeddings em prod, terminando em /v1>"
       # NUNCA troque para hashing em producao: hashing e Qwen3 gravam vetores de
       # 1024 dimensoes em espacos semanticos diferentes na MESMA colecao e a busca
       # quebra em silencio, de forma permanente.
