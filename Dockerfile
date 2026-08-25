@@ -3,8 +3,15 @@
 # Multi-stage: builder (wheels) -> runtime enxuto, non-root, pronto p/ Kubernetes
 # =============================================================================
 
+# Imagem base parametrizavel: por padrao a oficial do Docker Hub, mas em rede
+# corporativa (ou atras de um proxy que bloqueie o CDN de blobs do Hub) aponte
+# para o mirror interno:
+#   docker build --build-arg PYTHON_IMAGE=<registry>/python:3.11-slim-bookworm .
+# Qualquer imagem Debian bookworm com Python 3.11 serve — o Dockerfile usa apt.
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm
+
 # ------------------------------ estagio: builder -----------------------------
-FROM python:3.11-slim-bookworm AS builder
+FROM ${PYTHON_IMAGE} AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -26,7 +33,7 @@ COPY src ./src
 RUN /opt/venv/bin/pip install --no-deps .
 
 # ------------------------------ estagio: runtime -----------------------------
-FROM python:3.11-slim-bookworm AS runtime
+FROM ${PYTHON_IMAGE} AS runtime
 
 LABEL org.opencontainers.image.title="lukato" \
       org.opencontainers.image.version="1.0.0" \

@@ -102,6 +102,16 @@ modulo (uma linha no banco), nao um arquivo Python.
    make docker-build  # somente a imagem  (lukato:1.0.0)
    make docker-run    # roda a imagem isolada com o .env local
 
+ Rede restrita (proxy corporativo que bloqueia o CDN do Docker Hub):
+ a imagem base e parametrizavel, entao aponte para o espelho interno --
+
+   make docker-build-mirror PYTHON_IMAGE=<registry-interno>/python:3.11-slim-bookworm
+
+ Serve qualquer imagem Debian bookworm com Python 3.11 (o Dockerfile usa apt).
+ O build tambem precisa alcancar deb.debian.org para instalar curl, libpq5 e
+ tini; se o proxy bloquear o repositorio Debian, aponte o apt para o espelho
+ interno de voces.
+
  Perfil de observabilidade (Langfuse local em http://localhost:3000):
 
    docker compose --profile obs up -d

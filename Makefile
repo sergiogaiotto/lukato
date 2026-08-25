@@ -96,6 +96,10 @@ openapi: ## exporta o contrato OpenAPI para specs/contracts/
 docker-build: ## constroi a imagem
 	docker build -t $(IMAGE) .
 
+docker-build-mirror: ## constroi usando um registry espelho (rede restrita); PYTHON_IMAGE=<ref>
+	@test -n "$(PYTHON_IMAGE)" || (echo "informe PYTHON_IMAGE=<registry>/python:3.11-slim-bookworm"; exit 1)
+	docker build --build-arg PYTHON_IMAGE=$(PYTHON_IMAGE) -t $(IMAGE) .
+
 docker-run: ## roda a imagem isolada
 	docker run --rm -p 8000:8000 --env-file .env $(IMAGE)
 
