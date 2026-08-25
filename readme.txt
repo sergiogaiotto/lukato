@@ -286,6 +286,25 @@ modulo (uma linha no banco), nao um arquivo Python.
  se domain/ passar a importar sqlalchemy, fastapi, httpx, openai, langgraph,
  langfuse ou jinja2.
 
+ Provas executaveis
+ ------------------
+ Duas delas, para quando ler o codigo nao basta. Cada uma monta o proprio banco
+ descartavel e nao toca no seu: rode quantas vezes quiser, com ou sem .env.
+
+   python scripts/prova_trinca.py
+       O requisito central, em 7 asercoes. O LLM e um EchoLLM instrumentado que
+       CONTA chamadas: quando o guardrail de entrada bloqueia, o contador fica em
+       zero, e "o guardrail bloqueia antes do provedor" deixa de ser afirmacao e
+       vira evidencia. Prova tambem que duas definicoes sobre a MESMA classe
+       produzem comportamentos diferentes so trocando o binding.
+
+   python scripts/prova_adwatch.py
+       O funil do AdWatch inteiro sem FFmpeg, sem WhisperX, sem GPU e sem rede,
+       pelo caminho de importacao de transcricao. Imprime a decomposicao do score
+       parcela por parcela, contra os pesos da SPEC-0010. O comercial presente
+       para em needs_review porque falta OCR: e o pipeline obedecendo a 3.6, nao
+       um defeito.
+
 
 -------------------------------------------------------------------------------
  12. BANCO DE DADOS
