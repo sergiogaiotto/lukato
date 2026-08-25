@@ -119,10 +119,10 @@ def _load_repositories_module() -> ModuleType:
 def _instantiate(factory: Any, session: AsyncSession, vector_dim: int) -> Any:
     """Instancia o repositorio passando `vector_dim` apenas quando ele o aceita."""
     try:
-        parameters = inspect.signature(factory).parameters
-    except (TypeError, ValueError):  # builtins e objetos sem assinatura introspectavel
-        parameters = {}
-    if "vector_dim" in parameters:
+        accepts_dim = "vector_dim" in inspect.signature(factory).parameters
+    except (TypeError, ValueError):  # objetos sem assinatura introspectavel
+        accepts_dim = False
+    if accepts_dim:
         return factory(session, vector_dim=vector_dim)
     return factory(session)
 
