@@ -3,10 +3,12 @@ kind: Kustomization
 
 namespace: lukato
 
-commonLabels:
-  app.kubernetes.io/name: lukato
-  app.kubernetes.io/part-of: lukato
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: lukato
+      app.kubernetes.io/part-of: lukato
+      app.kubernetes.io/managed-by: kustomize
 
 resources:
   - namespace.yaml

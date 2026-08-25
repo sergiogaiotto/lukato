@@ -135,8 +135,16 @@ jobs:
           test -s /tmp/dev.yaml && test -s /tmp/prod.yaml
       - name: Nenhum segredo real versionado
         run: |
+          # O corpus do detector de segredos e a UNICA excecao: para testar que o
+          # guardrail reconhece 'sk-...', 'AKIA...' e chaves PEM, o teste precisa
+          # conter um exemplo de cada. Sao valores publicos e obviamente falsos
+          # (um deles e o proprio exemplo da documentacao da AWS). A exclusao
+          # e por ARQUIVO, nao por diretorio: um segredo de verdade em qualquer
+          # outro teste continua sendo pego.
           if grep -rniE '(sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' \
-               --exclude-dir=.git . ; then
+               --exclude-dir=.git \
+               --exclude=test_guardrail_rules.py \
+               . ; then
             echo "::error::segredo aparente encontrado no repositorio"; exit 1
           fi
           echo "nenhum segredo aparente"
