@@ -130,15 +130,15 @@ class CostCalculator:
             "by_module": {key: round(value, _COST_DIGITS) for key, value in by_module.items()},
             "by_model": {key: round(value, _COST_DIGITS) for key, value in by_model.items()},
         }
-        if "unknown_models" in CostSummary.model_fields:
-            payload["unknown_models"] = sorted(unknown)
+        payload["unknown_models"] = sorted(unknown)
         return CostSummary(**payload)
 
     def unknown_models(self, records: Iterable[UsageRecord]) -> frozenset[str]:
         """Modelos dos registros que nao possuem preco cadastrado.
 
-        Complementa `summarize` enquanto `CostSummary` nao expuser o campo: a
-        lacuna de precificacao nunca fica silenciosa.
+        `summarize` ja devolve a mesma informacao em `CostSummary.unknown_models`;
+        este metodo continua util para inspecionar um lote de registros sem montar
+        o agregado inteiro.
         """
         return frozenset(record.model for record in records if not self.is_known(record.model))
 

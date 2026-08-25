@@ -56,10 +56,9 @@ from lukato.application.use_cases.identity import (
     RotateApiKey,
 )
 from lukato.config import get_logger
-from lukato.domain.errors import UnsupportedCapability, ValidationError
+from lukato.domain.errors import ConfigurationError, UnsupportedCapability, ValidationError
 from lukato.domain.models.identity import ApiKey
 from lukato.domain.models.module import ModuleKind
-from lukato.domain.ports.media import MediaToolbox
 from lukato.domain.types import Json
 from lukato.modules.base import (
     BaseModule,
@@ -70,7 +69,6 @@ from lukato.modules.base import (
     UINavItem,
 )
 from lukato.modules.registry import register_module
-from lukato.modules.registry import registry as process_registry
 
 __all__ = [
     "ACTIONS",
@@ -320,35 +318,27 @@ def _gather_services(ctx: ModuleContext, names: tuple[str, ...]) -> dict[str, An
     return found
 
 
-def _container_from_context(ctx: ModuleContext) -> Container:
-    """Monta um `Container` com as portas do contexto (rede de seguranca)."""
-    parts = _gather_services(ctx, REQUIRED_SERVICES)
-    media = ctx.services.get("media")
-    return Container(
-        settings=ctx.settings,
-        llm=ctx.llm,
-        embeddings=ctx.embeddings,
-        vector_store=parts["vector_store"],
-        guardrails=ctx.guardrails,
-        tracer=ctx.tracer,
-        uow_factory=ctx.uow_factory,
-        orchestrators=dict(ctx.orchestrators),
-        registry=ctx.services.get("registry") or process_registry,
-        cost_calculator=parts["cost_calculator"],
-        composer=parts["composer"],
-        hasher=parts["hasher"],
-        tokens=parts["tokens"],
-        media=media if isinstance(media, MediaToolbox) else MediaToolbox(),
-        tools=ctx.services.get("tools"),
-    )
-
-
 def _resolve_container(ctx: ModuleContext) -> Container:
-    """Devolve o `Container` publicado em `ctx.services` ou um montado do contexto."""
+    """Devolve o `Container` publicado em `ctx.services` pelo `InvokeModule`.
+
+    Antes havia aqui uma rede de seguranca que remontava o `Container` a partir do
+    contexto. Ela foi removida: duplicava a fiacao (um campo novo no `Container`
+    precisaria ser lembrado em dois lugares, e o esquecimento seria silencioso) e,
+    pior, mascarava exatamente o defeito que existia — `InvokeModule` nao publicava
+    a chave `container`, e so este modulo nao quebrava por causa do remendo.
+    """
     found = ctx.services.get(CONTAINER_SERVICE)
     if isinstance(found, Container):
         return found
-    return _container_from_context(ctx)
+    raise ConfigurationError(
+        f"O modulo '{ctx.definition.slug}' precisa de ctx.services['{CONTAINER_SERVICE}'], "
+        "publicado pelo InvokeModule. Contexto montado a mao em teste deve inclui-lo.",
+        details={
+            "module_slug": ctx.definition.slug,
+            "expected_service": CONTAINER_SERVICE,
+            "available": sorted(ctx.services),
+        },
+    )
 
 
 def _with_token_ttl(container: Container, ttl_seconds: int) -> Container:

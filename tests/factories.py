@@ -684,9 +684,7 @@ def make_scenes(bounds: Sequence[tuple[float, float]], *, kind: str = "cut") -> 
     ]
 
 
-def make_ocr(
-    spec: Sequence[tuple[str, float, float]], *, confidence: float = 0.9
-) -> list[OcrText]:
+def make_ocr(spec: Sequence[tuple[str, float, float]], *, confidence: float = 0.9) -> list[OcrText]:
     """Cria a lista de `OcrText` a partir de trechos `("texto", inicio, fim)`."""
     return [
         OcrText(text=texto, start=float(inicio), end=float(fim), confidence=confidence)

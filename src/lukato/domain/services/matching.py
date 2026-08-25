@@ -576,12 +576,21 @@ class CandidateBuilder:
         if window_vec and fingerprint.embedding:
             semantic = self.semantic.similarity(window_vec, fingerprint.embedding)
         ocr = 0.0
-        if window.ocr_text.strip():
+        ocr_available = bool(window.ocr_text.strip())
+        if ocr_available:
             ocr = max(
                 self.lexical.score(window.ocr_text, fingerprint.normalized_text),
                 self.lexical.best_keyword_score(window.ocr_text, fingerprint.keywords),
             )
-        visual = speech if visual_score is None else _clamp(float(visual_score))
+        # Sem juiz multimodal, `visual_match` herda a fala — e o fato precisa
+        # viajar junto na evidencia, senao um 0.91 herdado fica indistinguivel de
+        # um 0.91 que o VLM realmente afirmou (SPEC-0010 secao 3.5).
+        if visual_score is None:
+            visual_from_proxy = True
+            visual = speech
+        else:
+            visual_from_proxy = False
+            visual = _clamp(float(visual_score))
         duration = self.fusion.duration_score(window.duration, fingerprint.duration)
         anchors = fingerprint.key_phrases or fingerprint.keywords
         _, order_ok = self.order.evaluate(window.text, anchors)
@@ -594,6 +603,8 @@ class CandidateBuilder:
             order_ok=order_ok,
             brand_detected=self._brand(window, fingerprint),
             matched_text=window.text,
+            visual_from_proxy=visual_from_proxy,
+            ocr_available=ocr_available,
         )
         score = self.fusion.fuse(evidence)
         return score, evidence

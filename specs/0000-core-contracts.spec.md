@@ -48,8 +48,22 @@ Regras **obrigatorias**, verificadas por teste de arquitetura (`tests/unit/test_
    `adapters` nem `interfaces` (a composicao acontece no *composition root*).
 3. `lukato.adapters.*` importa `domain` (para implementar portas) e bibliotecas externas.
 4. `lukato.interfaces.*` importa `application` + `domain`; recebe adaptadores por injecao.
-5. `lukato.composition` (composition root) e o **unico** modulo autorizado a importar
-   `adapters` + `application` + `interfaces` ao mesmo tempo.
+5. `lukato.composition` (composition root) e o **unico** modulo que **monta o
+   `Container`**. Nenhum outro modulo pode chama-lo — e assim que a fiacao fica em
+   um lugar so e a troca de adaptador vira uma linha.
+
+   Isto **nao** proibe `interfaces/` de importar um adaptador. Interfaces sao
+   infraestrutura (driving adapters), e ha tres usos legitimos e deliberados:
+
+   | Modulo | Importa | Por que |
+   | --- | --- | --- |
+   | `interfaces/http/api/v1/routers/adwatch.py` | `adapters.media.importers`, `adapters.media.factory` | o parsing do JSON do WhisperX acontece na borda, e a aplicacao recebe `list[TranscriptWord]` ja tipada (SPEC-0010) |
+   | `interfaces/http/api/v1/routers/health.py` | `adapters.observability.metrics` | servir `/metrics` exige o registro de metricas |
+   | `interfaces/cli.py` | `adapters.guardrails.policies` | o `seed` precisa das politicas concretas |
+
+   A regra que importa e a de dentro: **`domain/` e `application/` nunca importam
+   `adapters` nem `interfaces`** (itens 1 e 2). Essa e verificada por lint e por
+   `tests/unit/test_architecture.py`.
 
 ---
 

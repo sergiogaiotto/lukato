@@ -1014,6 +1014,11 @@ class InvokeModule(_UseCase):
         """
         container = self._container
         services: dict[str, Any] = {
+            # Os building blocks que orquestram casos de uso proprios (auth, finops,
+            # knowledge, adwatch) constroem-nos com o container. Sem esta chave eles
+            # levantam UnsupportedCapability na primeira invocacao — so `processing`
+            # sobrevive, porque nao usa caso de uso nenhum.
+            "container": container,
             "composer": container.composer,
             "cost_calculator": container.cost_calculator,
             "vector_store": container.vector_store,
