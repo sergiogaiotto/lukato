@@ -125,7 +125,16 @@ COPY --chown=10001:10001 migrations ./migrations
 COPY --chown=10001:10001 alembic.ini pyproject.toml README.md ./
 COPY --chown=10001:10001 scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 
-RUN chmod +x /usr/local/bin/entrypoint.sh \
+# `tr -d '\r'` antes do chmod: o `.gitattributes` impede que o checkout no
+# Windows estrague o script, mas quem clonou ANTES dele ja tem o arquivo com CRLF
+# no disco, e o build usa o que esta no disco. Sem esta linha o container morre no
+# start com `/usr/bin/env: 'bash\r': No such file or directory` — uma mensagem que
+# nao menciona final de linha em lugar nenhum, e que custa horas para quem nunca
+# viu. Um `tr` idempotente e barato demais para deixar essa armadilha de pe.
+RUN tr -d '\r' < /usr/local/bin/entrypoint.sh > /tmp/entrypoint.sh \
+ && mv /tmp/entrypoint.sh /usr/local/bin/entrypoint.sh \
+ && chmod +x /usr/local/bin/entrypoint.sh \
+ && head -1 /usr/local/bin/entrypoint.sh | grep -q '^#!/usr/bin/env bash$' \
  && mkdir -p /app/var && chown -R 10001:10001 /app/var
 
 USER 10001:10001

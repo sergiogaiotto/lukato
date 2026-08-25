@@ -1,0 +1,50 @@
+# =============================================================================
+#  Finais de linha
+#
+#  O Git no Windows vem com core.autocrlf=true e converte LF para CRLF ao fazer
+#  checkout. Para um .py isso e inofensivo. Para um script que roda DENTRO da
+#  imagem Linux, nao e: o shebang vira
+#
+#      #!/usr/bin/env bash\r
+#
+#  e o Linux passa a procurar um programa chamado literalmente `bash\r`. O
+#  container morre no start com
+#
+#      /usr/bin/env: 'bash\r': No such file or directory
+#
+#  Sem este arquivo, qualquer pessoa que clone o repositorio no Windows e rode
+#  `docker compose up --build` bate nisso — e a mensagem nao diz "final de linha"
+#  em lugar nenhum.
+# =============================================================================
+
+# Padrao: o Git normaliza para LF no repositorio e entrega LF no checkout, em
+# qualquer sistema operacional.
+* text=auto eol=lf
+
+# Explicito para o que EXECUTA em Linux: aqui CRLF nao e questao de estilo, e
+# quebra funcional.
+*.sh        text eol=lf
+entrypoint  text eol=lf
+Dockerfile  text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+
+# Estes o Windows le com ferramentas nativas; CRLF ajuda e nao atrapalha ninguem.
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binarios: o Git nao encosta.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       text eol=lf
+*.pdf       binary
+*.mp4       binary
+*.tar       binary
+*.gz        binary
+*.zip       binary
+*.whl       binary
+*.db        binary
