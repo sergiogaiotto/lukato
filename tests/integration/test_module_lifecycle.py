@@ -339,7 +339,10 @@ async def test_modulo_de_fora_publica_item_de_menu_no_console(
     html = (await client.get("/modules")).text
 
     assert f'href="/modules/{DEFINICAO_TRIAGEM}"' in html
-    assert ">Ensaio<" in html, "o item de menu publicado pelo modulo nao apareceu na sidebar"
+    assert '<span class="lk-nav__label">Ensaio</span>' in html, (
+        "o item de menu publicado pelo modulo nao apareceu na sidebar"
+    )
+    assert 'aria-label="Ensaio"' in html, "o item de menu recolhido ficou sem rotulo acessivel"
 
 
 async def test_remover_o_modulo_do_registry_nao_derruba_a_aplicacao(
