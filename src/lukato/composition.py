@@ -251,12 +251,27 @@ async def build_container(settings: Settings) -> tuple[Container, AsyncEngine]:
         fail_open=settings.guardrails.fail_open,
     )
 
+    # -- calculo de custo ---------------------------------------------------
+    # Construido ANTES das ferramentas: a `cost_lookup` recebe o calculador para
+    # marcar modelo sem preco em vez de entregar 0.00 ao agente como se fosse
+    # gratuito (SPEC-0005 secao 2).
+    cost_calculator = build_cost_calculator(settings)
+    _selected(
+        "cost_calculator",
+        "CostCalculator",
+        reason="tabela de precos de LUKATO_FINOPS__PRICES aplicada sobre os modelos conhecidos",
+        models=sorted(cost_calculator.prices),
+        currency=settings.finops.currency,
+        enabled=settings.finops.enabled,
+    )
+
     # -- ferramentas e orquestradores --------------------------------------
     tools: ToolRegistry = build_tool_registry()
     tool_context = ToolContext(
         embeddings=embeddings,
         vector_store=vector_store,
         uow_factory=uow_factory,
+        cost_calculator=cost_calculator,
         settings=settings,
         collection=settings.embedding.collection,
     )
@@ -287,15 +302,6 @@ async def build_container(settings: Settings) -> tuple[Container, AsyncEngine]:
     discovered, builtin = _load_registry()
 
     # -- servicos de dominio e seguranca -----------------------------------
-    cost_calculator = build_cost_calculator(settings)
-    _selected(
-        "cost_calculator",
-        "CostCalculator",
-        reason="tabela de precos de LUKATO_FINOPS__PRICES aplicada sobre os modelos conhecidos",
-        models=sorted(cost_calculator.prices),
-        currency=settings.finops.currency,
-        enabled=settings.finops.enabled,
-    )
 
     composer = ModuleComposer(
         default_model=settings.llm.model,

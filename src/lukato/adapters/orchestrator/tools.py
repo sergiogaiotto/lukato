@@ -23,10 +23,12 @@ from typing import Any, Final
 
 from lukato.config import Settings, get_logger
 from lukato.domain.errors import ConflictError, LukatoError, ModuleError, ValidationError
+from lukato.domain.models.finops import CostSummary
 from lukato.domain.ports.embeddings import EmbeddingPort
 from lukato.domain.ports.misc import ClockPort
 from lukato.domain.ports.unit_of_work import UnitOfWorkFactory
 from lukato.domain.ports.vector_store import VectorStorePort
+from lukato.domain.services.cost_calculator import CostCalculator
 from lukato.domain.types import DEFAULT_TENANT, Json, utcnow
 
 __all__ = [
@@ -95,6 +97,7 @@ class ToolContext:
     embeddings: EmbeddingPort | None = None
     vector_store: VectorStorePort | None = None
     uow_factory: UnitOfWorkFactory | None = None
+    cost_calculator: CostCalculator | None = None
     settings: Settings | None = None
     tenant_id: str = DEFAULT_TENANT
     module_slug: str = ""
@@ -431,7 +434,18 @@ async def cost_lookup(args: Json, ctx: ToolContext) -> Json:
         "runs": summary.runs,
         "by_module": summary.by_module,
         "by_model": summary.by_model,
+        # Mesma razao do campo em `GetCostSummary`: a agregacao vem em SQL e nao
+        # sabe quais modelos tem preco. Sem isto, um modelo sem tabela chega ao
+        # agente como 0.00 — indistinguivel de gratuito (SPEC-0005 secao 2).
+        "unknown_models": _unknown_models(summary, ctx.cost_calculator),
     }
+
+
+def _unknown_models(summary: CostSummary, calculator: CostCalculator | None) -> list[str]:
+    """Modelos do resumo sem preco cadastrado; lista vazia quando nao da para saber."""
+    if calculator is None:
+        return []
+    return sorted(model for model in summary.by_model if not calculator.is_known(model))
 
 
 def _commercial_item(commercial: Any) -> Json:

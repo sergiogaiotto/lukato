@@ -184,6 +184,15 @@ class SqlAlchemyDocumentRepository:
             rows: Sequence[ChunkRow] = result.scalars().all()
         return [chunk_to_domain(row) for row in rows]
 
+    async def count_chunks(self, document_id: Id) -> int:
+        """Conta os chunks do documento sem carregar conteudo nem vetores."""
+        statement = (
+            select(func.count()).select_from(ChunkRow).where(ChunkRow.document_id == document_id)
+        )
+        async with _translate("documents.count_chunks"):
+            result = await self._session.execute(statement)
+        return int(result.scalar_one())
+
     async def delete_chunks(self, document_id: Id) -> int:
         """Remove os chunks do documento; devolve quantos foram apagados."""
         statement = delete(ChunkRow).where(ChunkRow.document_id == document_id)

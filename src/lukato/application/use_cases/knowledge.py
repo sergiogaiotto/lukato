@@ -12,6 +12,12 @@ gravados:
 * **Idempotencia por checksum.** O `checksum` e o SHA-256 do conteudo
   normalizado. Reingerir o mesmo conteudo atualiza apenas os metadados do
   documento: nenhum chunk novo e criado e nenhum embedding e pedido ao provedor.
+* **Ingestao compensada.** A linha do documento e gravada numa transacao curta,
+  antes do embedding, e de proposito: ninguem segura transacao de banco aberta
+  durante tres tentativas com backoff contra a rede. A atomicidade vem depois, por
+  compensacao — se o embedder falhar, a gravacao e desfeita, e nenhuma ingestao
+  sobrevive sem vetor. Documento gravado com zero chunks nao esta indexado: nao e
+  achado pela busca e nao aparece como pendencia em lugar nenhum.
 * **Guarda de compatibilidade da colecao** (SPEC-0007 secao 1.2). Cada chunk
   carrega `embedding_provider`, `embedding_model` e `embedding_dimensions`.
   Gravar ou buscar em uma colecao produzida por outro embedder e recusado com
@@ -537,8 +543,14 @@ def _chunk_id(document_id: Id, index: int) -> Id:
 class IngestDocument(_KnowledgeUseCase):
     """Ingere um documento: normaliza, recorta, embedda e indexa.
 
-    Reingerir o mesmo conteudo (mesmo `checksum`) e idempotente: os metadados sao
-    atualizados, nenhum embedding e pedido e nenhum chunk e duplicado.
+    Reingerir o mesmo conteudo (mesmo `checksum`) e idempotente **quando o documento
+    tem vetores**: os metadados sao atualizados, nenhum embedding e pedido e nenhum
+    chunk e duplicado. Um documento gravado com zero chunks nunca foi indexado, entao
+    a reingestao o manda de volta ao embedder em vez de responder 201.
+
+    Falha na indexacao e compensada (`_compensate`): a linha gravada nao fica para
+    tras como orfao. A compensacao cobre a LINHA, nao o indice — os limites estao
+    escritos na docstring de `_compensate`.
     """
 
     async def execute(self, data: DocumentInput, principal: Principal) -> IngestResult:
@@ -564,7 +576,14 @@ class IngestDocument(_KnowledgeUseCase):
         async with self._container.uow_factory() as uow:
             fingerprint = await self.ensure_compatible(uow, collection, action="ingerir")
             existing = await self._find_existing(uow, collection, data, title=title, source=source)
-            if existing is not None and existing.checksum == checksum:
+            # `count_chunks` e nao `len(list_chunks(...))`: a pergunta aqui e so
+            # "chegou a ser indexado?", e carregar cada chunk com o vetor inteiro
+            # para comparar o tamanho com zero custa ate MAX_CHUNKS_PER_DOCUMENT
+            # linhas por request, em TODA ingestao que encontra documento existente.
+            indexed_chunks = (
+                0 if existing is None else await uow.documents.count_chunks(existing.id)
+            )
+            if existing is not None and existing.checksum == checksum and indexed_chunks > 0:
                 return await self._refresh_metadata(
                     uow,
                     existing,
@@ -572,7 +591,21 @@ class IngestDocument(_KnowledgeUseCase):
                     source=source,
                     metadata=metadata,
                     fingerprint=fingerprint,
+                    chunks=indexed_chunks,
                 )
+            if existing is not None and existing.checksum == checksum:
+                # Mesmo checksum e nenhum vetor: a indexacao anterior morreu no meio.
+                # Responder o caminho idempotente aqui devolveria 201 para um documento
+                # que a busca nunca acha, e a cada nova tentativa de novo. Cai adiante,
+                # no caminho que embedda.
+                _logger.warning(
+                    "document_ingest_orphan_reindex",
+                    document_id=existing.id,
+                    collection=collection,
+                    checksum=checksum,
+                )
+            # So um documento que ja tem vetores tem estado anterior digno de voltar.
+            previous = existing if indexed_chunks > 0 else None
             previous_id = existing.id if existing is not None else None
 
         document = Document(
@@ -585,7 +618,15 @@ class IngestDocument(_KnowledgeUseCase):
             checksum=checksum,
         )
         stored = await self._persist(document, previous_id=previous_id)
-        indexed = await self.index_document(stored, fingerprint)
+        try:
+            indexed = await self.index_document(stored, fingerprint)
+        except BaseException as error:
+            # BaseException e nao Exception de proposito: `asyncio.CancelledError`
+            # nao herda de Exception desde o 3.8, e uma desconexao do cliente no
+            # meio do embed deixaria a linha gravada sem compensacao — o mesmo
+            # orfao, por outra porta.
+            await self._compensate(stored, previous=previous, error=error)
+            raise
         _logger.info(
             "document_ingested",
             document_id=stored.id,
@@ -640,8 +681,14 @@ class IngestDocument(_KnowledgeUseCase):
         source: str,
         metadata: Json,
         fingerprint: EmbeddingFingerprint,
+        chunks: int,
     ) -> IngestResult:
-        """Caminho idempotente: mesmo checksum, so os metadados sao atualizados."""
+        """Caminho idempotente: mesmo checksum e vetores no lugar, so metadados mudam.
+
+        `chunks` vem contado pelo chamador porque e ele quem decide se este caminho
+        vale: documento sem nenhum vetor nao esta indexado, e voltar 201 para ele
+        seria transformar uma falha transitoria do hub em perda permanente e muda.
+        """
         merged: Json = {**existing.metadata, **metadata}
         updated = existing.model_copy(
             update={
@@ -653,7 +700,6 @@ class IngestDocument(_KnowledgeUseCase):
         )
         stored = await uow.documents.update(updated)
         await uow.commit()
-        chunks = len(await uow.documents.list_chunks(stored.id))
         _logger.info(
             "document_ingest_idempotent",
             document_id=stored.id,
@@ -692,6 +738,60 @@ class IngestDocument(_KnowledgeUseCase):
             stored = await uow.documents.add(document)
             await uow.commit()
             return stored
+
+    async def _compensate(
+        self, stored: Document, *, previous: Document | None, error: BaseException
+    ) -> None:
+        """Desfaz a gravacao da LINHA quando a indexacao falha.
+
+        A transacao de `_persist` e curta de proposito, entao a atomicidade da
+        linha do documento e feita aqui, depois:
+
+        * documento que ja tinha vetores volta ao conteudo anterior;
+        * documento sem vetor nenhum e removido: ele so sobreviveria como orfao,
+          invisivel a busca, contado como documento em `GET /knowledge/collections`
+          e sem nada que o aponte como pendente.
+
+        O QUE ESTA COMPENSACAO NAO ALCANCA — e importante nao se enganar com ela.
+        `index_document` apaga o indice antigo e grava o novo em duas transacoes
+        separadas (`vector_store.delete` e `vector_store.upsert`, cada uma com seu
+        commit). Se a falha cair ENTRE as duas, os vetores antigos ja se foram e
+        aqui so da para restaurar a linha: o conteudo volta ao anterior, mas o
+        documento fica sem indice ate a proxima reingestao. Por isso o log diz
+        `linha_restaurada`, e nao "restaurado" — restaurar a linha nao e restaurar
+        a busca. Fechar essa janela exige trocar o par delete+upsert por uma
+        operacao unica no `VectorStore`, o que muda a porta e esta fora daqui.
+
+        Falha da propria compensacao e registrada e engolida: quem chamou precisa
+        receber o erro do provedor, que e a causa, e nao um erro de limpeza.
+        """
+        try:
+            async with self._container.uow_factory() as uow:
+                if previous is None:
+                    await uow.documents.delete(stored.id)
+                else:
+                    await uow.documents.update(previous.model_copy(update={"updated_at": utcnow()}))
+                await uow.commit()
+        except Exception as undo_error:
+            _logger.error(
+                "document_ingest_compensation_failed",
+                document_id=stored.id,
+                collection=stored.collection,
+                error=f"{type(undo_error).__name__}: {undo_error}",
+                cause=f"{type(error).__name__}: {error}",
+            )
+            return
+        _logger.warning(
+            "document_ingest_compensated",
+            document_id=stored.id,
+            collection=stored.collection,
+            # `linha_restaurada` fala so da linha do documento. O indice pode ter
+            # sido apagado antes da falha (ver a docstring): nao ha como afirmar
+            # daqui que a busca voltou ao que era.
+            linha_restaurada=previous is not None,
+            indice_incerto=True,
+            cause=f"{type(error).__name__}: {error}",
+        )
 
 
 class ReindexDocument(_KnowledgeUseCase):

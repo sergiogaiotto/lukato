@@ -324,6 +324,15 @@ class DocumentRepository(Protocol):
         """Lista os chunks do documento em ordem de indice."""
         ...
 
+    async def count_chunks(self, document_id: Id) -> int:
+        """Conta os chunks do documento sem carregar conteudo nem vetores.
+
+        Existe para responder "este documento chegou a ser indexado?" — a pergunta
+        da ingestao — sem materializar ate `MAX_CHUNKS_PER_DOCUMENT` linhas com o
+        vetor inteiro de cada uma so para comparar o tamanho com zero.
+        """
+        ...
+
     async def delete_chunks(self, document_id: Id) -> int:
         """Remove os chunks do documento; devolve quantos foram apagados."""
         ...

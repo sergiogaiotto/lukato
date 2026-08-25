@@ -452,12 +452,38 @@ class GetCostSummary(_FinOpsUseCase):
         """Devolve o `CostSummary` do recorte pedido (SPEC-0005 secao 4)."""
         authorize(principal, Permission.FINOPS_READ, "ler o resumo de custo")
         async with self._container.uow_factory() as uow:
-            return await uow.usage.summary(
+            summary = await uow.usage.summary(
                 since=filters.since,
                 until=filters.until,
                 module_slug=filters.module_slug,
                 tenant_id=filters.tenant_id,
             )
+        return self._flag_unknown_models(summary)
+
+    def _flag_unknown_models(self, summary: CostSummary) -> CostSummary:
+        """Nomeia em `unknown_models` os modelos do resumo sem preco cadastrado.
+
+        A agregacao vem em SQL do repositorio, que nao tem como decidir isto: a
+        tabela de precos vive no processo (`Settings` e `UpdatePrices`), nunca no
+        banco (SPEC-0011). A lacuna e resolvida aqui, na aplicacao, onde o
+        `CostCalculator` esta ao alcance e nenhum adaptador precisa conhecer o
+        outro. Sem esta marcacao, um modelo novo custaria `0.00` pelo preco
+        default e passaria por gratuito (SPEC-0005 secao 2).
+        """
+        calculator = self._container.cost_calculator
+        unknown = sorted(model for model in summary.by_model if not calculator.is_known(model))
+        if unknown:
+            # `debug`, nao `warning`: esta e a leitura, nao o evento. A barra de
+            # status do console chama este caso de uso a cada render de pagina, e
+            # um warning aqui repetiria a mesma lista para sempre. Quem avisa e
+            # `module_usage_unknown_model_price`, no momento da invocacao. Para
+            # quem consome a resposta, o sinal e o proprio campo `unknown_models`.
+            _logger.debug(
+                "cost_summary_unknown_models",
+                models=unknown,
+                reason="modelos sem preco cadastrado: custo apurado com o preco default",
+            )
+        return summary.model_copy(update={"unknown_models": unknown})
 
 
 class GetCostSeries(_FinOpsUseCase):

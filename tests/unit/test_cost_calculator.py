@@ -273,7 +273,13 @@ def test_unknown_models_e_vazio_quando_tudo_esta_precificado() -> None:
 
 
 def test_summarize_reporta_modelos_desconhecidos_no_proprio_resumo() -> None:
-    """SPEC-0005 secao 2: o modelo sem preco e reportado em `CostSummary.unknown_models`."""
+    """SPEC-0005 secao 2: o modelo sem preco e reportado em `CostSummary.unknown_models`.
+
+    Cuidado ao ler este teste como cobertura do defeito: `summarize` agrega uma
+    lista de registros em memoria e **nenhuma rota o chama** — as rotas leem o
+    resumo agregado em SQL por `uow.usage.summary`. Quem cobre o caminho de
+    producao e `tests/integration/test_finops_unknown_models.py`.
+    """
     registros = [
         make_usage_record(model="qwen-latest", record_id=id_de("c", 1)),
         make_usage_record(model="modelo-fantasma", record_id=id_de("c", 2)),
@@ -281,7 +287,7 @@ def test_summarize_reporta_modelos_desconhecidos_no_proprio_resumo() -> None:
 
     resumo = _calculadora(PRECO_SPEC).summarize(registros)
 
-    assert resumo.unknown_models == ["modelo-fantasma"]  # type: ignore[attr-defined]
+    assert resumo.unknown_models == ["modelo-fantasma"]
 
 
 # --------------------------------------------------------------------------- #

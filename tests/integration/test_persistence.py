@@ -450,6 +450,10 @@ async def test_summary_agrega_custo_e_tokens_por_modulo_e_por_modelo(uow) -> Non
     assert resumo.by_module == {"alfa": pytest.approx(3.0), "beta": pytest.approx(4.0)}
     assert resumo.by_model == {"modelo-a": pytest.approx(5.0), "modelo-b": pytest.approx(2.0)}
     assert resumo.runs == 2, "uma execucao distinta mais um registro avulso sem run_id"
+    assert resumo.unknown_models == [], (
+        "a tabela de precos nao vive no banco: quem marca a lacuna e GetCostSummary, "
+        "coberto por tests/integration/test_finops_unknown_models.py"
+    )
 
 
 async def test_summary_respeita_o_recorte_de_periodo_e_de_modulo(uow) -> None:

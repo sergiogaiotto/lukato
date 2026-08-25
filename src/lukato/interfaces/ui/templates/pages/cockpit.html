@@ -204,7 +204,9 @@
 {% block context_title %}Ambiente{% endblock %}
 
 {% block context %}
-  {% if context_item %}
+  {#- `missing_selection` tem prioridade: um `?sel=` que nao carregou precisa dizer
+      isso, e nao ser trocado em silencio pelo resumo do ambiente. -#}
+  {% if context_item or missing_selection %}
     {% include "partials/context_panel.html" %}
   {% else %}
     <div class="lk-context__title">

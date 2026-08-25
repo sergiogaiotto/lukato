@@ -711,6 +711,10 @@ class FakeDocumentRepository:
         found = sorted(self.chunks.get(document_id, []), key=lambda chunk: chunk.index)
         return [_copy(chunk) for chunk in found]
 
+    async def count_chunks(self, document_id: Id) -> int:
+        """Conta os chunks do documento sem carregar conteudo nem vetores."""
+        return len(self.chunks.get(document_id, []))
+
     async def delete_chunks(self, document_id: Id) -> int:
         """Remove os chunks do documento; devolve quantos foram apagados."""
         removed = self.chunks.pop(document_id, [])

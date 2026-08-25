@@ -54,6 +54,14 @@ class CostSummaryOut(OutSchema):
     runs: int = Field(default=0, ge=0, description="Execucoes distintas no periodo.")
     by_module: dict[str, float] = Field(default_factory=dict, description="Custo por modulo.")
     by_model: dict[str, float] = Field(default_factory=dict, description="Custo por modelo.")
+    unknown_models: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Modelos do periodo sem preco cadastrado, custeados pelo preco default. "
+            "O custo deles em `by_model` nao e confiavel: em geral sai zero, e sem "
+            "esta lista seria indistinguivel de um modelo gratuito (SPEC-0005 secao 2)."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -62,7 +70,8 @@ class CostSummaryOut(OutSchema):
                 "total_tokens": 512340,
                 "runs": 128,
                 "by_module": {"atendimento": 1.2},
-                "by_model": {"qwen-latest": 1.2},
+                "by_model": {"qwen-latest": 1.2, "modelo-novo": 0.0},
+                "unknown_models": ["modelo-novo"],
             }
         }
     )
@@ -76,6 +85,7 @@ class CostSummaryOut(OutSchema):
             runs=summary.runs,
             by_module=dict(summary.by_module),
             by_model=dict(summary.by_model),
+            unknown_models=list(summary.unknown_models),
         )
 
 

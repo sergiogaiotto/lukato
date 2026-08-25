@@ -45,10 +45,10 @@ from lukato.application.container import Container
 from lukato.domain.models.module import ModuleKind, ModuleStatus
 from lukato.domain.models.run import RunStatus, StepKind, TokenUsage
 from lukato.domain.types import Id
-from lukato.interfaces.ui.context import NOT_CONFIGURED, mask_secret
+from lukato.interfaces.ui.context import NOT_CONFIGURED, entities_for_route, mask_secret
 from lukato.interfaces.ui.router import STATIC_DIR, TEMPLATES_DIR
 from tests.conftest import SeedIds
-from tests.factories import make_module, make_run, make_step
+from tests.factories import make_api_key, make_module, make_run, make_step, make_user
 
 pytestmark = pytest.mark.integration
 
@@ -104,6 +104,27 @@ CHAVE_DE_TESTE: Final[str] = "sk-lukato-chave-secreta-de-teste-9042"
 
 NOME_MALICIOSO: Final[str] = "<script>alert(1)</script>"
 """Nome de modulo usado para provar que o autoescape do Jinja esta ligado."""
+
+NOME_DA_CHAVE: Final[str] = "chave-do-console"
+"""Nome da chave de API semeada em `/identity`, a segunda entidade daquela tela."""
+
+ID_INEXISTENTE: Final[str] = "00000000-0000-4000-8000-000000000000"
+"""Identificador com forma valida que nenhuma entidade reconhece."""
+
+MARCA_DA_EXECUCAO: Final[str] = "<dt>Latência</dt>"
+"""Par chave/valor que so `context/run.html` imprime."""
+
+MARCA_DO_MODULO: Final[str] = "<dt>Ferramentas</dt>"
+"""Par chave/valor que so o painel do modulo imprime."""
+
+MARCA_DA_CHAVE: Final[str] = "<dt>Prefixo</dt>"
+"""Par chave/valor que so `context/apikey.html` imprime."""
+
+VAZIO_DE_USUARIO: Final[str] = "Nenhum usuário selecionado"
+"""Estado vazio de `context/user.html` — a entidade padrao de `/identity`."""
+
+NAO_ENCONTRADO: Final[str] = "Item não encontrado"
+"""Estado vazio honesto de um `?sel=<id>` que nenhuma entidade da rota carrega."""
 
 ATRIBUTOS_QUE_CARREGAM: Final[frozenset[str]] = frozenset(
     {
@@ -225,6 +246,21 @@ def arquivos_de_texto(raiz: Path) -> Iterator[Path]:
             yield caminho
 
 
+def painel(html: str) -> str:
+    """Recorta o painel de contexto (`#lk-context-body`) da pagina renderizada.
+
+    O recorte comeca na abertura do elemento — entao carrega junto o
+    `data-selected-id`, que e o que a pagina **afirma** estar exibindo — e termina
+    no rodape da gaveta. Sem esse recorte, procurar uma marca do painel no
+    documento inteiro acharia o mesmo texto no miolo da pagina.
+    """
+    inicio = html.find('id="lk-context-body"')
+    assert inicio >= 0, "a pagina nao tem o corpo do painel de contexto"
+    fim = html.find('class="lk-aside__foot"', inicio)
+    assert fim > inicio, "o painel de contexto nao foi fechado pelo rodape da gaveta"
+    return html[inicio:fim]
+
+
 def referencias_externas(html: str) -> list[str]:
     """URLs externas em posicao de carregamento: `src`, `href`, `url(...)`, `@import`.
 
@@ -253,6 +289,11 @@ async def console(
     Alem do seed padrao (politicas, prompts e dois modulos), acrescenta uma
     execucao com trilha — sem ela `/runs/{run_id}` nao teria o que renderizar — e
     um modulo cujo **nome e um `<script>`**, que e o corpo de prova do autoescape.
+
+    O usuario e a chave de API existem por um motivo especifico: `/identity`
+    hospeda **duas** entidades na mesma tela, e e nesse tipo de pagina que o
+    `?sel=<id>` sem JavaScript erra o alvo se o servidor decidir a entidade pela
+    rota em vez de decidir pelo id (SPEC-0009 secao 7).
     """
     execucao = make_run(
         module_slug="assistente",
@@ -280,11 +321,17 @@ async def console(
                 config={"module": "processing"},
             )
         )
+        operadora = await unidade.users.add(
+            make_user("operadora@console.local", name="Operadora do console")
+        )
+        chave = await unidade.api_keys.add(make_api_key(NOME_DA_CHAVE, prefix="lkt_console"))
         await unidade.commit()
     return client, {
         "modulo": seeded.module_id,
         "modulo_malicioso": malicioso.id,
         "execucao": gravada.id,
+        "usuario": operadora.id,
+        "chave": chave.id,
     }
 
 
@@ -487,6 +534,87 @@ async def test_selecao_inexistente_nao_derruba_a_pagina(
     assert "lk-context__title" not in resposta.text
 
 
+# --------------------------------------------------------------------------- #
+# Criterio 4 e 11.4 — a tela que hospeda mais de uma entidade
+# --------------------------------------------------------------------------- #
+# Uma pagina de entidade unica nao distingue as duas resolucoes possiveis: com
+# JavaScript o link diz a entidade (`data-context-entity`), sem JavaScript so o
+# id viaja na URL. A diferenca so aparece onde a mesma tela hospeda mais de uma
+# entidade — `/modules/{slug}` (o modulo e as execucoes dele) e `/identity` (os
+# usuarios e as chaves de API). E o que estes testes cobrem.
+async def test_sel_de_execucao_na_pagina_do_modulo_abre_a_execucao(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """`/modules/{slug}?sel=<run_id>` mostra a execucao, nao o painel do modulo."""
+    http, ids = console
+    resposta = await http.get("/modules/assistente", params={"sel": ids["execucao"]})
+
+    assert resposta.status_code == 200
+    corpo = painel(resposta.text)
+    assert MARCA_DA_EXECUCAO in corpo, (
+        "sem JavaScript, ?sel=<run_id> caiu no painel do modulo: a rota escolheu a "
+        "entidade, em vez de descobrir a entidade do id (SPEC-0009 secao 7)"
+    )
+    assert MARCA_DO_MODULO not in corpo, "o painel do modulo continua no lugar da execucao"
+    assert f'data-selected-id="{ids["execucao"]}"' in corpo
+
+
+async def test_sel_de_chave_de_api_na_identidade_abre_a_chave(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """`/identity?sel=<apikey_id>` mostra a chave, nao o vazio da entidade `user`."""
+    http, ids = console
+    resposta = await http.get("/identity", params={"sel": ids["chave"]})
+
+    assert resposta.status_code == 200
+    corpo = painel(resposta.text)
+    assert VAZIO_DE_USUARIO not in corpo, (
+        "sem JavaScript, ?sel=<apikey_id> caiu no estado vazio de 'usuario': a rota "
+        "escolheu a entidade, em vez de descobrir a entidade do id"
+    )
+    assert MARCA_DA_CHAVE in corpo, "o painel da chave de API nao foi renderizado"
+    assert NOME_DA_CHAVE in corpo
+    assert f'data-selected-id="{ids["chave"]}"' in corpo
+
+
+async def test_sel_de_usuario_na_identidade_continua_abrindo_o_usuario(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """A entidade padrao da tela nao pode ser perdida ao ensinar a rota a segunda."""
+    http, ids = console
+    corpo = painel((await http.get("/identity", params={"sel": ids["usuario"]})).text)
+
+    assert "Operadora do console" in corpo
+    assert MARCA_DA_CHAVE not in corpo, "a chave de API foi aberta no lugar do usuario"
+    assert f'data-selected-id="{ids["usuario"]}"' in corpo
+
+
+@pytest.mark.parametrize("rota", ("/", "/modules", "/modules/assistente", "/identity"))
+async def test_sel_que_nao_existe_da_estado_vazio_honesto(
+    console: tuple[AsyncClient, dict[str, Id]], rota: str
+) -> None:
+    """Id desconhecido nao vira o item errado — nem uma selecao que a tela nao exibe.
+
+    As duas metades importam. O painel precisa **dizer** que o id pedido nao
+    existe, e nao pode continuar ecoando esse id em `data-selected-id`: uma tela
+    que afirma uma selecao que nao esta mostrando e indistinguivel de uma tela
+    que mostra o item errado.
+    """
+    http, _ = console
+    resposta = await http.get(rota, params={"sel": ID_INEXISTENTE})
+
+    assert resposta.status_code == 200
+    corpo = painel(resposta.text)
+    assert NAO_ENCONTRADO in corpo, f"{rota} escondeu que o id pedido nao carregou"
+    assert ID_INEXISTENTE in corpo, "o painel nao diz qual identificador se perdeu"
+    assert f'data-selected-id="{ID_INEXISTENTE}"' not in corpo, (
+        "a pagina afirma uma selecao que nao esta exibindo"
+    )
+    assert MARCA_DO_MODULO not in corpo and MARCA_DA_EXECUCAO not in corpo, (
+        f"{rota} trocou o item pedido pelo painel padrao da propria tela"
+    )
+
+
 async def test_fragmento_de_contexto_devolve_so_o_miolo_e_nao_a_pagina_inteira(
     console: tuple[AsyncClient, dict[str, Id]],
 ) -> None:
@@ -505,15 +633,46 @@ async def test_fragmento_de_contexto_devolve_so_o_miolo_e_nao_a_pagina_inteira(
 async def test_fragmento_e_a_pagina_com_sel_mostram_o_mesmo_item(
     console: tuple[AsyncClient, dict[str, Id]],
 ) -> None:
-    """Com e sem JavaScript o operador ve o mesmo painel — e o contrato da secao 7."""
-    http, ids = console
-    fragmento = (await http.get(f"/ui/context/module/{ids['modulo']}")).text
-    pagina = (await http.get("/modules", params={"sel": ids["modulo"]})).text
+    """Com e sem JavaScript o operador ve o mesmo painel — e o contrato da secao 7.
 
-    miolo = " ".join(fragmento.split())
-    assert miolo, "o fragmento veio vazio"
-    assert miolo in " ".join(pagina.split()), (
-        "a pagina renderizada com ?sel= nao contem o mesmo fragmento servido a /ui/context"
+    A conferencia passa pelas telas de entidade unica **e** pelas que hospedam
+    mais de uma. Com JavaScript, `context.js` pede
+    `GET /ui/context/{entidade}/{id}` porque o link carrega a entidade em
+    `data-context-entity`; sem JavaScript, o navegador leva so `?sel=<id>` — a
+    mesma URL que `history.replaceState` grava. Se o servidor decidir a entidade
+    pela rota, os dois caminhos divergem exatamente onde a tela tem duas
+    entidades, e o painel do link colado mostra outra coisa.
+    """
+    http, ids = console
+    casos = (
+        ("/modules", "module", ids["modulo"]),
+        ("/modules/assistente", "run", ids["execucao"]),
+        ("/identity", "user", ids["usuario"]),
+        ("/identity", "apikey", ids["chave"]),
+    )
+
+    for rota, entidade, item in casos:
+        fragmento = (await http.get(f"/ui/context/{entidade}/{item}")).text
+        pagina = (await http.get(rota, params={"sel": item})).text
+
+        miolo = " ".join(fragmento.split())
+        assert miolo, f"o fragmento de {entidade} veio vazio"
+        assert miolo in " ".join(pagina.split()), (
+            f"{rota}?sel={item} nao mostra o mesmo painel que "
+            f"/ui/context/{entidade}/{item} serve ao JavaScript"
+        )
+
+
+async def test_fragmento_de_id_inexistente_tambem_diz_que_nao_encontrou(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """O caminho com JavaScript recebe o mesmo estado vazio honesto do caminho sem."""
+    http, _ = console
+    corpo = (await http.get(f"/ui/context/apikey/{ID_INEXISTENTE}")).text
+
+    assert NAO_ENCONTRADO in corpo
+    assert "Nenhuma chave selecionada" not in corpo, (
+        "o fragmento devolveu o vazio generico da entidade, sem dizer que o id nao existe"
     )
 
 
@@ -745,3 +904,69 @@ async def test_existe_formulario_de_mutacao_em_toda_tela_de_operacao(
     ]
 
     assert not sem_mutacao, f"telas de operacao sem formulario POST: {sem_mutacao}"
+
+
+async def test_toda_entidade_que_a_pagina_emite_esta_no_mapa_da_rota(
+    console: tuple[AsyncClient, dict[str, Id]],
+) -> None:
+    """Nenhuma tela pode oferecer um `?sel=` que o servidor nao saiba resolver.
+
+    Este teste existe porque a classe de defeito nao e "`/identity` errou o alvo",
+    e sim "a pagina emite links de uma entidade que `ENTITIES_BY_ROUTE` nao lista".
+    Travar so as duas telas que hoje hospedam duas entidades deixaria o defeito
+    voltar em silencio no dia em que alguem acrescentar uma segunda entidade a
+    `/knowledge`, a `/finops` ou a `/adwatch`.
+
+    Em vez de repetir a lista a mao, varre o HTML que cada rota REALMENTE devolve,
+    junta os `data-context-entity` que ela emite e exige que cada um esteja na tupla
+    da rota. O mapa passa a ser conferido contra os templates, nao contra si mesmo.
+    """
+    client, ids = console
+    rotas = [rota for rota, _ in ROTAS_ESTATICAS]
+    rotas += ["/modules/assistente", f"/runs/{ids['execucao']}"]
+
+    emitidas_por_rota: dict[str, set[str]] = {}
+    for rota in rotas:
+        resposta = await client.get(rota)
+        assert resposta.status_code == 200, f"{rota} respondeu {resposta.status_code}"
+        # O <aside> tambem carrega o atributo, mas com a entidade PADRAO da rota,
+        # que nao e um link clicavel: so interessam os gatilhos de selecao, e todo
+        # gatilho traz `data-context-id` junto.
+        gatilhos = re.findall(
+            r'data-context-entity="([^"]+)"[^>]*data-context-id="[^"]+"'
+            r'|data-context-id="[^"]+"[^>]*data-context-entity="([^"]+)"',
+            resposta.text,
+        )
+        emitidas_por_rota[rota] = {a or b for a, b in gatilhos if (a or b)}
+
+    for rota, emitidas in emitidas_por_rota.items():
+        modelo = _rota_template(rota)
+        declaradas = set(entities_for_route(modelo))
+        fora = emitidas - declaradas
+        assert not fora, (
+            f"{rota} emite link(s) `?sel=` da(s) entidade(s) {sorted(fora)}, que nao estao "
+            f"em ENTITIES_BY_ROUTE[{modelo!r}] = {sorted(declaradas)}. "
+            "Sem JavaScript esse link resolve a entidade errada ou nao resolve nada."
+        )
+
+    # A varredura so vale se ela viu alguma coisa. Exigir gatilho em TODA rota seria
+    # errado — pagina cuja tabela esta vazia no seed nao emite nenhum — entao a
+    # ancora sao as duas telas multi-entidade, que sao exatamente a classe de defeito
+    # em questao. Se a regex parar de casar, estas duas linhas caem primeiro.
+    assert emitidas_por_rota["/identity"] == {"user", "apikey"}, (
+        "a varredura nao viu as duas entidades de /identity; se o HTML mudou de forma, "
+        f"a regex precisa acompanhar. Encontrado: {sorted(emitidas_por_rota['/identity'])}"
+    )
+    assert "run" in emitidas_por_rota["/modules/assistente"], (
+        "a varredura nao viu os links de execucao em /modules/{slug}; encontrado: "
+        f"{sorted(emitidas_por_rota['/modules/assistente'])}"
+    )
+
+
+def _rota_template(rota: str) -> str:
+    """Converte o caminho concreto de volta ao template usado por `ENTITIES_BY_ROUTE`."""
+    if rota.startswith("/modules/") and rota != "/modules":
+        return "/modules/{slug}"
+    if rota.startswith("/runs/") and rota != "/runs":
+        return "/runs/{run_id}"
+    return rota
