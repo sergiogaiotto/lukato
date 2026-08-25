@@ -1,0 +1,161 @@
+{#-
+  ============================================================================
+  base.html — esqueleto do console lukato (SPEC-0009 secao 3)
+  ============================================================================
+
+  CONTRATO DE BLOCOS. Toda pagina em `templates/pages/` estende este arquivo e
+  preenche os blocos abaixo. Nenhum outro bloco existe: se uma pagina precisa de
+  um ponto de extensao novo, ele nasce aqui, documentado, e nao dentro de um
+  `include`.
+
+  | Bloco           | Onde entra                | Obrigatorio | O que colocar |
+  | --------------- | ------------------------- | ----------- | ------------- |
+  | `title`         | `<title>` do documento    | nao         | Titulo curto da tela. O padrao ja monta `"<page_title> · lukato"`; sobrescreva so para um titulo especial. |
+  | `head_extra`    | fim do `<head>`           | nao         | `<link>`/`<meta>` extras servidos de `static/`. **Nunca** um host externo. |
+  | `breadcrumb`    | topbar, apos a marca      | nao         | Trilha customizada. O padrao renderiza a lista `breadcrumb` vinda da rota. |
+  | `hero`          | topo do miolo             | nao         | `{% from "partials/hero.html" import hero %}` e um `{% call hero(...) %}`. |
+  | `toolbar`       | abaixo do hero            | nao         | Filtros e acoes em massa (`.lk-toolbar`), sempre dentro de um `<form method="get">`. |
+  | `content`       | miolo da pagina           | **sim**     | Cartoes, formularios e tabelas da tela. |
+  | `context_title` | cabecalho do painel dir.  | nao         | Titulo do painel de contexto. Padrao: "Detalhes". |
+  | `context`       | corpo do painel direito   | nao         | Padrao: inclui `partials/context_panel.html`, que resolve `context/<entidade>.html`. Sobrescreva apenas para um painel totalmente proprio. |
+  | `scripts`       | fim do `<body>`           | nao         | `<script defer src="{{ static_url }}/js/...">` local. Nada inline. |
+
+  VARIAVEIS DE CONTEXTO garantidas em toda pagina (montadas por
+  `lukato.interfaces.ui.context.base_context`):
+
+  * `nav_sections`    lista de `NavSection(title, items)`; cada item tem
+                      `label`, `route`, `icon`, `active`.
+  * `active_route`    rota canonica da pagina (`/modules/{slug}`, por exemplo).
+  * `breadcrumb`      lista de `Crumb(label, href)`.
+  * `principal`       `Principal` da requisicao (`subject`, `role`, `tenant_id`).
+  * `settings_public` tupla de `SettingsSection(key, title, items)`; todo segredo
+                      ja chega **mascarado**.
+  * `health`          `HealthView` com `.indicators` e `.components`.
+  * `cost_summary`    `CostView` com `.total_usd`, `.runs`, `.modules`, `.models`.
+  * `version`         versao da aplicacao. `request_id` correlaciona com o log.
+  * `selected_id` / `selected_entity` / `context_template` / `context_item`
+                      estado do painel de contexto (`?sel=<id>` sem JavaScript).
+  * `page_title`      titulo da tela, definido pela rota.
+
+  FILTROS pt-BR disponiveis: `money`, `tokens`, `duration`, `timeago`, `pct`,
+  `number`, `datetime_br`, `badge_class`, `json_pretty`, `truncate_mid`,
+  `initials`, `nl2br`. Global `query_url(request, **params)` reescreve a URL
+  atual preservando os filtros; `template_exists(nome)` testa um template.
+
+  OFFLINE-FIRST: nenhuma URL externa neste arquivo nem nos que ele inclui. O
+  unico script inline e o de boot (`boot_script`), liberado na CSP por hash.
+-#}
+{%- from "partials/topbar.html" import
+      aside_toggle, brand, breadcrumb_trail, global_search, sidebar_toggle,
+      theme_toggle, topbar_links, user_block with context -%}
+<!doctype html>
+<html lang="pt-BR" data-sidebar="expanded" data-aside="open">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Console operacional do ecossistema de agentes lukato." />
+    <title>{% block title %}{{ page_title | default('Console', true) }} · lukato{% endblock %}</title>
+
+    <link rel="icon" href="{{ static_url }}/img/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ static_url }}/css/tokens.css" />
+    <link rel="stylesheet" href="{{ static_url }}/css/base.css" />
+    <link rel="stylesheet" href="{{ static_url }}/css/layout.css" />
+    <link rel="stylesheet" href="{{ static_url }}/css/components.css" />
+    <link rel="stylesheet" href="{{ static_url }}/css/pages.css" />
+
+    {#- Restaura sidebar, tema e gaveta ANTES do primeiro paint: um arquivo
+        externo so rodaria depois de uma ida ao servidor, e a tela piscaria. -#}
+    <script>{{ boot_script | safe }}</script>
+
+    {% block head_extra %}{% endblock %}
+  </head>
+
+  <body>
+    <a class="lk-skip" href="#lk-main">Pular para o conteúdo</a>
+
+    <div class="lk-app">
+      {#- A topbar e composta aqui (e nao por um `include`) porque o bloco
+          `breadcrumb` precisa ficar em base.html: bloco declarado dentro de um
+          template incluido nao pode ser sobrescrito pela pagina filha. -#}
+      <header class="lk-topbar" role="banner">
+        {{ sidebar_toggle() }}
+        {{ brand() }}
+        {% block breadcrumb %}{{ breadcrumb_trail(breadcrumb) }}{% endblock %}
+        {{ global_search() }}
+        {{ topbar_links() }}
+        {{ theme_toggle() }}
+        {{ aside_toggle() }}
+        {{ user_block(principal) }}
+      </header>
+
+      <nav class="lk-sidebar" id="lk-sidebar" aria-label="Navegação principal">
+        {% include "partials/sidebar.html" %}
+      </nav>
+
+      <main class="lk-main" id="lk-main" tabindex="-1">
+        <div class="lk-main__inner">
+          {% block hero %}{% endblock %}
+          {% block toolbar %}{% endblock %}
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+
+      <aside
+        class="lk-aside"
+        id="lk-aside"
+        aria-label="Painel de contexto"
+        data-context-base="/ui/context"
+        data-context-entity="{{ selected_entity | default('', true) }}"
+      >
+        <div class="lk-aside__head">
+          <h2 class="lk-aside__title">{% block context_title %}Detalhes{% endblock %}</h2>
+          <button
+            type="button"
+            class="lk-btn lk-btn--ghost lk-btn--sm lk-aside-toggle"
+            data-aside-toggle
+            aria-controls="lk-aside"
+            aria-label="Fechar painel de contexto"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          class="lk-aside__body"
+          id="lk-context-body"
+          data-selected-id="{{ selected_id | default('', true) }}"
+          aria-live="polite"
+        >
+          {% block context %}{% include "partials/context_panel.html" %}{% endblock %}
+        </div>
+
+        <div class="lk-aside__foot">
+          <span class="lk-mono">req {{ request_id | default('—', true) | truncate_mid(12) }}</span>
+        </div>
+      </aside>
+
+      <footer class="lk-statusbar" role="contentinfo">
+        {% include "partials/statusbar.html" %}
+      </footer>
+    </div>
+
+    <button
+      type="button"
+      class="lk-overlay"
+      id="lk-overlay"
+      tabindex="-1"
+      aria-hidden="true"
+      aria-label="Fechar painéis abertos"
+    ></button>
+
+    <div class="lk-toasts" id="lk-toasts" role="status" aria-live="polite"></div>
+
+    <script defer src="{{ static_url }}/js/app.js"></script>
+    <script defer src="{{ static_url }}/js/sidebar.js"></script>
+    <script defer src="{{ static_url }}/js/context.js"></script>
+    <script defer src="{{ static_url }}/js/palette.js"></script>
+    <script defer src="{{ static_url }}/js/charts.js"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

@@ -1,0 +1,121 @@
+{#-
+  context/detection.html — detalhe de uma deteccao do AdWatch (SPEC-0010 secao 3.5).
+
+  `context_item` e uma `Detection`. O painel abre a **decomposicao das
+  evidencias** em barras: a confianca final e uma fusao ponderada, e sem ver as
+  parcelas nao da para revisar a decisao — uma peca aceita so por locucao e uma
+  peca aceita por locucao, OCR e juiz visual sao coisas diferentes.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/stat.html" import progress -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhuma detecção selecionada',
+       'Escolha uma detecção na tabela para ver aqui a faixa de tempo, as evidências por modalidade e as ações de revisão.',
+       name='film',
+       action_href='/adwatch/detections',
+       action_label='Ver detecções'
+     ) }}
+{% else %}
+  {%- set evidence = item.evidence -%}
+  <div class="lk-context__title">
+    <span class="lk-truncate lk-mono">{{ item.commercial_code }}</span>
+    {{ badge(item.status) }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Faixa</dt>
+    <dd class="lk-timecode">{{ item.start | duration }} → {{ item.end | duration }}</dd>
+    <dt>Duração</dt>
+    <dd class="lk-timecode">{{ (item.end - item.start) | duration }}</dd>
+    <dt>Confiança</dt>
+    <dd>{{ progress(item.confidence, label=item.confidence | pct) }}</dd>
+    <dt>Campanha</dt>
+    <dd>{{ item.campaign if item.campaign else '—' }}</dd>
+    <dt>Marca</dt>
+    <dd>{{ item.brand if item.brand else '—' }}</dd>
+    <dt>Mídia</dt>
+    <dd class="lk-mono">{{ item.media_id | truncate_mid(18) }}</dd>
+    <dt>Detectado</dt>
+    <dd>{{ item.created_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__section">
+    <p class="lk-label">Evidências por modalidade</p>
+    <dl class="lk-kv">
+      <dt>Locução</dt>
+      <dd>{{ progress(evidence.speech_match, label=evidence.speech_match | pct) }}</dd>
+      <dt>Semântica</dt>
+      <dd>{{ progress(evidence.semantic_match, label=evidence.semantic_match | pct) }}</dd>
+      <dt>OCR</dt>
+      <dd>{{ progress(evidence.ocr_match, label=evidence.ocr_match | pct) }}</dd>
+      <dt>Visual</dt>
+      <dd>{{ progress(evidence.visual_match, label=evidence.visual_match | pct) }}</dd>
+      <dt>Duração</dt>
+      <dd>{{ progress(evidence.duration_match, label=evidence.duration_match | pct) }}</dd>
+    </dl>
+    <p class="lk-legend">
+      <span class="lk-legend__item">
+        {{ badge('true' if evidence.order_ok else 'false',
+                 label='ordem esperada' if evidence.order_ok else 'fora de ordem',
+                 title='As frases-chave precisam aparecer na ordem esperada dentro da janela.') }}
+      </span>
+      {% if evidence.brand_detected %}
+        <span class="lk-legend__item">marca reconhecida: {{ evidence.brand_detected }}</span>
+      {% endif %}
+      <span class="lk-legend__item">
+        {{ 'fronteira refinada por corte de cena' if item.refined_by_scene else 'fronteira pela transcrição' }}
+      </span>
+      {% if item.verified_by_vlm %}
+        <span class="lk-legend__item">confirmada pelo juiz multimodal</span>
+      {% endif %}
+    </p>
+  </div>
+
+  {% if evidence.matched_text %}
+    <div class="lk-context__section">
+      <p class="lk-label">Trecho casado</p>
+      <p class="lk-hit__snippet">{{ evidence.matched_text | truncate(320) }}</p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__section">
+    <p class="lk-label">Revisão humana</p>
+    <div class="lk-context__actions">
+      <form method="post" action="/api/v1/adwatch/detections/{{ item.id }}">
+        <input type="hidden" name="_method" value="patch" />
+        <input type="hidden" name="status" value="accepted" />
+        <button class="lk-btn lk-btn--primary lk-btn--sm" type="submit">Aceitar</button>
+      </form>
+      <form method="post" action="/api/v1/adwatch/detections/{{ item.id }}">
+        <input type="hidden" name="_method" value="patch" />
+        <input type="hidden" name="status" value="rejected" />
+        <button
+          class="lk-btn lk-btn--danger lk-btn--sm"
+          type="submit"
+          data-confirm="Rejeitar esta detecção?"
+        >
+          Rejeitar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch/commercials?sel={{ item.commercial_id }}">
+      Ver comercial
+    </a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch/detections?media={{ item.media_id }}">
+      Detecções da mídia
+    </a>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

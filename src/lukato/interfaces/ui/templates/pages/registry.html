@@ -1,0 +1,199 @@
+{#-
+  pages/registry.html — building blocks descobertos (SPEC-0009 secao 8,
+  rota `GET /registry`).
+
+  Contexto entregue por `router.registry_page`, alem da moldura de `base_context`:
+
+  | Chave             | Tipo                    | Uso na tela |
+  | ----------------- | ----------------------- | ----------- |
+  | `descriptors`     | list[ModuleDescriptor]  | um cartao por building block registrado |
+  | `discover_errors` | list[tuple[str, str]]   | `(origem, motivo)` de cada carga que falhou |
+  | `runtimes`        | list[str]               | orquestradores disponiveis |
+  | `tools`           | list[Json]              | `{name, description, schema}` das ferramentas |
+  | `principal_role`  | Role                    | so `root`/`admin` redescobrem |
+
+  O registry mostra o que a **aplicacao** conhece; `/modules` mostra o que foi
+  **configurado**. Um bloco aqui so entra em operacao quando existe uma definicao
+  de modulo apontando para ele — por isso cada cartao leva ao catalogo de modulos.
+
+  FORMULARIO
+
+  * redescobrir — `POST /api/v1/registry/discover`. Sem corpo: a varredura reabre
+    o grupo de entry points e recarrega os embutidos.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card, card_foot -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+
+{%- set pode_descobrir = principal_role in ('root', 'admin') -%}
+
+{% block hero %}
+  {% call hero(
+       'Registry',
+       subtitle='Building blocks que esta instalação carregou: embutidos e publicados por entry point.',
+       metrics=[
+         ('Blocos', descriptors | length),
+         ('Runtimes', runtimes | length),
+         ('Ferramentas', tools | length),
+         ('Falhas', discover_errors | length),
+       ]
+     ) %}
+    <form method="post" action="/api/v1/registry/discover">
+      <button
+        class="lk-btn lk-btn--outline"
+        type="submit"
+        {{ 'disabled' if not pode_descobrir }}
+        title="{{ 'Varre os entry points de novo, sem reiniciar a aplicação.' if pode_descobrir else 'Ação restrita a administradores.' }}"
+      >
+        Redescobrir
+      </button>
+    </form>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="lk-stack">
+  {% if discover_errors %}
+    {% call card('Falhas de descoberta', dot='danger') %}
+      <div class="lk-findings">
+        {% for origin, reason in discover_errors %}
+          <div class="lk-finding lk-finding--block">
+            <span class="lk-grow">
+              <b class="lk-mono">{{ origin }}</b>
+              <span class="lk-hint">{{ reason }}</span>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+      {% call card_foot() %}
+        Uma carga quebrada não derruba a varredura: os demais blocos continuam
+        registrados. Corrija a dependência e use <b>Redescobrir</b>.
+      {% endcall %}
+    {% endcall %}
+  {% endif %}
+
+  {% if descriptors %}
+    <div class="lk-grid lk-grid--2">
+      {% for descriptor in descriptors %}
+        {% set bloco_actions %}
+          <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/modules?q={{ descriptor.slug }}">
+            Definições
+          </a>
+        {% endset %}
+        {% call card(descriptor.name or descriptor.slug, actions=bloco_actions) %}
+          <div class="lk-row lk-row--wrap">
+            <span class="lk-mono">{{ descriptor.slug }}</span>
+            {{ badge(descriptor.kind.value) }}
+            <span class="lk-capability">v{{ descriptor.version }}</span>
+            <span class="lk-capability">
+              {{ 'embutido' if descriptor.source == 'builtin' else 'entry point' }}
+            </span>
+          </div>
+
+          {% if descriptor.description %}
+            <p class="lk-hint">{{ descriptor.description }}</p>
+          {% endif %}
+
+          <div class="lk-context__section">
+            <p class="lk-label">Capacidades</p>
+            {% if descriptor.capabilities %}
+              <div class="lk-capabilities">
+                {% for capability in descriptor.capabilities %}
+                  <span class="lk-capability">{{ capability }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="lk-hint">Nenhuma capacidade declarada.</p>
+            {% endif %}
+          </div>
+
+          <dl class="lk-kv lk-context__section">
+            <dt>Classe</dt>
+            <dd class="lk-mono lk-truncate" title="{{ descriptor.class_path }}">
+              {{ descriptor.class_path or '—' }}
+            </dd>
+            <dt>Modelo padrão</dt>
+            <dd class="lk-mono">{{ descriptor.default_binding.model or 'padrão do provedor' }}</dd>
+            <dt>Ferramentas</dt>
+            <dd>
+              {{ descriptor.default_binding.tools | join(', ') if descriptor.default_binding.tools else 'nenhuma' }}
+            </dd>
+          </dl>
+
+          {% if descriptor.config_schema %}
+            <details class="lk-details">
+              <summary>Schema de configuração</summary>
+              <pre>{{ descriptor.config_schema | json_pretty }}</pre>
+            </details>
+          {% else %}
+            <p class="lk-hint">Sem schema de configuração: o bloco aceita qualquer objeto.</p>
+          {% endif %}
+        {% endcall %}
+      {% endfor %}
+    </div>
+  {% else %}
+    {% call card('Building blocks') %}
+      {{ empty(
+           'Nenhum building block registrado',
+           'Os módulos embutidos são carregados no boot e os externos chegam pelo grupo de entry points lukato.modules. Use Redescobrir depois de instalar um pacote novo.',
+           name='plug',
+           action_href='/settings',
+           action_label='Ver configuração'
+         ) }}
+    {% endcall %}
+  {% endif %}
+
+  <div class="lk-grid lk-grid--2">
+    {% call card('Runtimes disponíveis') %}
+      {% if runtimes %}
+        <div class="lk-capabilities">
+          {% for runtime in runtimes %}
+            <span class="lk-capability">{{ runtime }}</span>
+          {% endfor %}
+        </div>
+        {% call card_foot() %}
+          Um módulo que declara runtime indisponível cai no padrão da instalação, com aviso
+          no log — a execução não falha por isso.
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhum orquestrador registrado',
+             'Sem runtime, nenhuma definição pode ser invocada. Verifique a instalação das dependências de orquestração.',
+             name='blocks'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {% call card('Ferramentas') %}
+      {% if tools %}
+        <dl class="lk-kv">
+          {% for tool in tools %}
+            <dt class="lk-mono">{{ tool.name }}</dt>
+            <dd>
+              {{ tool.description }}
+              {% if tool.schema %}
+                <details class="lk-details">
+                  <summary>schema</summary>
+                  <pre>{{ tool.schema | json_pretty }}</pre>
+                </details>
+              {% endif %}
+            </dd>
+          {% endfor %}
+        </dl>
+        {% call card_foot() %}
+          Libere ferramentas por módulo no cartão da trinca, na tela de operação.
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma ferramenta registrada',
+             'As ferramentas ficam disponíveis para os agentes quando o catálogo é montado no boot da aplicação.',
+             name='sliders'
+           ) }}
+      {% endif %}
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

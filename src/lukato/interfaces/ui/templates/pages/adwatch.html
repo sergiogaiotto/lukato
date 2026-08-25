@@ -1,0 +1,381 @@
+{#-
+  pages/adwatch.html — pipeline do AdWatch (`GET /adwatch`, SPEC-0010 secoes 2 e 3).
+
+  Contexto entregue pela rota:
+    `media`              `Page[MediaAsset]` registradas.
+    `capabilities`       retrato de `GET /adwatch/capabilities`: adaptadores
+                         instalados, janelas, pesos, limiares e top-k.
+    `commercials_total`  tamanho do catalogo.
+    `detections_total`   deteccoes ja gravadas.
+    `filters`            `{q, status}`.
+
+  A tela e o pipeline em tres passos: registrar a midia, obter a transcricao e
+  detectar. O segundo passo tem dois caminhos — a ingestao automatica, que exige
+  FFmpeg e WhisperX, e a **importacao de uma transcricao pronta**, que torna o
+  funil inteiro executavel sem FFmpeg, sem GPU e sem rede.
+
+  Os formularios de transcricao e de deteccao vivem na propria linha da midia
+  porque o alvo deles e um ativo especifico: e o unico arranjo em que a acao
+  funciona sem JavaScript, ja que o endereco carrega o identificador.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge, dot %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/stat.html" import stat, stats_close, stats_open %}
+{% from "partials/table.html" import table with context %}
+
+{%- set capability_labels = {
+      'probe': 'sondagem de mídia e extração de áudio',
+      'asr': 'transcrição automática com marcação de palavra',
+      'ocr': 'leitura do texto em tela',
+      'scenes': 'detecção de cortes e fades',
+      'vision': 'juiz multimodal do fim do funil'
+    } -%}
+{%- set capability_hints = {
+      'probe': 'instale o FFmpeg no ambiente da aplicação',
+      'asr': 'instale o WhisperX — ou importe uma transcrição pronta, que dispensa este adaptador',
+      'ocr': 'instale o PaddleOCR; sem ele o sinal de OCR fica em zero e o teto de score cai',
+      'scenes': 'instale o PySceneDetect; sem ele a fronteira usa o primeiro e o último timestamp casado',
+      'vision': 'configure o juiz multimodal; sem ele a faixa de dúvida permanece em revisão'
+    } -%}
+{%- set status_options = [
+      ('registered', 'registrada'),
+      ('ingested', 'com transcrição'),
+      ('analyzed', 'analisada'),
+      ('failed', 'falhou')
+    ] -%}
+{%- set installed = capabilities.capabilities -%}
+{%- set windows = capabilities.windows -%}
+{%- set thresholds = capabilities.thresholds -%}
+{%- set top_k = capabilities.top_k -%}
+{%- set weights = capabilities.weights -%}
+{%- set window_default = windows.sizes | map('int') | join(', ') -%}
+
+{% block hero %}
+  {% call hero(
+       'AdWatch',
+       subtitle='Catálogo conhecido, matching temporal multimodal e evidência auditável de cada veiculação.',
+       metrics=[
+         ('Comerciais', commercials_total | number),
+         ('Detecções', detections_total | number),
+         ('Mídias', media.total | number),
+         ('Aceite', thresholds.accept | pct)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/adwatch/commercials">Abrir catálogo</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/adwatch" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filter-q">Buscar mídia</label>
+      <input
+        class="lk-input"
+        id="filter-q"
+        name="q"
+        type="search"
+        value="{{ filters.q }}"
+        placeholder="título ou caminho do arquivo"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-status">Estágio</label>
+      <select class="lk-select" id="filter-status" name="status">
+        <option value="">Todos</option>
+        {% for value, label in status_options %}
+          <option value="{{ value }}" {{ 'selected' if filters.status == value else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/adwatch">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--adwatch lk-stack">
+    {{ stats_open() }}
+      {{ stat('Comerciais no catálogo', commercials_total | number, href='/adwatch/commercials') }}
+      {{ stat('Detecções gravadas', detections_total | number, href='/adwatch/detections', primary=true) }}
+      {{ stat('Mídias registradas', media.total | number) }}
+      {{ stat(
+           'Janelas',
+           windows.sizes | length | number,
+           delta=window_default ~ ' s · passo ' ~ (windows.stride | number(0)) ~ ' s'
+         ) }}
+    {{ stats_close() }}
+
+    <div class="lk-steps">
+      <section class="lk-step">
+        <h2 class="lk-section__title">Registrar a mídia</h2>
+        <p class="lk-muted">
+          O ativo entra com <span class="lk-mono">status=registered</span>. Nada é copiado: o
+          caminho apontado precisa ser legível pelo processo da aplicação.
+        </p>
+        <form class="lk-stack" method="post" action="/api/v1/adwatch/media">
+          <div class="lk-field">
+            <label for="media-uri">Arquivo</label>
+            <input
+              class="lk-input lk-input--mono"
+              id="media-uri"
+              name="uri"
+              type="text"
+              placeholder="/dados/grade-12-08.mp4"
+              required
+            />
+          </div>
+          <div class="lk-field">
+            <label for="media-title">Título</label>
+            <input class="lk-input" id="media-title" name="title" type="text" />
+          </div>
+          <div class="lk-field">
+            <label for="media-kind">Natureza</label>
+            <select class="lk-select" id="media-kind" name="kind">
+              <option value="video">vídeo</option>
+              <option value="audio">áudio</option>
+            </select>
+          </div>
+          <button class="lk-btn lk-btn--primary" type="submit">Registrar</button>
+        </form>
+      </section>
+
+      <section class="lk-step">
+        <h2 class="lk-section__title">Obter a transcrição</h2>
+        <p class="lk-muted">
+          Dois caminhos levam ao mesmo lugar. A <b>ingestão automática</b> roda sondagem,
+          extração de áudio, ASR, cortes de cena e OCR — cada etapa sem adaptador instalado é
+          registrada e pulada. A <b>importação</b> aceita o JSON do WhisperX pronto e dispensa
+          FFmpeg, GPU e rede.
+        </p>
+        <p class="lk-legend">
+          <span class="lk-legend__item">
+            {{ dot('ok' if capabilities.can_ingest else 'warn') }}
+            {{ 'ingestão automática disponível' if capabilities.can_ingest else 'ingestão automática indisponível nesta instalação' }}
+          </span>
+          <span class="lk-legend__item">{{ dot('ok') }} importação sempre disponível</span>
+        </p>
+        <p class="lk-hint">
+          Os dois formulários ficam na coluna <b>Ações</b> de cada mídia, logo abaixo: a ação
+          precisa saber sobre qual ativo age.
+        </p>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="#lk-midias">Ir para as mídias</a>
+      </section>
+
+      <section class="lk-step">
+        <h2 class="lk-section__title">Detectar</h2>
+        <p class="lk-muted">
+          Janelas deslizantes sobre a linha do tempo, recuperação por palavra-chave e por
+          embedding, rerank, fusão de score e supressão de sobreposição. O juiz multimodal
+          entra só na faixa de dúvida, entre {{ thresholds.review | pct }} e
+          {{ thresholds.accept | pct }}.
+        </p>
+        <p class="lk-hint">
+          Reexecutar substitui as detecções anteriores da mídia: o funil é uma reanálise
+          completa, e manter o resultado antigo ao lado do novo contaria a mesma veiculação
+          duas vezes.
+        </p>
+        <a class="lk-btn lk-btn--outline lk-btn--sm" href="/adwatch/detections">Ver detecções</a>
+      </section>
+    </div>
+
+    {% call card('Capacidades instaladas') %}
+      <p class="lk-capabilities">
+        {% for name, label in capability_labels.items() %}
+          <span class="lk-capability">
+            {{ dot('ok' if installed.get(name) else 'warn') }} {{ name }}
+          </span>
+        {% endfor %}
+      </p>
+
+      <dl class="lk-kv">
+        {% for name, label in capability_labels.items() %}
+          <dt>{{ name }}</dt>
+          <dd>
+            {% if installed.get(name) %}
+              {{ badge('ok', label='disponível') }} <span class="lk-muted">{{ label }}</span>
+            {% else %}
+              {{ badge('warn', label='ausente') }}
+              <span class="lk-muted">{{ label }}</span>
+              <span class="lk-hint">Para habilitar: {{ capability_hints.get(name, 'instale o adaptador correspondente') }}.</span>
+            {% endif %}
+          </dd>
+        {% endfor %}
+      </dl>
+
+      <div class="lk-context__section">
+        <p class="lk-label">Efeito do que falta</p>
+        <dl class="lk-kv">
+          <dt>Sem OCR</dt>
+          <dd class="lk-mono">score máximo {{ capabilities.max_score_without.ocr | pct }}</dd>
+          <dt>Sem juiz visual</dt>
+          <dd class="lk-mono">score máximo {{ capabilities.max_score_without.vision | pct }}</dd>
+          <dt>Embeddings</dt>
+          <dd class="lk-mono">
+            {{ capabilities.embeddings.model }} · {{ capabilities.embeddings.dimensions | number }} dimensões
+          </dd>
+        </dl>
+      </div>
+
+      <div class="lk-context__section">
+        <p class="lk-label">Parâmetros da fusão</p>
+        <dl class="lk-kv">
+          <dt>Janelas</dt>
+          <dd class="lk-mono">{{ window_default }} s · passo {{ windows.stride | number(0) }} s</dd>
+          <dt>Top-K</dt>
+          <dd class="lk-mono">recuperação {{ top_k.retrieval }} · rerank {{ top_k.rerank }}</dd>
+          <dt>Limiares</dt>
+          <dd class="lk-mono">
+            aceite {{ thresholds.accept | pct }} · revisão {{ thresholds.review | pct }}
+          </dd>
+          <dt>Pesos</dt>
+          <dd class="lk-mono">
+            {% for name, weight in weights.items() %}{{ name }} {{ weight | number(2) }}{{ ' · ' if not loop.last else '' }}{% endfor %}
+          </dd>
+        </dl>
+      </div>
+    {% endcall %}
+
+    {% call card('Mídias registradas', flush=true, id='lk-midias') %}
+      {% if media.items %}
+        {% call table([
+             'Mídia',
+             {'label': 'Tipo'},
+             {'label': 'Duração', 'align': 'num'},
+             {'label': 'Estágio'},
+             {'label': 'Registrada', 'align': 'right'},
+             {'label': 'Ações', 'width': '34%'}
+           ], caption='Ativos de mídia e ações do pipeline') %}
+          {% for asset in media.items %}
+            <tr>
+              <td>
+                <p class="lk-truncate">{{ asset.title if asset.title else asset.uri }}</p>
+                <p class="lk-hint lk-mono">{{ asset.uri | truncate_mid(40) }}</p>
+              </td>
+              <td>{{ asset.kind.value }}</td>
+              <td class="lk-table__num lk-timecode">{{ asset.duration_seconds | duration }}</td>
+              <td>{{ badge(asset.status) }}</td>
+              <td class="lk-right lk-nowrap">{{ asset.created_at | timeago }}</td>
+              <td>
+                <details class="lk-details">
+                  <summary>Importar transcrição</summary>
+                  <form
+                    class="lk-stack"
+                    method="post"
+                    enctype="multipart/form-data"
+                    action="/api/v1/adwatch/media/{{ asset.id }}/transcript"
+                  >
+                    <div class="lk-field">
+                      <label for="file-{{ asset.id }}">Arquivo .json</label>
+                      <input class="lk-input" id="file-{{ asset.id }}" name="file" type="file" accept=".json" required />
+                      <span class="lk-field__hint">
+                        Lista de palavras, objeto com <span class="lk-mono">words</span> ou o
+                        JSON completo do WhisperX.
+                      </span>
+                    </div>
+                    <button class="lk-btn lk-btn--primary lk-btn--sm" type="submit">Enviar arquivo</button>
+                  </form>
+
+                  <form
+                    class="lk-stack"
+                    method="post"
+                    enctype="multipart/form-data"
+                    action="/api/v1/adwatch/media/{{ asset.id }}/transcript"
+                  >
+                    <div class="lk-field">
+                      <label for="paste-{{ asset.id }}">Ou cole o JSON</label>
+                      <textarea
+                        class="lk-textarea"
+                        id="paste-{{ asset.id }}"
+                        name="payload"
+                        rows="5"
+                        placeholder='[{"word": "aproveite", "start": 12.4, "end": 12.9}]'
+                        required
+                      ></textarea>
+                    </div>
+                    <button class="lk-btn lk-btn--outline lk-btn--sm" type="submit">Importar colado</button>
+                  </form>
+                </details>
+
+                <details class="lk-details">
+                  <summary>Detectar comerciais</summary>
+                  <form
+                    class="lk-stack"
+                    method="post"
+                    action="/api/v1/adwatch/media/{{ asset.id }}/detect"
+                  >
+                    <div class="lk-field">
+                      <label for="windows-{{ asset.id }}">Janelas (s)</label>
+                      <input
+                        class="lk-input lk-input--mono"
+                        id="windows-{{ asset.id }}"
+                        name="window_sizes"
+                        type="text"
+                        value="{{ window_default }}"
+                      />
+                      <span class="lk-field__hint">Separadas por vírgula; vazio usa a configuração.</span>
+                    </div>
+                    <div class="lk-field">
+                      <label for="topk-{{ asset.id }}">Top-K de recuperação</label>
+                      <input
+                        class="lk-input lk-input--mono"
+                        id="topk-{{ asset.id }}"
+                        name="top_k"
+                        type="number"
+                        min="1"
+                        max="50"
+                        value="{{ top_k.retrieval }}"
+                      />
+                    </div>
+                    <div class="lk-field">
+                      <label for="keep-{{ asset.id }}">Rejeitadas</label>
+                      <select class="lk-select" id="keep-{{ asset.id }}" name="keep_rejected">
+                        <option value="false">descartar</option>
+                        <option value="true">manter para auditoria</option>
+                      </select>
+                    </div>
+                    <button
+                      class="lk-btn lk-btn--primary lk-btn--sm"
+                      type="submit"
+                      data-confirm="Reexecutar a detecção substitui as detecções anteriores desta mídia. Continuar?"
+                    >
+                      Detectar
+                    </button>
+                  </form>
+
+                  <form method="post" action="/api/v1/adwatch/media/{{ asset.id }}/ingest">
+                    <button class="lk-btn lk-btn--ghost lk-btn--sm" type="submit">
+                      Executar ingestão automática
+                    </button>
+                  </form>
+                </details>
+
+                <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch/detections?media={{ asset.id }}">
+                  Ver detecções
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhuma mídia registrada',
+             'Registre o primeiro arquivo no passo 1 acima. Sem mídia não há linha do tempo para percorrer.',
+             name='film'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {{ pagination(media, label='mídias') }}
+  </div>
+{% endblock %}
+
+{% block context_title %}Comercial{% endblock %}

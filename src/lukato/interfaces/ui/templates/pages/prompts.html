@@ -1,0 +1,361 @@
+{#-
+  pages/prompts.html — biblioteca de prompts versionados (SPEC-0009 secao 8,
+  rota `GET /prompts`).
+
+  Contexto entregue por `router.prompts_page`, alem da moldura de `base_context`:
+
+  | Chave     | Tipo                   | Uso na tela |
+  | --------- | ---------------------- | ----------- |
+  | `prompts` | Page[PromptTemplate]   | lista, paginacao e alvo do editor |
+  | `filters` | dict `{q, active}`     | estado da barra de filtros |
+
+  Opcional, entregue pelo manipulador do POST de pre-visualizacao: `preview`, com
+  `slug`, `version`, `role`, `rendered` e `missing` — o mesmo corpo de
+  `POST /api/v1/prompts/{ref}/preview`.
+
+  O prompt em edicao e o selecionado por `?sel=<id>`, o mesmo parametro que abre o
+  painel de contexto: um clique na lista carrega o editor **sem JavaScript**.
+
+  FORMULARIOS
+
+  * filtros    — `GET /prompts`.
+  * editor     — prompt novo vai para `POST /api/v1/prompts`; prompt em edicao
+                 vai para `/api/v1/prompts/{id}` com `_method=put`, que **gera uma
+                 versao nova** em vez de sobrescrever. Campos: `slug`, `name`,
+                 `description`, `role`, `template`, `labels`, `is_active`.
+  * preview    — `POST /api/v1/prompts/{id}/preview`. Cada variavel viaja em um
+                 campo `var:<nome>` e a borda junta tudo em `variables`.
+
+  `_method` e o campo oculto que o console usa quando o verbo da API nao existe em
+  HTML — formulario so sabe `GET` e `POST`.
+
+  Os papeis sao o enum normativo `PromptRole` (SPEC-0000 secao 6.2). A rota nao
+  entrega a lista — diferente de `/modules`, que recebe `kinds` — entao ela e
+  declarada aqui, junto do campo que a usa.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card, card_foot -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+{%- from "partials/pagination.html" import pagination with context -%}
+{%- from "partials/table.html" import cell_link, row_attrs, table with context -%}
+
+{%- set papeis = ['system', 'user', 'assistant', 'developer'] -%}
+{%- set preview = preview | default(none) -%}
+{%- set selecionados = prompts.items | selectattr('id', 'equalto', selected_id) | list -%}
+{%- set prompt_atual = selecionados[0] if selecionados else none -%}
+
+{% block hero %}
+  {% call hero(
+       'Prompts',
+       subtitle='Cada salvamento cria uma versão nova: o texto que já rodou continua auditável.',
+       metrics=[
+         ('Nesta busca', prompts.total | number),
+         ('Em edição', prompt_atual.slug if prompt_atual else '—'),
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="{{ query_url(request, sel=none) }}#editor">Novo prompt</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/prompts" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filtro-busca">Busca</label>
+      <input
+        class="lk-input"
+        type="search"
+        id="filtro-busca"
+        name="q"
+        value="{{ filters.q }}"
+        placeholder="slug, nome ou descrição"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filtro-ativo">Situação</label>
+      <select class="lk-select" id="filtro-ativo" name="active">
+        <option value="">todas</option>
+        <option value="sim" {{ 'selected' if filters.active == 'sim' }}>ativas</option>
+        <option value="nao" {{ 'selected' if filters.active == 'nao' }}>inativas</option>
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/prompts">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="lk-stack">
+  {% call card('Biblioteca', flush=true) %}
+    {% if prompts.items %}
+      {% call table([
+           'Nome',
+           'Slug',
+           {'label': 'Papel'},
+           {'label': 'Versão', 'align': 'num'},
+           {'label': 'Variáveis'},
+           {'label': 'Situação'},
+           {'label': 'Atualizado', 'align': 'right'},
+         ], clickable=true, caption='Prompts cadastrados') %}
+        {% for prompt in prompts.items %}
+          <tr {{ row_attrs('prompt', prompt.id, selected_id) }}>
+            <td>{{ cell_link('prompt', prompt.id, prompt.name or prompt.slug) }}</td>
+            <td class="lk-mono">{{ prompt.slug }}</td>
+            <td>{{ prompt.role.value }}</td>
+            <td class="lk-table__num">v{{ prompt.version }}</td>
+            <td>
+              {% if prompt.variables %}
+                <span class="lk-capabilities">
+                  {% for variable in prompt.variables %}
+                    <span class="lk-capability">{{ variable }}</span>
+                  {% endfor %}
+                </span>
+              {% else %}
+                <span class="lk-faint">nenhuma</span>
+              {% endif %}
+            </td>
+            <td>{{ badge('true' if prompt.is_active else 'false', label='ativo' if prompt.is_active else 'inativo') }}</td>
+            <td class="lk-right lk-nowrap">{{ prompt.updated_at | timeago }}</td>
+          </tr>
+        {% endfor %}
+      {% endcall %}
+      {{ pagination(prompts, label='prompts') }}
+    {% elif filters.q or filters.active %}
+      {{ empty(
+           'Nenhum prompt com esses filtros',
+           'Ajuste a busca ou a situação. O endereço guarda os filtros e pode ser compartilhado.',
+           name='filter',
+           action_href='/prompts',
+           action_label='Limpar filtros'
+         ) }}
+    {% else %}
+      {{ empty(
+           'Biblioteca vazia',
+           'O system prompt é a peça do meio da trinca. Crie o primeiro no editor abaixo e ele passa a aparecer no binding de qualquer módulo.',
+           name='message',
+           action_href='#editor',
+           action_label='Escrever o primeiro'
+         ) }}
+    {% endif %}
+  {% endcall %}
+
+  <div class="lk-grid lk-grid--sidebar">
+    {#- ---------------------------------------------------------------- EDITOR -#}
+    {% set editor_actions %}
+      {% if prompt_atual %}
+        <a class="lk-btn lk-btn--ghost lk-btn--sm" href="{{ query_url(request, sel=none) }}#editor">
+          Novo
+        </a>
+      {% endif %}
+    {% endset %}
+    {% call card(
+         'Editor · ' ~ (prompt_atual.slug if prompt_atual else 'novo prompt'),
+         actions=editor_actions,
+         id='editor'
+       ) %}
+      <form
+        method="post"
+        action="/api/v1/prompts{{ '/' ~ prompt_atual.id if prompt_atual else '' }}"
+        class="lk-stack"
+      >
+        {% if prompt_atual %}
+          <input type="hidden" name="_method" value="put" />
+        {% endif %}
+
+        <div class="lk-form-grid">
+          <div class="lk-field">
+            <label for="prompt-nome">Nome</label>
+            <input
+              class="lk-input"
+              type="text"
+              id="prompt-nome"
+              name="name"
+              value="{{ prompt_atual.name if prompt_atual else '' }}"
+              placeholder="Atendimento — base"
+            />
+          </div>
+
+          <div class="lk-field">
+            <label for="prompt-slug">Slug</label>
+            <input
+              class="lk-input lk-input--mono"
+              type="text"
+              id="prompt-slug"
+              name="slug"
+              required
+              value="{{ prompt_atual.slug if prompt_atual else '' }}"
+              {{ 'readonly' if prompt_atual }}
+              placeholder="atendimento-base"
+            />
+            <span class="lk-field__hint">
+              {% if prompt_atual %}
+                O slug identifica a linhagem de versões e não muda.
+              {% else %}
+                Identificador estável; as versões nascem debaixo dele.
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="lk-field">
+            <label for="prompt-papel">Papel</label>
+            <select class="lk-select" id="prompt-papel" name="role">
+              {% for papel in papeis %}
+                <option
+                  value="{{ papel }}"
+                  {{ 'selected' if (prompt_atual.role.value if prompt_atual else 'system') == papel }}
+                >
+                  {{ papel }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lk-field">
+            <label for="prompt-labels">Etiquetas</label>
+            <input
+              class="lk-input"
+              type="text"
+              id="prompt-labels"
+              name="labels"
+              value="{{ prompt_atual.labels | join(', ') if prompt_atual else '' }}"
+              placeholder="suporte, revisado"
+            />
+            <span class="lk-field__hint">Separadas por vírgula.</span>
+          </div>
+        </div>
+
+        <div class="lk-field">
+          <label for="prompt-descricao">Descrição</label>
+          <input
+            class="lk-input"
+            type="text"
+            id="prompt-descricao"
+            name="description"
+            value="{{ prompt_atual.description if prompt_atual else '' }}"
+            placeholder="Para que serve este prompt."
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="prompt-template">Template</label>
+          <textarea
+            class="lk-textarea"
+            id="prompt-template"
+            name="template"
+            rows="12"
+            required
+            spellcheck="false"
+            placeholder="Você atende clientes pelo canal &#123;&#123; canal &#125;&#125;."
+          >{{ prompt_atual.template if prompt_atual else '' }}</textarea>
+          <span class="lk-field__hint">
+            Placeholders no formato <code>&#123;&#123; variavel &#125;&#125;</code>. As variáveis são
+            extraídas do próprio texto quando você salva.
+          </span>
+        </div>
+
+        <label class="lk-row">
+          <input
+            type="checkbox"
+            name="is_active"
+            value="true"
+            {{ 'checked' if (prompt_atual.is_active if prompt_atual else true) }}
+          />
+          <span>Versão ativa — é esta que os módulos passam a executar.</span>
+        </label>
+
+        <div class="lk-row lk-row--wrap">
+          <button class="lk-btn lk-btn--primary" type="submit">
+            {{ 'Salvar nova versão' if prompt_atual else 'Criar prompt' }}
+          </button>
+          <span class="lk-hint">
+            {% if prompt_atual %}
+              Salvar <b>não sobrescreve</b> a versão {{ prompt_atual.version }}: nasce a
+              v{{ prompt_atual.version + 1 }}, e o histórico continua consultável.
+            {% else %}
+              O prompt nasce na versão 1. Toda edição posterior cria uma versão nova.
+            {% endif %}
+          </span>
+        </div>
+      </form>
+    {% endcall %}
+
+    {#- --------------------------------------------------------------- PREVIEW -#}
+    {% call card('Pré-visualização', dot='ai') %}
+      {% if prompt_atual %}
+        <form
+          method="post"
+          action="/api/v1/prompts/{{ prompt_atual.id }}/preview"
+          class="lk-stack"
+        >
+
+          {% if prompt_atual.variables %}
+            <div class="lk-form-grid">
+              {% for variable in prompt_atual.variables %}
+                <div class="lk-field">
+                  <label for="var-{{ loop.index }}">{{ variable }}</label>
+                  <input
+                    class="lk-input"
+                    type="text"
+                    id="var-{{ loop.index }}"
+                    name="var:{{ variable }}"
+                    placeholder="valor de {{ variable }}"
+                  />
+                </div>
+              {% endfor %}
+            </div>
+            <p class="lk-hint">
+              Variável em branco não é erro: a lacuna volta no texto como
+              <code>&#123;&#123; {{ prompt_atual.variables[0] }} &#125;&#125;</code> e o nome aparece
+              na lista de faltantes.
+            </p>
+          {% else %}
+            <p class="lk-hint">
+              Este template não declara variáveis — a pré-visualização mostra o texto como ele é.
+            </p>
+          {% endif %}
+
+          <div class="lk-row">
+            <button class="lk-btn lk-btn--outline" type="submit">Pré-visualizar</button>
+          </div>
+        </form>
+
+        {% if preview %}
+          <div class="lk-context__section">
+            <div class="lk-row lk-row--wrap">
+              <span class="lk-mono">{{ preview.slug }} · v{{ preview.version }}</span>
+              <span class="lk-capability">{{ preview.role }}</span>
+            </div>
+            <pre class="lk-result">{{ preview.rendered }}</pre>
+            {% if preview.missing %}
+              <div class="lk-findings">
+                <div class="lk-finding">
+                  <span class="lk-grow">
+                    Sem valor: <b>{{ preview.missing | join(', ') }}</b>. O texto foi renderizado
+                    com as lacunas preservadas.
+                  </span>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% else %}
+        {{ empty(
+             'Nenhum prompt selecionado',
+             'Clique em uma linha da biblioteca para carregar o texto no editor e gerar aqui um campo para cada variável.',
+             name='message'
+           ) }}
+      {% endif %}
+
+      {% call card_foot() %}
+        A pré-visualização não grava nada e não chama provedor nenhum.
+      {% endcall %}
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

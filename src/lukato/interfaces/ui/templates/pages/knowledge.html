@@ -1,0 +1,305 @@
+{#-
+  pages/knowledge.html — colecoes, ingestao e busca semantica (`GET /knowledge`).
+
+  Contexto entregue pela rota:
+    `documents`          `Page[Document]` filtrada por colecao e por texto.
+    `collections`        lista de `{name, documents, is_default, embedding, indexed, compatible}`.
+    `knowledge_health`   retrato do embedder corrente, com `degraded` e `reason`.
+    `default_collection` colecao usada quando o formulario nao informa uma.
+    `filters`            `{q, collection}` reexibidos nos formularios.
+
+  Opcional (preenchido quando a rota resolve uma busca vetorial):
+    `search_hits`        lista de `SearchHit` com `score`, `content` e `document_id`.
+
+  Aviso de degradacao: quando o provedor de embeddings cai para o modo local, a
+  busca continua respondendo — mas com vizinhanca pior. Isso **precisa** aparecer
+  na tela, senao um resultado ruim vira uma conclusao errada sobre a base.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set embedder = knowledge_health -%}
+{%- set hits = search_hits | default([], true) -%}
+{%- set documents_by_id = {} -%}
+{%- for document in documents.items -%}
+  {%- set _ = documents_by_id.update({document.id: document}) -%}
+{%- endfor -%}
+
+{% block hero %}
+  {% call hero(
+       'Conhecimento',
+       subtitle='Documentos indexados, ingestão idempotente e recuperação por similaridade.',
+       metrics=[
+         ('Documentos', documents.total | number),
+         ('Coleções', collections | length | number),
+         ('Embedder', embedder.get('provider', '—')),
+         ('Dimensões', embedder.get('dimensions', 0) | number)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="#lk-ingestao">Ingerir documento</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/knowledge" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filter-q">Filtrar documentos</label>
+      <input
+        class="lk-input"
+        id="filter-q"
+        name="q"
+        type="search"
+        value="{{ filters.q }}"
+        placeholder="título, origem ou trecho do conteúdo"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-collection">Coleção</label>
+      <select class="lk-select" id="filter-collection" name="collection">
+        <option value="">Todas</option>
+        {% for entry in collections %}
+          <option value="{{ entry.name }}" {{ 'selected' if filters.collection == entry.name else '' }}>
+            {{ entry.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/knowledge">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--knowledge lk-stack">
+    {% if embedder.get('degraded') %}
+      {% call card('Provedor de embeddings em modo degradado', dot='warn') %}
+        <p class="lk-finding">
+          {{ embedder.get('reason', 'O provedor configurado não respondeu e a plataforma caiu para o embedder local.') }}
+        </p>
+        <dl class="lk-kv">
+          <dt>Configurado</dt>
+          <dd class="lk-mono">{{ embedder.get('configured_provider', '—') }}</dd>
+          <dt>Em uso</dt>
+          <dd class="lk-mono">
+            {{ embedder.get('provider', '—') }} · {{ embedder.get('model', '—') }}
+          </dd>
+          <dt>Sondagem</dt>
+          <dd>{{ badge('ok' if embedder.get('healthy') else 'down',
+                       label='respondendo' if embedder.get('healthy') else 'sem resposta') }}</dd>
+        </dl>
+        <p class="lk-hint">
+          A ingestão e a busca continuam funcionando, mas a vizinhança recuperada é pior do que
+          a do provedor configurado. Coleções indexadas por outro embedder ficam marcadas como
+          incompatíveis e não são consultadas.
+        </p>
+      {% endcall %}
+    {% endif %}
+
+    {% call card('Coleções') %}
+      {% if collections %}
+        <div class="lk-collections">
+          {% for entry in collections %}
+            <div class="lk-hit">
+              <p class="lk-row lk-row--wrap">
+                <span class="lk-grow lk-truncate lk-mono">{{ entry.name }}</span>
+                {% if entry.is_default %}{{ badge('info', label='padrão') }}{% endif %}
+                {% if not entry.compatible %}
+                  {{ badge('warn', label='incompatível',
+                           title='Indexada por outro embedder: buscar aqui devolveria vizinhos sem sentido.') }}
+                {% elif not entry.indexed %}
+                  {{ badge('neutral', label='sem índice') }}
+                {% endif %}
+              </p>
+              <p class="lk-hit__score">{{ entry.documents | number }} documento(s)</p>
+              <p class="lk-hit__snippet">
+                {{ entry.embedding.get('provider', '—') }} ·
+                {{ entry.embedding.get('model', '—') }} ·
+                {{ entry.embedding.get('dimensions', 0) | number }} dimensões
+              </p>
+              <p>
+                <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/knowledge?collection={{ entry.name }}">
+                  Filtrar
+                </a>
+              </p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        {{ empty(
+             'Nenhuma coleção indexada',
+             'Ingira o primeiro documento abaixo para criar a coleção padrão desta instalação.',
+             name='book'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card('Busca semântica', dot='ai', ai=true) %}
+        <form class="lk-stack" method="get" action="/knowledge">
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="search-q">Consulta</label>
+              <input
+                class="lk-input"
+                id="search-q"
+                name="q"
+                type="search"
+                value="{{ filters.q }}"
+                placeholder="o que você procura na base"
+              />
+              <span class="lk-field__hint">A consulta é embeddada e comparada por cosseno.</span>
+            </div>
+
+            <div class="lk-field">
+              <label for="search-collection">Coleção</label>
+              <select class="lk-select" id="search-collection" name="collection">
+                <option value="">{{ default_collection }} (padrão)</option>
+                {% for entry in collections %}
+                  <option value="{{ entry.name }}" {{ 'selected' if filters.collection == entry.name else '' }}>
+                    {{ entry.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="lk-row">
+            <button class="lk-btn lk-btn--primary" type="submit">Buscar</button>
+            <a class="lk-btn lk-btn--ghost" href="/knowledge">Limpar</a>
+          </div>
+        </form>
+
+        <div class="lk-context__section lk-stack">
+          {% if hits %}
+            <p class="lk-label">{{ hits | length | number }} trecho(s) recuperado(s)</p>
+            {% for hit in hits %}
+              {%- set origin = documents_by_id.get(hit.document_id) -%}
+              <div class="lk-hit">
+                <p class="lk-row lk-row--wrap">
+                  <span class="lk-hit__score lk-grow">similaridade {{ hit.score | pct }}</span>
+                  <span class="lk-mono lk-hint">{{ hit.collection }}</span>
+                </p>
+                <p class="lk-hit__snippet">{{ hit.content | truncate(320) }}</p>
+                <p class="lk-hint">
+                  Documento de origem:
+                  <a class="lk-table__link" href="{{ query_url(request, sel=hit.document_id) }}">
+                    {{ origin.title if origin else (hit.document_id | truncate_mid(16)) }}
+                  </a>
+                </p>
+              </div>
+            {% endfor %}
+          {% elif filters.q %}
+            {{ empty(
+                 'Nenhum trecho recuperado',
+                 'Nenhum fragmento da coleção ficou próximo o bastante da consulta. Tente outros termos ou verifique a coleção escolhida.',
+                 name='search'
+               ) }}
+          {% else %}
+            <p class="lk-hint">
+              O resultado mostra, para cada trecho recuperado, a similaridade, o texto do
+              fragmento e o documento de origem — que abre no painel de contexto à direita.
+            </p>
+          {% endif %}
+        </div>
+      {% endcall %}
+
+      {% call card('Ingerir documento', id='lk-ingestao') %}
+        <form class="lk-stack" method="post" action="/api/v1/knowledge/documents">
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="doc-title">Título</label>
+              <input class="lk-input" id="doc-title" name="title" type="text" required />
+            </div>
+
+            <div class="lk-field">
+              <label for="doc-collection">Coleção</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="doc-collection"
+                name="collection"
+                type="text"
+                list="lk-collection-options"
+                value="{{ filters.collection if filters.collection else default_collection }}"
+              />
+              <datalist id="lk-collection-options">
+                {% for entry in collections %}<option value="{{ entry.name }}"></option>{% endfor %}
+              </datalist>
+            </div>
+
+            <div class="lk-field">
+              <label for="doc-source">Fonte</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="doc-source"
+                name="source"
+                type="text"
+                placeholder="manual.md, chamado #4021, ..."
+              />
+              <span class="lk-field__hint">Usada para reconhecer reingestões do mesmo material.</span>
+            </div>
+          </div>
+
+          <div class="lk-field">
+            <label for="doc-content">Conteúdo</label>
+            <textarea class="lk-textarea" id="doc-content" name="content" rows="10" required></textarea>
+            <span class="lk-field__hint">
+              O texto é normalizado, recortado em trechos com sobreposição
+              ({{ embedder.get('chunk_size', 0) | number }} caracteres, sobreposição de
+              {{ embedder.get('chunk_overlap', 0) | number }}) e indexado.
+            </span>
+          </div>
+
+          <div class="lk-row">
+            <button class="lk-btn lk-btn--primary" type="submit">Ingerir</button>
+            <span class="lk-hint">
+              Reingerir o mesmo conteúdo é idempotente: nada é duplicado e nenhum embedding novo
+              é gerado.
+            </span>
+          </div>
+        </form>
+      {% endcall %}
+    </div>
+
+    {% call card('Documentos', flush=true) %}
+      {% if documents.items %}
+        {% call table([
+             'Título',
+             {'label': 'Coleção'},
+             'Origem',
+             {'label': 'Tamanho', 'align': 'num'},
+             {'label': 'Ingerido', 'align': 'right'}
+           ], clickable=true, caption='Documentos indexados') %}
+          {% for document in documents.items %}
+            <tr {{ row_attrs('document', document.id, selected_id) }}>
+              <td>{{ cell_link('document', document.id, document.title) }}</td>
+              <td class="lk-mono">{{ document.collection }}</td>
+              <td class="lk-mono lk-truncate">{{ document.source if document.source else '(manual)' }}</td>
+              <td class="lk-table__num">{{ document.content | length | number }}</td>
+              <td class="lk-right lk-nowrap">{{ document.created_at | timeago }}</td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Nenhum documento nesta seleção',
+             'Remova os filtros ou ingira o primeiro documento da coleção pelo formulário acima.',
+             name='book'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {{ pagination(documents, label='documentos') }}
+  </div>
+{% endblock %}
+
+{% block context_title %}Documento{% endblock %}

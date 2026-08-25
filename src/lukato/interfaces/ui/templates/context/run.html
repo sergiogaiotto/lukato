@@ -1,0 +1,75 @@
+{#-
+  context/run.html — detalhe de uma execucao no painel direito.
+
+  `context_item` e um `AgentRun`. O painel resume desfecho, consumo e correlacao
+  de trace; a trilha completa de passos fica em `/runs/{id}`, que tem espaco para
+  a linha do tempo.
+-#}
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/empty.html" import empty -%}
+
+{%- set item = context_item | default(none) -%}
+
+{% if not item %}
+  {{ empty(
+       'Nenhuma execução selecionada',
+       'Escolha uma execução na tabela para ver aqui o desfecho, o consumo e o trace correspondente.',
+       name='activity',
+       action_href='/runs',
+       action_label='Ver execuções'
+     ) }}
+{% else %}
+  <div class="lk-context__title">
+    <span class="lk-truncate lk-mono">{{ item.id | truncate_mid(16) }}</span>
+    {{ badge(item.status) }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Módulo</dt>
+    <dd class="lk-mono">{{ item.module_slug }}</dd>
+    <dt>Custo</dt>
+    <dd class="lk-mono">{{ item.cost_usd | money }}</dd>
+    <dt>Tokens</dt>
+    <dd class="lk-mono">
+      {{ item.usage.total_tokens | tokens }}
+      <span class="lk-hint">
+        ({{ item.usage.prompt_tokens | tokens }} + {{ item.usage.completion_tokens | tokens }})
+      </span>
+    </dd>
+    <dt>Latência</dt>
+    <dd class="lk-mono">{{ item.latency_ms | number(0) }} ms</dd>
+    <dt>Passos</dt>
+    <dd class="lk-mono">{{ item.steps | length | number }}</dd>
+    <dt>Ator</dt>
+    <dd>{{ item.actor if item.actor else '—' }}</dd>
+    <dt>Tenant</dt>
+    <dd class="lk-mono">{{ item.tenant_id }}</dd>
+    <dt>Trace</dt>
+    <dd class="lk-mono">{{ item.trace_id | default('(sem trace)', true) | truncate_mid(18) }}</dd>
+    <dt>Início</dt>
+    <dd>{{ item.created_at | datetime_br('%d/%m/%Y %H:%M:%S') }}</dd>
+    <dt>Fim</dt>
+    <dd>
+      {% if item.finished_at %}{{ item.finished_at | datetime_br('%d/%m/%Y %H:%M:%S') }}
+      {% else %}<span class="lk-hint">em andamento</span>{% endif %}
+    </dd>
+  </dl>
+
+  {% if item.error %}
+    <div class="lk-context__section">
+      <p class="lk-label">Erro</p>
+      <p class="lk-finding lk-finding--block">{{ item.error }}</p>
+    </div>
+  {% endif %}
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--primary lk-btn--sm" href="/runs/{{ item.id }}">Abrir trilha</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/modules/{{ item.module_slug }}">Módulo</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/observability">Traces</a>
+  </div>
+
+  <details class="lk-details">
+    <summary>JSON</summary>
+    <pre>{{ item | json_pretty }}</pre>
+  </details>
+{% endif %}

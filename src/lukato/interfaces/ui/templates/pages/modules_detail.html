@@ -1,0 +1,525 @@
+{#-
+  pages/modules_detail.html — a operacao do modulo (SPEC-0009 secao 8,
+  rota `GET /modules/{slug}`). E a tela central do console: e daqui que se troca a
+  trinca, se invoca o modulo e se le o resultado com os achados de guardrail.
+
+  Contexto entregue por `router.modules_detail`, alem da moldura de `base_context`:
+
+  | Chave             | Tipo                       | Uso na tela |
+  | ----------------- | -------------------------- | ----------- |
+  | `module`          | ModuleDefinition           | cabecalho, trinca e painel de contexto |
+  | `descriptor`      | ModuleDescriptor \| None   | capacidades e schema de config do building block |
+  | `prompts`         | list[PromptTemplate]       | opcoes de system prompt |
+  | `input_policies`  | list[GuardrailPolicy]      | opcoes de guardrail de ENTRADA |
+  | `output_policies` | list[GuardrailPolicy]      | opcoes de guardrail de SAIDA |
+  | `policies`        | list[GuardrailPolicy]      | catalogo completo (contagem e atalhos) |
+  | `runs`            | Page[AgentRun]             | ultimas execucoes deste modulo |
+  | `runtimes`        | list[str]                  | orquestradores disponiveis na instalacao |
+
+  Opcionais, entregues pelo manipulador do POST ao redirecionar de volta:
+  `result` (resposta de uma invocacao) e `dry_run` (ensaio sem provedor). Quando
+  nao existem, os cartoes mostram o estado vazio — a tela nunca depende deles.
+
+  FORMULARIOS — HTML puro (`method="post"` mais `action` explicito, sem depender de
+  JavaScript), falando com a propria API v1 (SPEC-0009 secao 1.5). Os nomes dos
+  campos sao os do corpo documentado de cada rota.
+
+  * trinca      — `/api/v1/modules/{slug}` com `_method=put`. Os campos da trinca
+                  viajam achatados — `input_guardrail_id`, `system_prompt_id`,
+                  `output_guardrail_id`, `model`, `temperature`, `max_tokens`,
+                  `timeout_seconds`, `tools` (separadas por virgula) — e a borda os
+                  aninha em `binding`; `runtime` e campo de primeiro nivel.
+  * invocacao   — `/api/v1/modules/{slug}/invoke` com `input` e `variables` (JSON).
+                  O botao de ensaio usa `formaction="…/dry-run"`: HTML puro, mesmo
+                  formulario, outro destino.
+  * ciclo de vida — `/api/v1/modules/{slug}/status` com `_method=patch` e `status`.
+
+  `_method` e o campo oculto que o console usa quando o verbo da API nao existe em
+  HTML — formulario so sabe `GET` e `POST`.
+-#}
+{% extends "base.html" %}
+
+{%- from "partials/badge.html" import badge -%}
+{%- from "partials/card.html" import card, card_foot -%}
+{%- from "partials/empty.html" import empty -%}
+{%- from "partials/hero.html" import hero -%}
+{%- from "partials/table.html" import cell_link, row_attrs, table with context -%}
+
+{%- set binding = module.binding -%}
+{%- set result = result | default(none) -%}
+{%- set dry_run = dry_run | default(none) -%}
+{%- set prompts_vinculados = prompts | selectattr('id', 'equalto', binding.system_prompt_id) | list -%}
+{%- set prompt_atual = prompts_vinculados[0] if prompts_vinculados else none -%}
+
+{% block hero %}
+  {% call hero(
+       module.name or module.slug,
+       subtitle=module.description or 'Sem descrição. Use a trinca abaixo para definir como este módulo se comporta.',
+       metrics=[
+         ('Tipo', module.kind.value),
+         ('Runtime', module.runtime),
+         ('Versão', module.version),
+         ('Execuções', runs.total | number),
+       ]
+     ) %}
+    <form method="post" action="/api/v1/modules/{{ module.slug }}/status" class="lk-row">
+      <input type="hidden" name="_method" value="patch" />
+      {% if module.status.value == 'active' %}
+        <button class="lk-btn lk-btn--outline" type="submit" name="status" value="paused">
+          Pausar
+        </button>
+      {% else %}
+        <button class="lk-btn lk-btn--outline" type="submit" name="status" value="active">
+          Publicar
+        </button>
+      {% endif %}
+    </form>
+    <a class="lk-btn lk-btn--outline" href="/runs?module={{ module.slug }}">Execuções</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="lk-page--module lk-stack">
+  <div class="lk-row lk-row--wrap">
+    {{ badge(module.status, title='Ciclo de vida da definição') }}
+    <span class="lk-mono">{{ module.slug }}</span>
+    {% if module.owner %}<span class="lk-hint">responsável: {{ module.owner }}</span>{% endif %}
+    {% for tag in module.tags %}<span class="lk-capability">{{ tag }}</span>{% endfor %}
+  </div>
+
+  {% if module.status.value != 'active' %}
+    <p class="lk-hint">
+      Esta definição está em <b>{{ module.status.value }}</b>: a invocação real só roda com o
+      status <b>active</b>. O ensaio (dry-run) funciona em qualquer status — é para depurar
+      rascunho que ele existe.
+    </p>
+  {% endif %}
+
+  {#- ----------------------------------------------------------------- TRINCA -#}
+  {% set trinca_actions %}
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/guardrails">Políticas</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/prompts">Prompts</a>
+  {% endset %}
+  {% call card('Trinca parametrizável', dot='accent', actions=trinca_actions) %}
+    <div class="lk-pipeline" aria-label="Ordem de execução">
+      <span class="lk-pipeline__step">entrada</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">→</span>
+      <span class="lk-pipeline__step">guardrail in</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">→</span>
+      <span class="lk-pipeline__step">system prompt</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">→</span>
+      <span class="lk-pipeline__step">{{ module.runtime }}</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">→</span>
+      <span class="lk-pipeline__step">guardrail out</span>
+      <span class="lk-pipeline__arrow" aria-hidden="true">→</span>
+      <span class="lk-pipeline__step">resposta</span>
+    </div>
+
+    <form method="post" action="/api/v1/modules/{{ module.slug }}" class="lk-stack">
+      <input type="hidden" name="_method" value="put" />
+      <div class="lk-binding">
+        <div class="lk-field">
+          <label for="guardrail-entrada">Guardrail de entrada</label>
+          <select class="lk-select" id="guardrail-entrada" name="input_guardrail_id">
+            <option value="">sem guardrail de entrada</option>
+            {% for policy in input_policies %}
+              <option
+                value="{{ policy.id }}"
+                {{ 'selected' if policy.id == binding.input_guardrail_id }}
+              >
+                {{ policy.name or policy.slug }} ({{ policy.rules | length }} regras)
+              </option>
+            {% endfor %}
+          </select>
+          <span class="lk-field__hint">
+            {% if input_policies %}
+              Aplicado ao texto do usuário antes do prompt.
+            {% else %}
+              Nenhuma política de entrada ativa. <a href="/guardrails">Crie uma</a>.
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="lk-field">
+          <label for="system-prompt">System prompt</label>
+          <select class="lk-select" id="system-prompt" name="system_prompt_id">
+            <option value="">sem system prompt</option>
+            {% for prompt in prompts %}
+              <option value="{{ prompt.id }}" {{ 'selected' if prompt.id == binding.system_prompt_id }}>
+                {{ prompt.name or prompt.slug }} · v{{ prompt.version }}
+              </option>
+            {% endfor %}
+          </select>
+          <span class="lk-field__hint">
+            {% if prompt_atual and prompt_atual.variables %}
+              Variáveis esperadas: {{ prompt_atual.variables | join(', ') }}.
+            {% elif prompts %}
+              Renderizado com as variáveis enviadas na invocação.
+            {% else %}
+              Nenhum prompt ativo na biblioteca. <a href="/prompts">Crie um</a>.
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="lk-field">
+          <label for="guardrail-saida">Guardrail de saída</label>
+          <select class="lk-select" id="guardrail-saida" name="output_guardrail_id">
+            <option value="">sem guardrail de saída</option>
+            {% for policy in output_policies %}
+              <option
+                value="{{ policy.id }}"
+                {{ 'selected' if policy.id == binding.output_guardrail_id }}
+              >
+                {{ policy.name or policy.slug }} ({{ policy.rules | length }} regras)
+              </option>
+            {% endfor %}
+          </select>
+          <span class="lk-field__hint">
+            {% if output_policies %}
+              Aplicado à resposta antes de ela chegar ao usuário.
+            {% else %}
+              Nenhuma política de saída ativa. <a href="/guardrails">Crie uma</a>.
+            {% endif %}
+          </span>
+        </div>
+      </div>
+
+      <div class="lk-form-grid">
+        <div class="lk-field">
+          <label for="binding-modelo">Modelo</label>
+          <input
+            class="lk-input lk-input--mono"
+            type="text"
+            id="binding-modelo"
+            name="model"
+            value="{{ binding.model or '' }}"
+            placeholder="padrão do provedor"
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="binding-temperatura">Temperatura</label>
+          <input
+            class="lk-input"
+            type="number"
+            id="binding-temperatura"
+            name="temperature"
+            min="0"
+            max="2"
+            step="0.05"
+            value="{{ binding.temperature if binding.temperature is not none else '' }}"
+            placeholder="padrão"
+          />
+          <span class="lk-field__hint">0 a 2. Vazio usa a configuração global.</span>
+        </div>
+
+        <div class="lk-field">
+          <label for="binding-tokens">Máximo de tokens</label>
+          <input
+            class="lk-input"
+            type="number"
+            id="binding-tokens"
+            name="max_tokens"
+            min="1"
+            max="8192"
+            step="1"
+            value="{{ binding.max_tokens if binding.max_tokens is not none else '' }}"
+            placeholder="padrão"
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="binding-timeout">Tempo limite (s)</label>
+          <input
+            class="lk-input"
+            type="number"
+            id="binding-timeout"
+            name="timeout_seconds"
+            min="1"
+            step="1"
+            value="{{ binding.timeout_seconds }}"
+          />
+        </div>
+
+        <div class="lk-field">
+          <label for="binding-runtime">Runtime</label>
+          {% if runtimes %}
+            <select class="lk-select" id="binding-runtime" name="runtime">
+              {% for runtime in runtimes %}
+                <option value="{{ runtime }}" {{ 'selected' if runtime == module.runtime }}>
+                  {{ runtime }}
+                </option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <input
+              class="lk-input lk-input--mono"
+              type="text"
+              id="binding-runtime"
+              name="runtime"
+              value="{{ module.runtime }}"
+            />
+          {% endif %}
+        </div>
+
+        <div class="lk-field">
+          <label for="binding-ferramentas">Ferramentas</label>
+          <input
+            class="lk-input lk-input--mono"
+            type="text"
+            id="binding-ferramentas"
+            name="tools"
+            value="{{ binding.tools | join(', ') }}"
+            placeholder="nenhuma"
+          />
+          <span class="lk-field__hint">Nomes separados por vírgula, como no Registry.</span>
+        </div>
+      </div>
+
+      <div class="lk-row">
+        <button class="lk-btn lk-btn--primary" type="submit">Salvar trinca</button>
+        <span class="lk-hint">
+          A troca vale na próxima execução, sem reiniciar a aplicação.
+        </span>
+      </div>
+    </form>
+  {% endcall %}
+
+  {#- ---------------------------------------------------------------- INVOCAR -#}
+  {% call card('Invocar', dot='ai') %}
+    <form method="post" action="/api/v1/modules/{{ module.slug }}/invoke" class="lk-stack">
+      <div class="lk-field">
+        <label for="invoke-input">Entrada</label>
+        <textarea
+          class="lk-textarea"
+          id="invoke-input"
+          name="input"
+          rows="5"
+          placeholder="Explique a cobrança de julho."
+        ></textarea>
+      </div>
+
+      <div class="lk-field">
+        <label for="invoke-variaveis">Variáveis (JSON)</label>
+        <textarea
+          class="lk-textarea"
+          id="invoke-variaveis"
+          name="variables"
+          rows="3"
+          spellcheck="false"
+          placeholder='{"canal": "app"}'
+        >{}</textarea>
+        <span class="lk-field__hint">
+          {% if prompt_atual and prompt_atual.variables %}
+            Este prompt espera: {{ prompt_atual.variables | join(', ') }}.
+          {% else %}
+            Objeto JSON com os valores dos placeholders <code>&#123;&#123; var &#125;&#125;</code> do system prompt.
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="lk-row lk-row--wrap">
+        <button class="lk-btn lk-btn--primary" type="submit">Executar</button>
+        <button
+          class="lk-btn lk-btn--outline"
+          type="submit"
+          formaction="/api/v1/modules/{{ module.slug }}/dry-run"
+        >
+          Dry-run
+        </button>
+        <span class="lk-hint">
+          O dry-run aplica o guardrail de entrada e renderiza o prompt, mas não chama o
+          provedor: nenhum token, nenhum custo, nenhuma execução registrada.
+        </span>
+      </div>
+    </form>
+  {% endcall %}
+
+  {#- -------------------------------------------------------------- RESULTADO -#}
+  {% call card('Resultado', ai=true) %}
+    {% if result %}
+      <p class="lk-result">{{ result.output or '(sem texto na resposta)' }}</p>
+
+      <div class="lk-row lk-row--wrap lk-context__section">
+        <span class="lk-cost__value">{{ result.usage.total_tokens | tokens }} tokens</span>
+        <span class="lk-cost__value">{{ result.cost_usd | money }}</span>
+        {% if result.metadata.runtime is defined %}
+          <span class="lk-capability">{{ result.metadata.runtime }}</span>
+        {% endif %}
+        {% if result.metadata.latency_ms is defined %}
+          <span class="lk-capability">{{ result.metadata.latency_ms | number(0) }} ms</span>
+        {% endif %}
+        {% if result.run_id %}
+          <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/runs/{{ result.run_id }}">
+            Abrir execução
+          </a>
+        {% endif %}
+      </div>
+
+      {% if result.findings %}
+        <div class="lk-context__section">
+          <p class="lk-label">Achados de guardrail</p>
+          <div class="lk-findings">
+            {% for finding in result.findings %}
+              <div class="lk-finding {{ 'lk-finding--block' if finding.action.value == 'block' }}">
+                <span class="lk-grow">
+                  <b>{{ finding.rule_id }}</b> — {{ finding.message or finding.kind.value }}
+                  {% if finding.evidence %}
+                    <span class="lk-hint lk-mono">{{ finding.evidence | truncate_mid(72) }}</span>
+                  {% endif %}
+                </span>
+                {{ badge(finding.action) }}
+                <span class="lk-capability">{{ finding.severity.value }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if result.data %}
+        <details class="lk-details">
+          <summary>Resultado estruturado</summary>
+          <pre>{{ result.data | json_pretty }}</pre>
+        </details>
+      {% endif %}
+    {% elif dry_run %}
+      <p class="lk-label">Ensaio — o provedor não foi chamado</p>
+
+      <div class="lk-row lk-row--wrap">
+        {{ badge('allow' if dry_run.input_guardrail.allowed else 'block',
+                 label='entrada permitida' if dry_run.input_guardrail.allowed else 'entrada bloqueada') }}
+        <span class="lk-hint">
+          veredito em {{ dry_run.input_guardrail.latency_ms | number(1) }} ms
+        </span>
+      </div>
+
+      {% if dry_run.input_guardrail.findings %}
+        <div class="lk-findings lk-context__section">
+          {% for finding in dry_run.input_guardrail.findings %}
+            <div class="lk-finding {{ 'lk-finding--block' if finding.action.value == 'block' }}">
+              <span class="lk-grow">
+                <b>{{ finding.rule_id }}</b> — {{ finding.message or finding.kind.value }}
+              </span>
+              {{ badge(finding.action) }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="lk-context__section">
+        <p class="lk-label">Prompt renderizado</p>
+        <pre class="lk-result">{{ dry_run.rendered_prompt }}</pre>
+      </div>
+
+      {% if dry_run.messages %}
+        <details class="lk-details">
+          <summary>Conversa que iria ao provedor</summary>
+          <pre>{{ dry_run.messages | json_pretty }}</pre>
+        </details>
+      {% endif %}
+    {% else %}
+      {{ empty(
+           'Nenhum resultado nesta sessão',
+           'Preencha a entrada e use Executar para uma invocação real, ou Dry-run para ver o prompt renderizado e o veredito de entrada sem gastar tokens.',
+           name='play'
+         ) }}
+    {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}
+
+{% block context_title %}Detalhes do módulo{% endblock %}
+
+{% block context %}
+  {% if context_item and selected_entity != 'module' %}
+    {% include "partials/context_panel.html" %}
+  {% else %}
+    <div class="lk-context__title">
+      <span class="lk-truncate">{{ module.name or module.slug }}</span>
+      {{ badge(module.status) }}
+    </div>
+
+    <dl class="lk-kv">
+      <dt>Slug</dt>
+      <dd class="lk-mono">{{ module.slug }}</dd>
+      <dt>Tipo</dt>
+      <dd>{{ module.kind.value }}</dd>
+      <dt>Runtime</dt>
+      <dd class="lk-mono">{{ module.runtime }}</dd>
+      <dt>Versão</dt>
+      <dd>{{ module.version }}</dd>
+      <dt>Modelo</dt>
+      <dd class="lk-mono">{{ binding.model or 'padrão do provedor' }}</dd>
+      <dt>Temperatura</dt>
+      <dd>{{ binding.temperature if binding.temperature is not none else 'padrão' }}</dd>
+      <dt>Ferramentas</dt>
+      <dd>{{ binding.tools | join(', ') if binding.tools else 'nenhuma' }}</dd>
+      <dt>Atualizado</dt>
+      <dd>{{ module.updated_at | timeago }}</dd>
+    </dl>
+
+    {% if descriptor %}
+      <div class="lk-context__section">
+        <p class="lk-label">Building block</p>
+        <p class="lk-hint">{{ descriptor.description or descriptor.name }}</p>
+        {% if descriptor.capabilities %}
+          <div class="lk-capabilities">
+            {% for capability in descriptor.capabilities %}
+              <span class="lk-capability">{{ capability }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="lk-hint">Sem capacidades declaradas.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="lk-context__section">
+        <p class="lk-label">Building block</p>
+        <p class="lk-hint">
+          Nenhuma classe registrada com este slug. A definição existe, mas a invocação
+          precisa de um building block no <a href="/registry">Registry</a>.
+        </p>
+      </div>
+    {% endif %}
+
+    <div class="lk-context__section">
+      <p class="lk-label">Últimas execuções</p>
+      {% if runs.items %}
+        <dl class="lk-kv">
+          {% for run in runs.items[:6] %}
+            <dt>{{ run.created_at | timeago }}</dt>
+            <dd>
+              <a href="{{ query_url(request, sel=run.id) }}"
+                 data-context-entity="run"
+                 data-context-id="{{ run.id }}">{{ run.status.value }}</a>
+              <span class="lk-mono">{{ run.cost_usd | money }}</span>
+            </dd>
+          {% endfor %}
+        </dl>
+      {% else %}
+        <p class="lk-hint">Nenhuma execução registrada para este módulo.</p>
+      {% endif %}
+    </div>
+
+    {% if descriptor and descriptor.config_schema %}
+      <details class="lk-details">
+        <summary>Schema de configuração</summary>
+        <pre>{{ descriptor.config_schema | json_pretty }}</pre>
+      </details>
+    {% endif %}
+
+    <details class="lk-details">
+      <summary>Configuração atual</summary>
+      <pre>{{ module.config | json_pretty }}</pre>
+    </details>
+
+    <div class="lk-context__actions">
+      <a class="lk-btn lk-btn--outline lk-btn--sm" href="/runs?module={{ module.slug }}">
+        Execuções
+      </a>
+      <a class="lk-btn lk-btn--outline lk-btn--sm" href="/finops?module={{ module.slug }}">
+        Custo
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}

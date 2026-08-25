@@ -41,12 +41,14 @@ class GuardrailEngine:
         *,
         redaction_token: str = "[REDIGIDO]",  # noqa: S107 - marcador publico, nao e segredo
         fail_open: bool = False,
+        enabled: bool = True,
     ) -> None:
         self._evaluators: dict[GuardrailRuleKind, GuardrailRuleEvaluator] = {}
         for evaluator in evaluators:
             self.register(evaluator)
         self._redaction_token = redaction_token
         self._fail_open = fail_open
+        self._enabled = enabled
 
     def register(self, evaluator: GuardrailRuleEvaluator) -> None:
         """Registra (ou substitui) o avaliador responsavel por um tipo de regra."""
@@ -56,6 +58,11 @@ class GuardrailEngine:
     def kinds(self) -> frozenset[GuardrailRuleKind]:
         """Tipos de regra que este motor sabe avaliar."""
         return frozenset(self._evaluators)
+
+    @property
+    def enabled(self) -> bool:
+        """False quando a chave geral desliga a avaliacao (tudo passa intacto)."""
+        return self._enabled
 
     @property
     def redaction_token(self) -> str:
@@ -74,11 +81,15 @@ class GuardrailEngine:
 
         Politica `None` ou inativa e uma escolha explicita de "sem restricao": o
         conteudo passa intacto, com `findings` vazio e `policy_id=None`.
+
+        O motor construido com `enabled=False` (`LUKATO_GUARDRAILS__ENABLED=false`)
+        deixa **tudo** passar. E uma chave geral de emergencia, e o boot recusa
+        liga-la em producao: a plataforma inteira existe para garantir a trinca.
         """
         started = time.perf_counter()
         stage = _resolve_stage(policy, context)
 
-        if policy is None or not policy.is_active:
+        if policy is None or not policy.is_active or not self._enabled:
             return GuardrailVerdict(
                 allowed=True,
                 stage=stage,

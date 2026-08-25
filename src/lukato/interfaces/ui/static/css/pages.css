@@ -1,0 +1,400 @@
+/* pages.css — composicoes especificas de cada tela do console.
+ *
+ * Regra de convivencia com `components.css`: aqui so entram arranjos (grades,
+ * proporcoes, colunas) de uma pagina. Nada que possa ser reaproveitado em outra
+ * tela — isso pertence aos componentes.
+ *
+ * As classes seguem o padrao `.lk-page--<rota>` no contentor e
+ * `.lk-<assunto>` nos blocos internos, para que uma pagina nunca vaze estilo
+ * sobre a outra.
+ */
+
+/* ==========================================================================
+   Grades reaproveitadas pelas paginas
+   ========================================================================== */
+.lk-grid {
+  display: grid;
+  gap: var(--lk-space-4);
+}
+
+.lk-grid--2 {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.lk-grid--3 {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.lk-grid--sidebar {
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+}
+
+@media (max-width: 1080px) {
+  .lk-grid--sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lk-section__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lk-space-3);
+  margin-bottom: var(--lk-space-3);
+  font-size: var(--lk-fs-lg);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Cockpit
+   ========================================================================== */
+.lk-page--cockpit .lk-health {
+  display: grid;
+  gap: var(--lk-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.lk-health__item {
+  display: flex;
+  align-items: center;
+  gap: var(--lk-space-2);
+  padding: var(--lk-space-2) var(--lk-space-3);
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-sm);
+  background: var(--lk-panel-alt);
+}
+
+.lk-health__name {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: var(--lk-fs-sm);
+  letter-spacing: 0.06em;
+}
+
+.lk-health__detail {
+  margin-left: auto;
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-muted);
+  text-align: right;
+}
+
+/* ==========================================================================
+   Operacao do modulo
+   ========================================================================== */
+.lk-page--module .lk-binding {
+  display: grid;
+  gap: var(--lk-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+
+@media (max-width: 900px) {
+  .lk-page--module .lk-binding {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lk-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lk-space-2);
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-muted);
+}
+
+.lk-pipeline__step {
+  padding: 2px 8px;
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-pill);
+  background: var(--lk-panel-alt);
+  white-space: nowrap;
+}
+
+.lk-pipeline__arrow {
+  color: var(--lk-faint);
+}
+
+.lk-result {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lk-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lk-space-2);
+}
+
+.lk-finding {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lk-space-2);
+  padding: var(--lk-space-2) var(--lk-space-3);
+  border-left: 3px solid var(--lk-warn);
+  border-radius: var(--lk-radius-sm);
+  background: var(--lk-warn-soft);
+  font-size: var(--lk-fs-md);
+}
+
+.lk-finding--block {
+  border-left-color: var(--lk-danger);
+  background: var(--lk-danger-soft);
+}
+
+/* ==========================================================================
+   Execucoes: linha do tempo de passos
+   ========================================================================== */
+.lk-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding-left: var(--lk-space-4);
+  border-left: 2px solid var(--lk-border);
+}
+
+.lk-timeline__item {
+  position: relative;
+  padding: var(--lk-space-3) 0 var(--lk-space-3) var(--lk-space-4);
+}
+
+.lk-timeline__item::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: calc(-1 * var(--lk-space-4) - 6px);
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--lk-panel);
+  border-radius: 50%;
+  background: var(--lk-accent);
+}
+
+.lk-timeline__item--ok::before {
+  background: var(--lk-ok);
+}
+
+.lk-timeline__item--failed::before,
+.lk-timeline__item--blocked::before {
+  background: var(--lk-danger);
+}
+
+.lk-timeline__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lk-space-2);
+}
+
+.lk-timeline__name {
+  font-weight: 600;
+}
+
+.lk-timeline__meta {
+  margin-left: auto;
+  font-family: var(--lk-mono);
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-muted);
+}
+
+/* ==========================================================================
+   Conhecimento
+   ========================================================================== */
+.lk-collections {
+  display: grid;
+  gap: var(--lk-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.lk-hit {
+  padding: var(--lk-space-3);
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-sm);
+  background: var(--lk-panel-alt);
+}
+
+.lk-hit__score {
+  font-family: var(--lk-mono);
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-ai);
+}
+
+.lk-hit__snippet {
+  margin-top: 4px;
+  font-size: var(--lk-fs-md);
+  color: var(--lk-muted);
+}
+
+/* ==========================================================================
+   FinOps
+   ========================================================================== */
+.lk-page--finops .lk-chart-card {
+  padding: var(--lk-space-4);
+  min-height: 190px;
+}
+
+.lk-budget {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--lk-space-3);
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-sm);
+}
+
+.lk-budget__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lk-space-2);
+  font-weight: 600;
+}
+
+.lk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lk-space-3);
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-muted);
+}
+
+.lk-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   Observabilidade e registry
+   ========================================================================== */
+.lk-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lk-capability {
+  padding: 2px 8px;
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-pill);
+  background: var(--lk-panel-alt);
+  font-family: var(--lk-mono);
+  font-size: var(--lk-fs-sm);
+  color: var(--lk-muted);
+}
+
+/* ==========================================================================
+   AdWatch
+   ========================================================================== */
+.lk-page--adwatch .lk-steps {
+  display: grid;
+  gap: var(--lk-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  counter-reset: lk-step;
+}
+
+.lk-step {
+  position: relative;
+  padding: var(--lk-space-4) var(--lk-space-3) var(--lk-space-3);
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius);
+  background: var(--lk-panel);
+}
+
+.lk-step::before {
+  counter-increment: lk-step;
+  content: counter(lk-step);
+  position: absolute;
+  top: -11px;
+  left: var(--lk-space-3);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--lk-accent);
+  color: var(--lk-accent-contrast);
+  font-size: var(--lk-fs-sm);
+  font-weight: 700;
+}
+
+.lk-evidence {
+  display: grid;
+  gap: 4px var(--lk-space-3);
+  grid-template-columns: 1fr auto;
+  font-size: var(--lk-fs-md);
+}
+
+.lk-evidence__score {
+  font-family: var(--lk-mono);
+}
+
+.lk-timecode {
+  font-family: var(--lk-mono);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Configuracoes
+   ========================================================================== */
+.lk-page--settings .lk-settings-grid {
+  display: grid;
+  gap: var(--lk-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.lk-secret {
+  font-family: var(--lk-mono);
+  color: var(--lk-muted);
+}
+
+.lk-secret::after {
+  content: "mascarado";
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--lk-radius-pill);
+  background: var(--lk-neutral-soft);
+  color: var(--lk-faint);
+  font-family: var(--lk-font);
+  font-size: var(--lk-fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Erro
+   ========================================================================== */
+.lk-page--error {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  text-align: center;
+}
+
+.lk-error__code {
+  font-family: var(--lk-mono);
+  font-size: var(--lk-fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lk-danger);
+}
+
+.lk-error__title {
+  margin-top: var(--lk-space-2);
+  font-size: var(--lk-fs-xl);
+  font-weight: 700;
+}
+
+.lk-error__message {
+  margin-top: var(--lk-space-2);
+  max-width: 60ch;
+  color: var(--lk-muted);
+}
+
+.lk-error__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--lk-space-2);
+  margin-top: var(--lk-space-4);
+}

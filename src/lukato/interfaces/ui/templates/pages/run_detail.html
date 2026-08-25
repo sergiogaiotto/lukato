@@ -1,0 +1,268 @@
+{#-
+  pages/run_detail.html — trilha completa de uma execucao (`GET /runs/{id}`).
+
+  Contexto entregue pela rota:
+    `run`    o `AgentRun` pedido.
+    `steps`  `list[RunStep]` na ordem de execucao.
+
+  A tela responde a tres perguntas, nesta ordem: **o que aconteceu** (cabecalho
+  com desfecho, custo, consumo e trace), **onde o tempo foi** (linha do tempo com
+  a barra de cada passo proporcional a sua latencia) e **por que** (entrada,
+  saida e achados de guardrail).
+
+  A largura da barra e o unico `style` inline da tela — e a excecao prevista pela
+  CSP do console, porque a proporcao e um dado, nao uma decisao de estilo.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/stat.html" import progress, stat, stats_close, stats_open %}
+
+{%- set kind_labels = {
+      'guardrail_in': 'guardrail de entrada',
+      'prompt': 'system prompt',
+      'llm': 'modelo',
+      'tool': 'ferramenta',
+      'retrieval': 'recuperação',
+      'plan': 'planejamento',
+      'reflect': 'reflexão',
+      'guardrail_out': 'guardrail de saída',
+      'error': 'erro'
+    } -%}
+{%- set kind_dots = {
+      'guardrail_in': 's1',
+      'prompt': 's2',
+      'llm': 's3',
+      'tool': 's4',
+      'retrieval': 's5',
+      'plan': 's6',
+      'reflect': 's7',
+      'guardrail_out': 's8',
+      'error': 'danger'
+    } -%}
+{%- set kind_tones = {
+      'guardrail_in': 'warn',
+      'guardrail_out': 'warn',
+      'tool': 'ok',
+      'retrieval': 'ok',
+      'plan': 'ok',
+      'reflect': 'ok',
+      'error': 'danger'
+    } -%}
+{%- set status_modifiers = {
+      'succeeded': 'ok',
+      'failed': 'failed',
+      'blocked': 'blocked'
+    } -%}
+
+{%- set latencies = steps | map(attribute='latency_ms') | list -%}
+{%- set peak_latency = (latencies | max) if latencies else 0.0 -%}
+{%- set total_latency = (latencies | sum) if latencies else 0.0 -%}
+
+{% block hero %}
+  {% call hero(
+       'Execução ' ~ (run.id | truncate_mid(14)),
+       subtitle='Módulo ' ~ run.module_slug ~ ' · ' ~ (run.created_at | datetime_br('%d/%m/%Y %H:%M:%S')),
+       metrics=[
+         ('Custo', run.cost_usd | money),
+         ('Tokens', run.usage.total_tokens | tokens),
+         ('Latência', (run.latency_ms | number(0)) ~ ' ms'),
+         ('Passos', steps | length | number)
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/runs?module={{ run.module_slug }}">Execuções do módulo</a>
+  {% endcall %}
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--run lk-stack">
+    {{ stats_open() }}
+      {{ stat('Desfecho', run.status.value, info='Estado final registrado para a execução.') }}
+      {{ stat('Custo', run.cost_usd | money, primary=true, delta=run.usage.total_tokens | tokens ~ ' tokens') }}
+      {{ stat(
+           'Entrada / saída',
+           (run.usage.prompt_tokens | tokens) ~ ' / ' ~ (run.usage.completion_tokens | tokens),
+           info='Tokens de prompt e de resposta somados em todas as chamadas de LLM.'
+         ) }}
+      {{ stat(
+           'Latência',
+           (run.latency_ms | number(0)) ~ ' ms',
+           delta='soma dos passos: ' ~ (total_latency | number(0)) ~ ' ms'
+         ) }}
+    {{ stats_close() }}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card('Linha do tempo dos passos', flush=false) %}
+        {% if steps %}
+          <p class="lk-legend">
+            {% for kind, label in kind_labels.items() %}
+              <span class="lk-legend__item">
+                <span class="lk-dot lk-dot--{{ kind_dots.get(kind, 'accent') }}" aria-hidden="true"></span>
+                {{ label }}
+              </span>
+            {% endfor %}
+          </p>
+
+          <ol class="lk-timeline">
+            {% for step in steps %}
+              {%- set share = (step.latency_ms / peak_latency) if peak_latency > 0 else 0.0 -%}
+              {%- set modifier = status_modifiers.get(step.status.value, '') -%}
+              <li class="lk-timeline__item{{ ' lk-timeline__item--' ~ modifier if modifier else '' }}">
+                <div class="lk-timeline__head">
+                  <span class="lk-dot lk-dot--{{ kind_dots.get(step.kind.value, 'accent') }}" aria-hidden="true"></span>
+                  <span class="lk-timeline__name">{{ step.index + 1 }}. {{ step.name }}</span>
+                  <span class="lk-badge lk-badge--neutral">{{ kind_labels.get(step.kind.value, step.kind.value) }}</span>
+                  {{ badge(step.status) }}
+                  <span class="lk-timeline__meta">
+                    {{ step.latency_ms | number(0) }} ms · {{ step.usage.total_tokens | tokens }} tk ·
+                    {{ step.cost_usd | money }}
+                  </span>
+                </div>
+
+                {{ progress(
+                     share,
+                     label=(step.latency_ms | number(0)) ~ ' ms',
+                     tone=kind_tones.get(step.kind.value, '')
+                   ) }}
+
+                {% if step.error %}
+                  <p class="lk-finding lk-finding--block">{{ step.error }}</p>
+                {% endif %}
+
+                <details class="lk-details">
+                  <summary>Entrada e saída do passo</summary>
+                  <pre>{{ step.input | json_pretty }}</pre>
+                  <pre>{{ step.output | json_pretty }}</pre>
+                </details>
+              </li>
+            {% endfor %}
+          </ol>
+
+          <p class="lk-hint">
+            A barra de cada passo é proporcional ao passo mais lento desta execução
+            ({{ peak_latency | number(0) }} ms) e a cor identifica o tipo de passo.
+          </p>
+        {% else %}
+          {{ empty(
+               'Execução sem passos registrados',
+               'A trilha só é gravada quando o pipeline chega a executar ao menos uma etapa.',
+               name='activity',
+               action_href='/runs',
+               action_label='Voltar às execuções'
+             ) }}
+        {% endif %}
+      {% endcall %}
+
+      <div class="lk-stack">
+        {% call card('Identificação') %}
+          <dl class="lk-kv">
+            <dt>Execução</dt>
+            <dd class="lk-mono">{{ run.id }}</dd>
+            <dt>Módulo</dt>
+            <dd><a class="lk-table__link" href="/modules/{{ run.module_slug }}">{{ run.module_slug }}</a></dd>
+            <dt>Status</dt>
+            <dd>{{ badge(run.status) }}</dd>
+            <dt>Ator</dt>
+            <dd>{{ run.actor if run.actor else '—' }}</dd>
+            <dt>Tenant</dt>
+            <dd class="lk-mono">{{ run.tenant_id }}</dd>
+            <dt>Início</dt>
+            <dd>{{ run.created_at | datetime_br('%d/%m/%Y %H:%M:%S') }}</dd>
+            <dt>Fim</dt>
+            <dd>
+              {% if run.finished_at %}{{ run.finished_at | datetime_br('%d/%m/%Y %H:%M:%S') }}
+              {% else %}<span class="lk-hint">em andamento</span>{% endif %}
+            </dd>
+          </dl>
+        {% endcall %}
+
+        {% call card('Trace', dot='ai', ai=true) %}
+          {% if run.trace_id %}
+            <p class="lk-mono">{{ run.trace_id }}</p>
+            <p class="lk-hint">
+              Use este identificador para localizar a execução no coletor de traces
+              configurado nesta instalação.
+            </p>
+            <p>
+              <a class="lk-btn lk-btn--outline lk-btn--sm" href="/observability?sel={{ run.id }}">
+                Abrir observabilidade
+              </a>
+            </p>
+          {% else %}
+            <p class="lk-hint">
+              Nenhum trace foi emitido: o tracer está em modo noop nesta instalação. Os passos
+              acima continuam sendo a trilha completa e auditável da execução.
+            </p>
+            <p>
+              <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/settings">Ver configuração</a>
+            </p>
+          {% endif %}
+        {% endcall %}
+
+        {% if run.status.value in ('pending', 'running') %}
+          {% call card('Controle') %}
+            <form method="post" action="/api/v1/runs/{{ run.id }}/cancel">
+              <button
+                class="lk-btn lk-btn--danger lk-btn--sm"
+                type="submit"
+                data-confirm="Cancelar esta execução?"
+              >
+                Cancelar execução
+              </button>
+            </form>
+          {% endcall %}
+        {% endif %}
+      </div>
+    </div>
+
+    {% call card('Achados de guardrail') %}
+      {%- set ns = namespace(total=0) -%}
+      <div class="lk-findings">
+        {% for step in steps %}
+          {%- set findings = step.output.get('findings') if step.output is mapping else [] -%}
+          {% if findings %}
+            {% for finding in findings %}
+              {%- set ns.total = ns.total + 1 -%}
+              <p class="lk-finding{{ ' lk-finding--block' if finding.get('action') == 'block' else '' }}">
+                <span class="lk-mono">{{ finding.get('rule_id', '—') }}</span>
+                {{ badge(finding.get('action', 'warn')) }}
+                <span class="lk-grow">{{ finding.get('message', 'Regra disparada sem mensagem.') }}</span>
+                <span class="lk-hint">
+                  {{ kind_labels.get(step.kind.value, step.kind.value) }} ·
+                  {{ finding.get('severity', 'medium') }}
+                </span>
+              </p>
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if ns.total == 0 %}
+        <p class="lk-hint">
+          Nenhuma regra disparou nesta execução: entrada e saída passaram limpas pelos dois
+          estágios de guardrail.
+        </p>
+      {% endif %}
+    {% endcall %}
+
+    <div class="lk-grid lk-grid--2">
+      {% call card('Entrada') %}
+        <details class="lk-details" open>
+          <summary>JSON enviado ao módulo</summary>
+          <pre>{{ run.input | json_pretty }}</pre>
+        </details>
+      {% endcall %}
+
+      {% call card('Saída') %}
+        <details class="lk-details" open>
+          <summary>JSON devolvido pelo módulo</summary>
+          <pre>{{ run.output | json_pretty }}</pre>
+        </details>
+      {% endcall %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block context_title %}Execução{% endblock %}

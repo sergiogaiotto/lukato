@@ -105,10 +105,19 @@ class ModuleRegistry:
     ) -> type[BaseModule]:
         """Registra a classe pelo seu `slug` e devolve a propria classe.
 
-        Slug ja ocupado levanta :class:`ConflictError`, salvo `replace=True`.
+        Slug ja ocupado por **outra** classe levanta :class:`ConflictError`, salvo
+        `replace=True`. Registrar a **mesma** classe de novo e no-op: os cinco
+        embutidos sao alcancaveis por dois caminhos (`load_builtin()` e o entry
+        point `lukato.modules` do `pyproject.toml`), e com o pacote instalado os
+        dois rodam. Sem esta idempotencia, o segundo caminho acumularia cinco
+        erros em `discover_errors` e `/readyz` reportaria o registry degradado em
+        toda instalacao empacotada — sem nada de errado acontecendo de fato.
         """
         slug = self._validate_class(module_cls)
         current = self._classes.get(slug)
+        if current is module_cls:
+            self._sources.setdefault(slug, source)
+            return module_cls
         if current is not None and not replace:
             raise ConflictError(
                 f"Slug de modulo ja registrado: '{slug}' (por {_class_path(current)}).",

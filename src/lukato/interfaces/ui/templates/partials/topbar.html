@@ -1,0 +1,132 @@
+{#-
+  partials/topbar.html — as pecas da barra superior, como macros.
+
+  Sao macros (e nao um `include`) porque `base.html` precisa intercalar o bloco
+  `breadcrumb` entre a marca e a busca: um bloco declarado dentro de um template
+  incluido nao pode ser sobrescrito pela pagina filha. Cada peca continua morando
+  aqui, e `base.html` apenas as ordena.
+
+  Importe assim (o `with context` da acesso a `static_url`, `principal` e afins):
+      {% from "partials/topbar.html" import brand, global_search with context %}
+-#}
+{%- from "partials/sidebar.html" import icon -%}
+
+{#- Botao de recolher/expandir a sidebar; em telas estreitas vira o "hamburguer". -#}
+{% macro sidebar_toggle() -%}
+<button
+  type="button"
+  class="lk-btn lk-btn--ghost lk-btn--icon"
+  data-sidebar-toggle
+  aria-controls="lk-sidebar"
+  title="Recolher ou expandir o menu (atalho: [ )"
+  aria-label="Recolher ou expandir o menu"
+>
+  {{ icon('panel', 18, 'lk-btn__icon') }}
+</button>
+{%- endmacro %}
+
+{#- Marca: quadrado vermelho com "L" e o nome do produto. -#}
+{% macro brand() -%}
+<a class="lk-brand" href="/" aria-label="lukato — cockpit">
+  <span class="lk-brand__mark" aria-hidden="true">L</span>
+  <span>lukato</span>
+</a>
+{%- endmacro %}
+
+{#- Trilha de navegacao; `items` e a lista de `Crumb(label, href)` da rota. -#}
+{% macro breadcrumb_trail(items) -%}
+<nav class="lk-breadcrumb lk-grow lk-truncate" aria-label="Trilha de navegação">
+  <span class="lk-breadcrumb__sep" aria-hidden="true">/</span>
+  {% for crumb in items or [] %}
+    {% if crumb.href and not loop.last %}
+      <a class="lk-breadcrumb__item" href="{{ crumb.href }}">{{ crumb.label }}</a>
+    {% else %}
+      <span class="lk-breadcrumb__item lk-breadcrumb__item--current" aria-current="page">
+        {{- crumb.label -}}
+      </span>
+    {% endif %}
+    {% if not loop.last %}<span class="lk-breadcrumb__sep" aria-hidden="true">/</span>{% endif %}
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+{#- Busca global.
+
+    Com JavaScript, `palette.js` intercepta o campo e abre a paleta de comandos
+    (⌘K / Ctrl+K). Sem JavaScript o formulario ainda funciona: submete para o
+    catalogo de modulos, que e a busca textual mais util da plataforma. Nunca
+    exibimos um campo que nao leva a lugar nenhum. -#}
+{% macro global_search() -%}
+<form class="lk-topbar__search" role="search" method="get" action="/modules">
+  <label class="lk-sr-only" for="lk-search">Busca global</label>
+  <input
+    class="lk-input"
+    id="lk-search"
+    type="search"
+    name="q"
+    autocomplete="off"
+    placeholder="Buscar módulos, execuções e comandos…"
+    data-palette-input
+  />
+  <span class="lk-kbd" aria-hidden="true">⌘K</span>
+</form>
+{%- endmacro %}
+
+{#- Links de servico: contrato da API e encerramento de sessao. -#}
+{% macro topbar_links() -%}
+<div class="lk-topbar__links">
+  <a href="/api/docs" title="Contrato OpenAPI desta instalação">API</a>
+  {% if auth_enabled %}
+    <a href="/" data-logout title="Encerrar a sessão neste navegador">Sair</a>
+  {% else %}
+    <a
+      href="/"
+      data-logout
+      aria-disabled="true"
+      title="Autenticação desligada nesta instalação: não há sessão para encerrar"
+      >Sair</a
+    >
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{#- Alternancia de tema; o estado vive em localStorage["lukato.theme"]. -#}
+{% macro theme_toggle() -%}
+<button
+  type="button"
+  class="lk-btn lk-btn--ghost lk-btn--icon"
+  data-theme-toggle
+  title="Alternar tema claro e escuro"
+  aria-label="Alternar tema claro e escuro"
+>
+  <span data-theme-icon="light">{{ icon('moon', 18, 'lk-btn__icon') }}</span>
+  <span data-theme-icon="dark" hidden>{{ icon('sun', 18, 'lk-btn__icon') }}</span>
+</button>
+{%- endmacro %}
+
+{#- Abre a gaveta do painel de contexto; visivel apenas ate 1280px. -#}
+{% macro aside_toggle() -%}
+<button
+  type="button"
+  class="lk-btn lk-btn--ghost lk-btn--icon lk-aside-toggle"
+  data-aside-toggle
+  aria-controls="lk-aside"
+  title="Mostrar ou esconder o painel de contexto"
+  aria-label="Mostrar ou esconder o painel de contexto"
+>
+  {{ icon('info', 18, 'lk-btn__icon') }}
+</button>
+{%- endmacro %}
+
+{#- Identidade da requisicao: nome, papel e avatar de iniciais. -#}
+{% macro user_block(current) -%}
+<div class="lk-user">
+  <span class="lk-user__meta">
+    <span class="lk-user__name">{{ current.subject if current else 'anonymous' }}</span>
+    <span class="lk-user__role">{{ (current.role.value if current else 'root') }}</span>
+  </span>
+  <span class="lk-avatar" aria-hidden="true">
+    {{- (current.subject if current else 'anonymous') | initials -}}
+  </span>
+</div>
+{%- endmacro %}

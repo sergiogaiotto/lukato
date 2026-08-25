@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  logo.svg — marca completa: o quadrado vermelho com o "L" e o nome do produto.
+
+  Sobre o `xmlns`: e a declaracao de namespace XML que torna este arquivo um SVG
+  valido quando servido como image/svg+xml. Nao ha requisicao de rede alguma
+  para esse endereco; o arquivo funciona identico offline.
+
+  O nome usa a mesma pilha de fontes do console (`--lk-font`), toda de sistema:
+  nenhuma fonte remota, nenhuma @font-face. `currentColor` no texto deixa o
+  logotipo acompanhar o tema quando embutido inline em uma pagina.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 32" width="132" height="32" role="img" aria-label="lukato">
+  <title>lukato</title>
+  <rect width="32" height="32" rx="7" fill="#c8102e"/>
+  <path d="M11 8h4.4v12.2H23V24H11z" fill="#ffffff"/>
+  <text
+    x="42"
+    y="22"
+    fill="currentColor"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="18"
+    font-weight="700"
+    letter-spacing="-0.3"
+  >lukato</text>
+</svg>

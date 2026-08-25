@@ -764,7 +764,15 @@ class Container:
     hasher: PasswordHasherPort
     tokens: TokenServicePort
     media: MediaToolbox            # probe/asr/ocr/scenes/vision
+    tools: ToolCatalog | None      # registro de ferramentas dos runtimes
+    cache: CachePort | None        # cache do processo; alimenta o rate limit HTTP
 ```
+
+> `cache` foi acrescentado depois da primeira redacao: sem ele o
+> `RateLimitMiddleware` lia `container.cache` de um `dataclass(slots=True)` que
+> nao tinha o campo, caia sempre numa janela local por instancia de middleware, e
+> os adaptadores de cache ficavam sem uso nenhum. `None` continua legitimo — o
+> middleware degrada — mas o composition root preenche.
 
 ### 10.2 Casos de uso
 Cada caso de uso e uma classe com `__init__(self, container: Container)` e

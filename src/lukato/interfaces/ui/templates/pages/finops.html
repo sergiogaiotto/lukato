@@ -1,0 +1,408 @@
+{#-
+  pages/finops.html — custo, serie temporal, orcamentos e precos (`GET /finops`).
+
+  Contexto entregue pela rota:
+    `summary`  `CostSummary` da janela (`total_usd`, `total_tokens`, `runs`,
+               `by_module`, `by_model`).
+    `series`   lista de `{bucket, cost_usd, tokens, runs}`, sem buracos no eixo.
+    `budgets`  `list[Budget]` cadastrados.
+    `prices`   `PriceTable` em vigor.
+    `buckets`  granularidades aceitas (`hour`, `day`).
+    `filters`  `{hours, bucket, module}`.
+
+  O grafico e desenhado por `static/js/charts.js` a partir de `data-series`. O
+  proprio contentor carrega a **tabela da serie** por dentro: com JavaScript o
+  script substitui o conteudo pelo SVG; sem JavaScript a tabela permanece, e o
+  numero continua legivel. Nenhuma biblioteca, nenhuma requisicao externa.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/stat.html" import progress, stat, stats_close, stats_open %}
+{% from "partials/table.html" import table with context %}
+
+{%- set window_options = [
+      (1, 'última hora'),
+      (24, 'últimas 24 horas'),
+      (168, 'últimos 7 dias'),
+      (720, 'últimos 30 dias'),
+      (2160, 'últimos 90 dias')
+    ] -%}
+{%- set bucket_labels = {'hour': 'por hora', 'day': 'por dia'} -%}
+{%- set period_options = [
+      ('daily', 'diário'),
+      ('weekly', 'semanal'),
+      ('monthly', 'mensal'),
+      ('total', 'acumulado')
+    ] -%}
+
+{%- set module_amounts = summary.by_module -%}
+{%- set model_amounts = summary.by_model -%}
+{%- set module_peak = (module_amounts.values() | max) if module_amounts else 0.0 -%}
+{%- set model_peak = (model_amounts.values() | max) if model_amounts else 0.0 -%}
+{%- set cost_points = series | map(attribute='cost_usd') | list -%}
+{%- set time_format = '%d/%m %Hh' if filters.bucket == 'hour' else '%d/%m' -%}
+
+{% block hero %}
+  {% call hero(
+       'FinOps',
+       subtitle='Todo token consumido vira custo atribuído a um módulo e a um modelo.',
+       metrics=[
+         ('Custo', summary.total_usd | money),
+         ('Tokens', summary.total_tokens | tokens),
+         ('Execuções', summary.runs | number),
+         ('Janela', filters.hours ~ ' h')
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="#lk-orcamento">Novo orçamento</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/finops">
+    <div class="lk-field">
+      <label for="filter-hours">Janela</label>
+      <select class="lk-select" id="filter-hours" name="hours">
+        {% for hours, label in window_options %}
+          <option value="{{ hours }}" {{ 'selected' if filters.hours == hours else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-bucket">Granularidade</label>
+      <select class="lk-select" id="filter-bucket" name="bucket">
+        {% for bucket in buckets %}
+          <option value="{{ bucket }}" {{ 'selected' if filters.bucket == bucket else '' }}>
+            {{ bucket_labels.get(bucket, bucket) }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="lk-field lk-grow">
+      <label for="filter-module">Módulo</label>
+      <input
+        class="lk-input lk-input--mono"
+        id="filter-module"
+        name="module"
+        type="text"
+        value="{{ filters.module }}"
+        placeholder="slug do módulo (vazio = todos)"
+      />
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Aplicar</button>
+      <a class="lk-btn lk-btn--ghost" href="/finops">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--finops lk-stack">
+    {{ stats_open() }}
+      {{ stat('Custo na janela', summary.total_usd | money, primary=true,
+              info='Soma dos registros de consumo faturáveis do período.') }}
+      {{ stat('Tokens', summary.total_tokens | tokens) }}
+      {{ stat('Execuções', summary.runs | number) }}
+      {{ stat(
+           'Custo por execução',
+           (summary.total_usd / summary.runs) | money if summary.runs else (0 | money),
+           delta='média simples do período'
+         ) }}
+    {{ stats_close() }}
+
+    {% call card('Custo ' ~ bucket_labels.get(filters.bucket, filters.bucket)) %}
+      {% if series %}
+        <div
+          class="lk-chart-card"
+          data-chart="bar"
+          data-format="money"
+          data-title="Custo {{ bucket_labels.get(filters.bucket, filters.bucket) }} na janela de {{ filters.hours }} horas"
+          data-caption="Custo {{ bucket_labels.get(filters.bucket, filters.bucket) }}"
+          data-series="{{ cost_points | join(',') }}"
+          data-labels="{% for point in series %}{{ point.bucket | datetime_br(time_format) }}{{ ',' if not loop.last else '' }}{% endfor %}"
+        >
+          {% call table([
+               'Período',
+               {'label': 'Custo', 'align': 'num'},
+               {'label': 'Tokens', 'align': 'num'},
+               {'label': 'Execuções', 'align': 'num'}
+             ], caption='Série de custo do período') %}
+            {% for point in series %}
+              <tr>
+                <td class="lk-mono lk-nowrap">{{ point.bucket | datetime_br(time_format) }}</td>
+                <td class="lk-table__num">{{ point.cost_usd | money }}</td>
+                <td class="lk-table__num">{{ point.tokens | tokens }}</td>
+                <td class="lk-table__num">{{ point.runs | number }}</td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        </div>
+        <p class="lk-hint">
+          Sem JavaScript, a tabela acima é a própria série — todo balde do intervalo aparece,
+          e um zero significa "não gastou", nunca "não sei".
+        </p>
+      {% else %}
+        {{ empty(
+             'Sem consumo na janela',
+             'Nenhum registro faturável foi produzido no período escolhido.',
+             name='coins',
+             action_href='/modules',
+             action_label='Invocar um módulo'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    <div class="lk-grid lk-grid--2">
+      {% call card('Custo por módulo', flush=true) %}
+        {% if module_amounts %}
+          {% call table([
+               'Módulo',
+               {'label': 'Custo', 'align': 'num'},
+               {'label': 'Participação', 'width': '38%'}
+             ], caption='Custo por módulo') %}
+            {% for slug, amount in module_amounts | dictsort(by='value', reverse=true) %}
+              <tr>
+                <td>
+                  <a class="lk-table__link" href="/finops?module={{ slug }}&hours={{ filters.hours }}">
+                    {{ slug }}
+                  </a>
+                </td>
+                <td class="lk-table__num">{{ amount | money }}</td>
+                <td>
+                  {{ progress(
+                       (amount / module_peak) if module_peak > 0 else 0.0,
+                       label=(amount / summary.total_usd) | pct if summary.total_usd > 0 else '—'
+                     ) }}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        {% else %}
+          {{ empty('Nenhum módulo consumiu na janela', name='blocks') }}
+        {% endif %}
+      {% endcall %}
+
+      {% call card('Custo por modelo', flush=true) %}
+        {% if model_amounts %}
+          {% call table([
+               'Modelo',
+               {'label': 'Custo', 'align': 'num'},
+               {'label': 'Participação', 'width': '38%'}
+             ], caption='Custo por modelo') %}
+            {% for model, amount in model_amounts | dictsort(by='value', reverse=true) %}
+              <tr>
+                <td class="lk-mono">{{ model }}</td>
+                <td class="lk-table__num">{{ amount | money }}</td>
+                <td>
+                  {{ progress(
+                       (amount / model_peak) if model_peak > 0 else 0.0,
+                       label=(amount / summary.total_usd) | pct if summary.total_usd > 0 else '—'
+                     ) }}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        {% else %}
+          {{ empty('Nenhum modelo consumiu na janela', name='spark') }}
+        {% endif %}
+      {% endcall %}
+    </div>
+
+    {% call card('Orçamentos', flush=true) %}
+      {% if budgets %}
+        {% call table([
+             'Orçamento',
+             {'label': 'Escopo'},
+             {'label': 'Período'},
+             {'label': 'Limite', 'align': 'num'},
+             {'label': 'Consumo na janela', 'width': '26%'},
+             {'label': 'Situação'},
+             {'label': 'Ações', 'width': '12%'}
+           ], caption='Orçamentos e consumo da janela filtrada') %}
+          {% for budget in budgets %}
+            {%- set scope_slug = budget.scope[7:] if budget.scope.startswith('module:') else '' -%}
+            {%- set consumed = module_amounts.get(scope_slug, 0.0) if scope_slug else summary.total_usd -%}
+            {%- set share = (consumed / budget.limit_usd) if budget.limit_usd > 0 else 0.0 -%}
+            {%- set blocked = budget.hard_stop and share >= 1.0 -%}
+            {%- set alerting = share >= budget.alert_threshold -%}
+            <tr>
+              <td>
+                <p class="lk-truncate">{{ budget.name }}</p>
+                {% if not budget.is_active %}
+                  <p class="lk-hint">inativo — não alerta nem bloqueia</p>
+                {% endif %}
+              </td>
+              <td class="lk-mono">{{ budget.scope }}</td>
+              <td>{{ budget.period.value }}</td>
+              <td class="lk-table__num">{{ budget.limit_usd | money }}</td>
+              <td>
+                {{ progress(
+                     share,
+                     label=(consumed | money) ~ ' · ' ~ (share | pct),
+                     tone='danger' if blocked else ('warn' if alerting else 'ok')
+                   ) }}
+              </td>
+              <td>
+                {% if blocked %}
+                  {{ badge('block', label='bloqueio',
+                           title='Limite estourado com parada obrigatória habilitada.') }}
+                {% elif alerting %}
+                  {{ badge('warn', label='alerta',
+                           title='Consumo acima do limiar de alerta (' ~ (budget.alert_threshold | pct) ~ ').') }}
+                {% else %}
+                  {{ badge('ok', label='dentro do limite') }}
+                {% endif %}
+                {% if budget.hard_stop %}
+                  <p class="lk-hint">parada obrigatória</p>
+                {% endif %}
+              </td>
+              <td>
+                <span class="lk-row lk-row--wrap">
+                  <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/finops?module={{ scope_slug }}&hours={{ filters.hours }}">
+                    Detalhar
+                  </a>
+                  <form method="post" action="/api/v1/finops/budgets/{{ budget.id }}">
+                    <input type="hidden" name="_method" value="delete" />
+                    <button
+                      class="lk-btn lk-btn--danger lk-btn--sm"
+                      type="submit"
+                      data-confirm="Remover o orçamento {{ budget.name }}?"
+                    >
+                      Remover
+                    </button>
+                  </form>
+                </span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+        <p class="lk-card__foot">
+          O consumo mostrado é o da janela filtrada nesta tela ({{ filters.hours }} h), recortado
+          pelo escopo de cada orçamento — e não o do período de apuração do orçamento, que pode
+          ser mais longo.
+        </p>
+      {% else %}
+        {{ empty(
+             'Nenhum orçamento cadastrado',
+             'Sem orçamento não há alerta nem parada: o consumo só aparece depois da fatura.',
+             name='coins'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card('Novo orçamento', id='lk-orcamento') %}
+        <form class="lk-stack" method="post" action="/api/v1/finops/budgets">
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="budget-name">Nome</label>
+              <input class="lk-input" id="budget-name" name="name" type="text" required />
+            </div>
+
+            <div class="lk-field">
+              <label for="budget-limit">Limite (US$)</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="budget-limit"
+                name="limit_usd"
+                type="number"
+                step="0.00001"
+                min="0"
+                value="10"
+                required
+              />
+            </div>
+
+            <div class="lk-field">
+              <label for="budget-scope">Escopo</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="budget-scope"
+                name="scope"
+                type="text"
+                value="global"
+                required
+              />
+              <span class="lk-field__hint">
+                <span class="lk-mono">global</span>,
+                <span class="lk-mono">module:&lt;slug&gt;</span> ou
+                <span class="lk-mono">tenant:&lt;id&gt;</span>.
+              </span>
+            </div>
+
+            <div class="lk-field">
+              <label for="budget-period">Período</label>
+              <select class="lk-select" id="budget-period" name="period">
+                {% for value, label in period_options %}
+                  <option value="{{ value }}" {{ 'selected' if value == 'monthly' else '' }}>
+                    {{ label }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="lk-field">
+              <label for="budget-threshold">Limiar de alerta</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="budget-threshold"
+                name="alert_threshold"
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                value="0.8"
+              />
+              <span class="lk-field__hint">Fração do limite a partir da qual o alerta acende.</span>
+            </div>
+
+            <div class="lk-field">
+              <label for="budget-hardstop">Parada obrigatória</label>
+              <select class="lk-select" id="budget-hardstop" name="hard_stop">
+                <option value="false">não — apenas alerta</option>
+                <option value="true">sim — bloqueia ao estourar</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lk-row">
+            <button class="lk-btn lk-btn--primary" type="submit">Criar orçamento</button>
+          </div>
+        </form>
+      {% endcall %}
+
+      {% call card('Tabela de preços', flush=true) %}
+        {% if prices.prices %}
+          {% call table([
+               'Modelo',
+               {'label': 'Entrada / 1k', 'align': 'num'},
+               {'label': 'Saída / 1k', 'align': 'num'}
+             ], caption='Preços por modelo') %}
+            {% for price in prices.prices %}
+              <tr>
+                <td class="lk-mono">{{ price.model }}</td>
+                <td class="lk-table__num">{{ price.input_usd_per_1k | money }}</td>
+                <td class="lk-table__num">{{ price.output_usd_per_1k | money }}</td>
+              </tr>
+            {% endfor %}
+          {% endcall %}
+        {% else %}
+          {{ empty('Nenhum modelo precificado', 'Os preços padrão são aplicados a todas as chamadas.', name='coins') }}
+        {% endif %}
+        <p class="lk-card__foot">
+          Padrão: {{ prices.default_input_usd_per_1k | money }} por 1k de entrada e
+          {{ prices.default_output_usd_per_1k | money }} por 1k de saída, em {{ prices.currency }}.
+          A tabela vem da configuração e não é editável por esta tela.
+        </p>
+      {% endcall %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block context_title %}Detalhes{% endblock %}

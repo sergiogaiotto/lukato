@@ -1,0 +1,57 @@
+{#-
+  partials/stat.html — tile de metrica e a grade que os alinha (SPEC-0009 secao 6).
+
+      {% from "partials/stat.html" import stat, stats_open, stats_close %}
+
+      {{ stats_open() }}
+        {{ stat('Módulos ativos', active_modules, info='Definições com status active.') }}
+        {{ stat('Custo 24h', cost_summary.total_usd | money, primary=true) }}
+      {{ stats_close() }}
+
+  Parametros de `stat`:
+    label    legenda em caixa alta (10px).
+    value    ja formatado pelo template (use `| number`, `| money`, `| tokens`).
+    info     texto do badge "i"; some quando vazio.
+    delta    linha de apoio abaixo do numero (variacao, recorte, unidade).
+    primary  destaca o tile com a borda azul de IA.
+    href     transforma o tile em link para o detalhamento.
+-#}
+
+{% macro stat(label, value, info='', delta='', primary=false, href=none) -%}
+{% set body %}
+  <span class="lk-stat__value">{{ value }}</span>
+  <span class="lk-stat__label">
+    {{ label }}
+    {% if info %}<span class="lk-stat__info" title="{{ info }}" aria-label="{{ info }}">i</span>{% endif %}
+  </span>
+  {% if delta %}<span class="lk-stat__delta">{{ delta }}</span>{% endif %}
+{% endset %}
+{% if href %}
+  <a class="lk-stat{{ ' is-primary' if primary else '' }}" href="{{ href }}">{{ body }}</a>
+{% else %}
+  <div class="lk-stat{{ ' is-primary' if primary else '' }}">{{ body }}</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro stats_open(extra_class='') -%}
+<div class="lk-stats {{ extra_class }}">
+{%- endmacro %}
+
+{% macro stats_close() -%}
+</div>
+{%- endmacro %}
+
+{#- Barra de progresso rotulada; `share` e uma fracao de 0 a 1. -#}
+{% macro progress(share, label='', tone='') -%}
+{%- set percent = ((share | float) * 100) | round(1) -%}
+{%- set width = (percent if percent > 0 else 0) if percent < 100 else 100 -%}
+<div class="lk-progress">
+  <span class="lk-progress__track">
+    <span
+      class="lk-progress__fill{{ ' lk-progress__fill--' ~ tone if tone else '' }}"
+      style="width: {{ width }}%"
+    ></span>
+  </span>
+  <span class="lk-progress__value">{{ label if label else (share | pct) }}</span>
+</div>
+{%- endmacro %}

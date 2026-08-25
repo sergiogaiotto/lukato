@@ -446,6 +446,16 @@ class Settings(BaseSettings):
                 "declare este ambiente como producao (LUKATO_APP__ENV)"
             )
 
+        if not self.guardrails.enabled:
+            raise ValueError(
+                "LUKATO_GUARDRAILS__ENABLED=false em producao desliga a trinca "
+                "guardrail de entrada -> system prompt -> guardrail de saida em TODOS "
+                "os modulos: PII, segredos e prompt injection passariam direto para o "
+                "provedor. E uma chave geral de emergencia para diagnostico local. "
+                "Para afrouxar um modulo especifico, troque a politica dele em vez de "
+                "desligar a plataforma inteira"
+            )
+
         secret = self.security.jwt_secret_value.strip()
         remedio = "gere um segredo forte com: openssl rand -hex 32"
 

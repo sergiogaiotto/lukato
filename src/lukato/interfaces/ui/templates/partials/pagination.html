@@ -1,0 +1,60 @@
+{#-
+  partials/pagination.html — navegacao de paginas de uma `Page[T]`.
+
+      {% from "partials/pagination.html" import pagination with context %}
+      {{ pagination(runs) }}
+
+  O `with context` e obrigatorio: os links usam `query_url(request, offset=…)`,
+  que preserva todos os outros filtros da URL.
+
+  `page` e a `Page` da aplicacao: `items`, `total`, `limit`, `offset`. A
+  paginacao e por `offset`, e nao por numero de pagina, porque e assim que a API
+  e os casos de uso conversam — trocar de representacao no meio do caminho so
+  criaria uma classe de bug de arredondamento.
+-#}
+
+{% macro pagination(page, label='itens') -%}
+{%- if page and page.total is defined -%}
+  {%- set limit = page.limit if page.limit else 25 -%}
+  {%- set offset = page.offset if page.offset else 0 -%}
+  {%- set shown = page.items | length -%}
+  {%- set first = (offset + 1) if shown else 0 -%}
+  {%- set last = offset + shown -%}
+  {%- set has_prev = offset > 0 -%}
+  {%- set has_next = last < page.total -%}
+  {%- set current = (offset // limit) + 1 -%}
+  {%- set pages = ((page.total + limit - 1) // limit) if limit else 1 -%}
+  <nav class="lk-pagination" aria-label="Paginação">
+    <span>
+      {% if shown %}
+        {{ first | number }}–{{ last | number }} de {{ page.total | number }} {{ label }}
+      {% else %}
+        Nenhum resultado
+      {% endif %}
+    </span>
+    <span class="lk-pagination__pages">
+      <a
+        class="lk-btn lk-btn--ghost lk-btn--sm"
+        href="{{ query_url(request, offset=none) }}"
+        {% if not has_prev %}aria-disabled="true" tabindex="-1"{% endif %}
+        >Primeira</a
+      >
+      <a
+        class="lk-btn lk-btn--ghost lk-btn--sm"
+        href="{{ query_url(request, offset=[offset - limit, 0] | max) }}"
+        rel="prev"
+        {% if not has_prev %}aria-disabled="true" tabindex="-1"{% endif %}
+        >Anterior</a
+      >
+      <span class="lk-mono">{{ current }} / {{ [pages, 1] | max }}</span>
+      <a
+        class="lk-btn lk-btn--ghost lk-btn--sm"
+        href="{{ query_url(request, offset=offset + limit) }}"
+        rel="next"
+        {% if not has_next %}aria-disabled="true" tabindex="-1"{% endif %}
+        >Próxima</a
+      >
+    </span>
+  </nav>
+{%- endif -%}
+{%- endmacro %}

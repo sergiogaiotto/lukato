@@ -1,0 +1,311 @@
+{#-
+  pages/adwatch_commercials.html — CRUD do catalogo (`GET /adwatch/commercials`).
+
+  Contexto entregue pela rota:
+    `commercials`  `Page[Commercial]` filtrada.
+    `filters`      `{q, brand, campaign, active}`.
+
+  O item aberto no painel de contexto (`?sel=<id>`) tambem alimenta o formulario:
+  com uma peca selecionada o formulario vira **edicao**, ja preenchido; sem
+  selecao ele e o de **criacao**. E o mesmo formulario porque sao os mesmos
+  campos, e duas copias divergiriam no primeiro campo novo.
+
+  Formularios de mutacao apontam para a API v1 da propria origem. Verbos que o
+  HTML nao emite (PUT, DELETE) viajam em `_method`, ao lado do POST.
+
+  Editar o texto do comercial regenera o fingerprint: as palavras-chave e as
+  frases-chave passam a valer para as proximas deteccoes, nao para as ja gravadas.
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+{% from "partials/pagination.html" import pagination with context %}
+{% from "partials/table.html" import table, row_attrs, cell_link with context %}
+
+{%- set editing = context_item if selected_entity == 'commercial' else none -%}
+{%- set form_action =
+      ('/api/v1/adwatch/commercials/' ~ editing.id) if editing else '/api/v1/adwatch/commercials' -%}
+
+{% block hero %}
+  {% call hero(
+       'Catálogo de comerciais',
+       subtitle='O texto conhecido de cada peça é a âncora de toda detecção — sem catálogo não há o que procurar.',
+       metrics=[
+         ('No recorte', commercials.total | number),
+         ('Nesta página', commercials.items | length | number),
+         ('Modo', 'edição' if editing else 'criação')
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/adwatch">Voltar ao pipeline</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form class="lk-toolbar" method="get" action="/adwatch/commercials" role="search">
+    <div class="lk-field lk-grow">
+      <label for="filter-q">Buscar</label>
+      <input
+        class="lk-input"
+        id="filter-q"
+        name="q"
+        type="search"
+        value="{{ filters.q }}"
+        placeholder="código, campanha ou trecho do texto"
+      />
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-brand">Marca</label>
+      <input class="lk-input" id="filter-brand" name="brand" type="text" value="{{ filters.brand }}" />
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-campaign">Campanha</label>
+      <input class="lk-input" id="filter-campaign" name="campaign" type="text" value="{{ filters.campaign }}" />
+    </div>
+
+    <div class="lk-field">
+      <label for="filter-active">Situação</label>
+      <select class="lk-select" id="filter-active" name="active">
+        <option value="">Todas</option>
+        <option value="sim" {{ 'selected' if filters.active == 'sim' else '' }}>ativas</option>
+        <option value="nao" {{ 'selected' if filters.active == 'nao' else '' }}>inativas</option>
+      </select>
+    </div>
+
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Filtrar</button>
+      <a class="lk-btn lk-btn--ghost" href="/adwatch/commercials">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="lk-page--adwatch-commercials lk-stack">
+    {% call card('Catálogo', flush=true) %}
+      {% if commercials.items %}
+        {% call table([
+             'Código',
+             'Campanha',
+             'Marca',
+             {'label': 'Duração', 'align': 'num'},
+             {'label': 'Ativo'},
+             {'label': 'Atualizado', 'align': 'right'},
+             {'label': 'Ações', 'width': '16%'}
+           ], clickable=true, caption='Comerciais catalogados') %}
+          {% for item in commercials.items %}
+            <tr {{ row_attrs('commercial', item.id, selected_id) }}>
+              <td class="lk-mono">{{ cell_link('commercial', item.id, item.commercial_id) }}</td>
+              <td class="lk-truncate">{{ item.campaign if item.campaign else '—' }}</td>
+              <td>{{ item.brand if item.brand else '—' }}</td>
+              <td class="lk-table__num lk-timecode">{{ item.duration_expected | duration }}</td>
+              <td>
+                {{ badge('active' if item.is_active else 'paused',
+                         label='sim' if item.is_active else 'não') }}
+              </td>
+              <td class="lk-right lk-nowrap">{{ item.updated_at | timeago }}</td>
+              <td>
+                <span class="lk-row lk-row--wrap">
+                  <a class="lk-btn lk-btn--ghost lk-btn--sm" href="{{ query_url(request, sel=item.id) }}#lk-form">
+                    Editar
+                  </a>
+                  <form method="post" action="/api/v1/adwatch/commercials/{{ item.id }}">
+                    <input type="hidden" name="_method" value="delete" />
+                    <button
+                      class="lk-btn lk-btn--danger lk-btn--sm"
+                      type="submit"
+                      data-confirm="Remover o comercial {{ item.commercial_id }} do catálogo?"
+                    >
+                      Remover
+                    </button>
+                  </form>
+                </span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% endcall %}
+      {% else %}
+        {{ empty(
+             'Catálogo vazio neste recorte',
+             'Cadastre a primeira peça no formulário abaixo ou importe o catálogo inteiro em lote.',
+             name='film'
+           ) }}
+      {% endif %}
+    {% endcall %}
+
+    {{ pagination(commercials, label='comerciais') }}
+
+    <div class="lk-grid lk-grid--sidebar">
+      {% call card(('Editar ' ~ editing.commercial_id) if editing else 'Novo comercial', id='lk-form') %}
+        <form class="lk-stack" method="post" action="{{ form_action }}">
+          {% if editing %}<input type="hidden" name="_method" value="put" />{% endif %}
+
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="commercial-code">Código</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="commercial-code"
+                name="commercial_id"
+                type="text"
+                value="{{ editing.commercial_id if editing else '' }}"
+                placeholder="COM_000234"
+                required
+              />
+              <span class="lk-field__hint">Código de negócio da peça; único no catálogo.</span>
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-campaign">Campanha</label>
+              <input
+                class="lk-input"
+                id="commercial-campaign"
+                name="campaign"
+                type="text"
+                value="{{ editing.campaign if editing else '' }}"
+              />
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-brand">Marca</label>
+              <input
+                class="lk-input"
+                id="commercial-brand"
+                name="brand"
+                type="text"
+                value="{{ editing.brand if editing else '' }}"
+              />
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-duration">Duração esperada (s)</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="commercial-duration"
+                name="duration_expected"
+                type="number"
+                step="0.5"
+                min="1"
+                value="{{ editing.duration_expected | number(1) if editing else '30' }}"
+              />
+              <span class="lk-field__hint">Alimenta o sinal de duração da fusão de score.</span>
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-language">Idioma</label>
+              <input
+                class="lk-input lk-input--mono"
+                id="commercial-language"
+                name="language"
+                type="text"
+                value="{{ editing.language if editing else 'pt-BR' }}"
+              />
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-active">Situação</label>
+              <select class="lk-select" id="commercial-active" name="is_active">
+                <option value="true" {{ 'selected' if not editing or editing.is_active else '' }}>ativo</option>
+                <option value="false" {{ 'selected' if editing and not editing.is_active else '' }}>inativo</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lk-field">
+            <label for="commercial-text">Texto do comercial</label>
+            <textarea class="lk-textarea" id="commercial-text" name="text" rows="7" required>{{ editing.text if editing else '' }}</textarea>
+            <span class="lk-field__hint">
+              A locução conhecida da peça. É dela que saem o texto normalizado, o conjunto de
+              tokens e o embedding do fingerprint.
+            </span>
+          </div>
+
+          <div class="lk-form-grid">
+            <div class="lk-field">
+              <label for="commercial-keywords">Palavras-chave</label>
+              <input
+                class="lk-input"
+                id="commercial-keywords"
+                name="keywords"
+                type="text"
+                value="{{ editing.keywords | join(', ') if editing else '' }}"
+                placeholder="200 GB, R$ 79,90, internet"
+              />
+              <span class="lk-field__hint">
+                Separadas por vírgula. Filtram a janela antes de qualquer cálculo caro.
+              </span>
+            </div>
+
+            <div class="lk-field">
+              <label for="commercial-phrases">Frases-chave</label>
+              <input
+                class="lk-input"
+                id="commercial-phrases"
+                name="key_phrases"
+                type="text"
+                value="{{ editing.key_phrases | join(', ') if editing else '' }}"
+                placeholder="aproveite muito mais, sua internet"
+              />
+              <span class="lk-field__hint">
+                Separadas por vírgula. Definem a ordem temporal exigida dentro da janela.
+              </span>
+            </div>
+          </div>
+
+          <div class="lk-row lk-row--wrap">
+            <button class="lk-btn lk-btn--primary" type="submit">
+              {{ 'Salvar alterações' if editing else 'Cadastrar comercial' }}
+            </button>
+            {% if editing %}
+              <a class="lk-btn lk-btn--ghost" href="{{ query_url(request, sel=none) }}">
+                Cancelar edição
+              </a>
+              <a class="lk-btn lk-btn--ghost" href="/adwatch/detections?commercial={{ editing.id }}">
+                Detecções desta peça
+              </a>
+            {% endif %}
+          </div>
+        </form>
+      {% endcall %}
+
+      {% call card('Importação em lote') %}
+        <form class="lk-stack" method="post" action="/api/v1/adwatch/commercials/bulk">
+          <div class="lk-field">
+            <label for="bulk-items">Catálogo em JSON</label>
+            <textarea
+              class="lk-textarea"
+              id="bulk-items"
+              name="items"
+              rows="10"
+              placeholder='[{"commercial_id": "COM_000234", "campaign": "Verão", "brand": "Marca", "text": "..."}]'
+              required
+            ></textarea>
+            <span class="lk-field__hint">
+              Array de comerciais ou o objeto <span class="lk-mono">{items, update_existing}</span>.
+            </span>
+          </div>
+
+          <div class="lk-field">
+            <label for="bulk-update">Código já cadastrado</label>
+            <select class="lk-select" id="bulk-update" name="update_existing">
+              <option value="false">pular</option>
+              <option value="true">atualizar</option>
+            </select>
+          </div>
+
+          <button class="lk-btn lk-btn--outline" type="submit">Importar lote</button>
+        </form>
+
+        <p class="lk-card__foot">
+          Cada item é gravado na própria transação: um código duplicado ou um texto inválido
+          fica isolado no relatório e não derruba o resto do lote.
+        </p>
+      {% endcall %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block context_title %}Comercial{% endblock %}

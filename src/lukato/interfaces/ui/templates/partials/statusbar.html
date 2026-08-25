@@ -1,0 +1,60 @@
+{#-
+  partials/statusbar.html — a barra inferior do console (SPEC-0009 secao 6).
+
+  Esquerda: indicadores de saude com ponto colorido (`guardrails`, `langfuse`,
+  `otel`, `db`) e a versao. Direita: custo por modulo das ultimas 24h, com ponto
+  colorido, valor em US$ com cinco casas e barra proporcional; depois o custo
+  total e a contagem de execucoes.
+
+  Dados vem de `health` (`HealthView`) e `cost_summary` (`CostView`), montados em
+  `lukato.interfaces.ui.context`. A largura da barra proporcional e o unico
+  `style` inline do console — e por isso que a CSP mantem `style-src 'unsafe-inline'`.
+-#}
+{%- set costs = cost_summary if cost_summary else none -%}
+{%- set top_modules = (costs.modules[:3] if costs and costs.modules else []) -%}
+
+<div class="lk-statusbar__health">
+  {% for indicator in (health.indicators if health else []) %}
+    <span
+      class="lk-statusbar__item"
+      title="{{ indicator.label }}: {{ indicator.detail }}"
+    >
+      <span
+        class="lk-dot {{ 'lk-dot--ok' if indicator.status == 'ok' else ('lk-dot--warn' if indicator.status == 'degraded' else 'lk-dot--danger') }}"
+        aria-hidden="true"
+      ></span>
+      <span>{{ indicator.label }}</span>
+      <span class="lk-sr-only">{{ indicator.status }} — {{ indicator.detail }}</span>
+    </span>
+  {% endfor %}
+  <span class="lk-statusbar__version" title="Versão desta instalação">v{{ version }}</span>
+</div>
+
+<div class="lk-statusbar__costs">
+  {% if costs and costs.available %}
+    {% for entry in top_modules %}
+      <span class="lk-cost" title="{{ entry.label }} — {{ entry.usd | money }} nas últimas {{ costs.window_hours }}h">
+        <span class="lk-dot {{ entry.series_class }}" aria-hidden="true"></span>
+        <span class="lk-truncate">{{ entry.label }}</span>
+        <span class="lk-cost__value">{{ entry.usd | money }}</span>
+        <span class="lk-cost__bar" aria-hidden="true">
+          <span class="lk-cost__fill" style="width: {{ entry.width }}"></span>
+        </span>
+      </span>
+    {% endfor %}
+
+    <span class="lk-statusbar__total">
+      <span>Custo total</span>
+      <span class="lk-cost__value">{{ costs.total_usd | money }}</span>
+    </span>
+    <span class="lk-statusbar__item" title="Execuções nas últimas {{ costs.window_hours }} horas">
+      {{ costs.runs | number }} exec.
+    </span>
+  {% else %}
+    <span class="lk-statusbar__total">
+      <span>Custo total</span>
+      <span class="lk-cost__value">{{ 0 | money }}</span>
+    </span>
+    <span class="lk-statusbar__item lk-faint">FinOps indisponível</span>
+  {% endif %}
+</div>

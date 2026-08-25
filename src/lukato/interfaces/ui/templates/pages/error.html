@@ -1,0 +1,75 @@
+{#-
+  pages/error.html — pagina de erro do console (SPEC-0009 secao 8).
+
+  Renderizada por `router._error_page` para **qualquer** falha de pagina: erro de
+  dominio, template ausente ou defeito inesperado. O contexto pode chegar
+  incompleto (a propria moldura pode ter falhado), entao toda variavel e lida com
+  `default` — esta tela nunca pode ser a segunda a quebrar.
+
+  Contexto:
+    `error_code`     codigo estavel do erro (`not_found`, `internal_error`, ...).
+    `error_message`  frase em pt-BR ja pronta para leitura humana.
+    `error_status`   status HTTP correspondente.
+    `error_details`  mapa auxiliar do erro; vai para o bloco colapsavel.
+-#}
+{% extends "base.html" %}
+
+{% block title %}Erro {{ error_status | default(500, true) }} · lukato{% endblock %}
+
+{% block content %}
+  <div class="lk-page--error">
+    <div class="lk-stack">
+      <p class="lk-error__code">
+        {{ error_status | default(500, true) }} · {{ error_code | default('internal_error', true) }}
+      </p>
+
+      <h1 class="lk-error__title">Não foi possível abrir esta tela</h1>
+
+      <p class="lk-error__message">
+        {{ error_message | default('Ocorreu uma falha inesperada ao montar a página.', true) }}
+      </p>
+
+      <div class="lk-error__actions">
+        <a class="lk-btn lk-btn--primary" href="/">Voltar ao cockpit</a>
+        <a class="lk-btn lk-btn--ghost" href="/runs">Ver execuções</a>
+      </div>
+
+      <p class="lk-hint">
+        Requisição <span class="lk-mono">{{ request_id | default('—', true) }}</span> ·
+        versão <span class="lk-mono">{{ version | default('—', true) }}</span>. Informe o
+        identificador ao procurar o registro correspondente no log.
+      </p>
+
+      {% set details = error_details | default({}, true) %}
+      {% if details %}
+        <details class="lk-details">
+          <summary>Detalhes técnicos</summary>
+          <pre>{{ details | json_pretty }}</pre>
+        </details>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block context_title %}Diagnóstico{% endblock %}
+
+{% block context %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">Falha ao renderizar</span>
+    <span class="lk-badge lk-badge--danger">{{ error_status | default(500, true) }}</span>
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Código</dt>
+    <dd class="lk-mono">{{ error_code | default('internal_error', true) }}</dd>
+    <dt>Requisição</dt>
+    <dd class="lk-mono">{{ request_id | default('—', true) }}</dd>
+    <dt>Rota</dt>
+    <dd class="lk-mono">{{ active_route | default('—', true) }}</dd>
+  </dl>
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--outline lk-btn--sm" href="/observability">Observabilidade</a>
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/settings">Configurações</a>
+  </div>
+{% endblock %}
