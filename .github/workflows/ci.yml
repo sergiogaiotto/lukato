@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -53,7 +53,7 @@ jobs:
       - name: Contrato OpenAPI
         run: python -m lukato.interfaces.cli openapi --out /tmp/openapi.json && test -s /tmp/openapi.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: cobertura
@@ -79,8 +79,8 @@ jobs:
       LUKATO_DB__URL: postgresql+asyncpg://lukato:lukato@localhost:5432/lukato
       LUKATO_DB__AUTO_FALLBACK: "false"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -96,10 +96,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
       - name: Build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -127,12 +127,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: kustomize build
         run: |
-          kubectl kustomize deploy/k8s/overlays/dev  > /tmp/dev.yaml
-          kubectl kustomize deploy/k8s/overlays/prod > /tmp/prod.yaml
-          test -s /tmp/dev.yaml && test -s /tmp/prod.yaml
+          # Percorre TODO overlay em vez de listar dev/prod: um overlay novo
+          # entra coberto no dia em que nasce. O `oke` nasceu descoberto porque
+          # a lista era fixa.
+          n=0
+          for o in deploy/k8s/overlays/*/; do
+            name=$(basename "$o")
+            echo "::group::kustomize build $name"
+            kubectl kustomize "$o" > "/tmp/$name.yaml"
+            test -s "/tmp/$name.yaml" || { echo "::error::$name gerou saida vazia"; exit 1; }
+            echo "$name: $(grep -c '^kind:' "/tmp/$name.yaml") recursos"
+            echo "::endgroup::"
+            n=$((n + 1))
+          done
+          # Guarda contra glob vazio (o `for` sobre um glob sem match itera uma
+          # vez com o padrao literal, e `kubectl kustomize` falharia — mas se o
+          # diretorio sumir por inteiro, o loop nao roda e o job passaria verde).
+          test "$n" -ge 3 || { echo "::error::so $n overlay(s) construido(s); esperado >= 3"; exit 1; }
       - name: Nenhum segredo real versionado
         run: |
           # O corpus do detector de segredos e a UNICA excecao: para testar que o

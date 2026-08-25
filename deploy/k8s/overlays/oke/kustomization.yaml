@@ -1,0 +1,302 @@
+# =============================================================================
+# lukato 1.0.0 — overlay para Oracle Kubernetes Engine (OKE)
+#
+# NADA AQUI E APLICAVEL COMO ESTA. Todo valor no formato "<PREENCHER: ...>"
+# depende da tenancy/cluster da Claro e precisa ser respondido pelo time de
+# plataforma ANTES do primeiro `kubectl apply`. Ver deploy/k8s/overlays/oke/README.md
+# e docs/DEPLOY.md.
+#
+# Convencao deste arquivo:
+#   <PREENCHER: ...>   -> valor obrigatorio, quebra de proposito se esquecido
+#   # INCERTO: ...     -> a pesquisa NAO confirmou; pergunte, nao adivinhe
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lukato
+
+resources:
+  - ../../base
+
+# -----------------------------------------------------------------------------
+# Imagem — OCI Container Registry (OCIR)
+#
+# Formato:  <region-key>.ocir.io/<tenancy-namespace>/<repo>:<tag>
+#   region-key       gru = sa-saopaulo-1 | vcp = sa-vinhedo-1
+#   tenancy-namespace = Object Storage namespace da tenancy (string autogerada,
+#                       ex.: ansh81vru1zp). NAO e o nome da tenancy.
+# O dominio longo tambem e valido:
+#   ocir.<region-identifier>.oci.oraclecloud.com/<tenancy-namespace>/<repo>
+# -----------------------------------------------------------------------------
+images:
+  - name: lukato
+    newName: "<PREENCHER: gru.ocir.io/<tenancy-namespace>/lukato>"
+    newTag: "1.0.0"
+
+# -----------------------------------------------------------------------------
+# Configuracao de producao
+#
+# Estes valores sao normativos: com LUKATO_APP__ENV=prod, o boot RECUSA subir se
+# AUTH_ENABLED=false, se GUARDRAILS__ENABLED=false ou se o JWT_SECRET tiver menos
+# de 32 caracteres (src/lukato/config/settings.py::_check_production_secrets).
+# Nao "afrouxe temporariamente para destravar o deploy" — e um guarda, nao um bug.
+# -----------------------------------------------------------------------------
+configMapGenerator:
+  - name: lukato-config
+    behavior: merge
+    literals:
+      # ---- aplicacao ----
+      - LUKATO_APP__ENV=prod
+      - LUKATO_APP__DEBUG=false
+      - LUKATO_APP__WORKERS=4
+
+      # ---- seguranca ----
+      - LUKATO_SECURITY__AUTH_ENABLED=true
+      - 'LUKATO_SECURITY__CORS_ORIGINS=["https://<PREENCHER: FQDN publico do lukato>"]'
+
+      # ---- guardrails ----
+      - LUKATO_GUARDRAILS__ENABLED=true
+      - LUKATO_GUARDRAILS__FAIL_OPEN=false
+
+      # ---- observabilidade ----
+      - LUKATO_OBSERVABILITY__LOG_JSON=true
+      - LUKATO_OBSERVABILITY__LOG_LEVEL=INFO
+      - LUKATO_OBSERVABILITY__METRICS_ENABLED=true
+      # Langfuse: deixe true so se as duas chaves estiverem no Secret. Com
+      # LANGFUSE_ENABLED=true e chaves vazias o tracer vira no-op e /readyz
+      # reporta tracer=degraded (esperado, nao derruba readiness).
+      - LUKATO_OBSERVABILITY__LANGFUSE_ENABLED=false
+      - "LUKATO_OBSERVABILITY__LANGFUSE_HOST=<PREENCHER: https://cloud.langfuse.com ou host interno>"
+
+      # ---- banco ----
+      # A URL completa (com usuario/senha) vem do Secret lukato-secrets.
+      - LUKATO_DB__AUTO_FALLBACK=false
+      - LUKATO_DB__CREATE_ALL=false
+      - LUKATO_DB__RUN_MIGRATIONS=false
+
+      # ---- LLM / embeddings (hub interno) ----
+      # Os defaults do base apontam para hub-gpus-lab.usto.re (LLM) e
+      # hub-gpus.claro.com.br/embed06b (embeddings). Confirme se sao os hosts de
+      # PRODUCAO — nenhum dos dois foi exercitado a partir deste ambiente.
+      - "LUKATO_LLM__BASE_URL=<PREENCHER: URL do hub de LLM em prod, terminando em /v1>"
+      - "LUKATO_EMBEDDING__BASE_URL=<PREENCHER: URL do hub de embeddings em prod, terminando em /v1>"
+      # NUNCA troque para hashing em producao: hashing e Qwen3 gravam vetores de
+      # 1024 dimensoes em espacos semanticos diferentes na MESMA colecao e a busca
+      # quebra em silencio, de forma permanente.
+      - LUKATO_EMBEDDING__PROVIDER=qwen
+      - LUKATO_EMBEDDING__COLLECTION=agente_evidence
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  # ---------------------------------------------------------------------------
+  # Deployment: escala, recursos de producao, imagePullSecret do OCIR e
+  # ephemeral-storage (os dois emptyDir consomem o boot volume do worker node).
+  # ---------------------------------------------------------------------------
+  - target: { kind: Deployment, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ocirsecret
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 1Gi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+            ephemeral-storage: 4Gi
+
+  # ---------------------------------------------------------------------------
+  # Job de migracao: mesmo imagePullSecret, senao o Job fica em ImagePullBackOff
+  # e o rollout da aplicacao segue sem o schema aplicado.
+  # ---------------------------------------------------------------------------
+  - target: { kind: Job, name: lukato-migrate }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ocirsecret
+
+  - target: { kind: PodDisruptionBudget, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+  # ---------------------------------------------------------------------------
+  # Ingress
+  #
+  # INCERTO — decisao de plataforma, NAO ha resposta universal:
+  #   (a) Service type=LoadBalancer com annotations OCI  -> menor superficie
+  #   (b) OCI Native Ingress Controller (NIC, add-on)     -> 1 LB para varias rotas
+  #   (c) nginx-ingress                                   -> mais portavel, 1 hop extra
+  # O base assume (c) (ingressClassName: nginx). Pergunte ao time qual ingress ja
+  # esta padronizado no cluster e NAO introduza um terceiro.
+  #
+  # O patch abaixo so troca host/TLS/classe. As annotations especificas de cada
+  # caminho estao nos blocos comentados mais adiante.
+  # ---------------------------------------------------------------------------
+  - target: { kind: Ingress, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: "<PREENCHER: FQDN do lukato, ex. lukato.claro.com.br>"
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: "<PREENCHER: FQDN do lukato, ex. lukato.claro.com.br>"
+      - op: replace
+        path: /spec/ingressClassName
+        value: "<PREENCHER: nginx | nome da IngressClass do NIC no cluster>"
+
+  # ---------------------------------------------------------------------------
+  # NetworkPolicy — egresso para o banco
+  #
+  # O base libera 5432 por podSelector (app.kubernetes.io/name=postgresql), que so
+  # funciona com PostgreSQL DENTRO do cluster. Com OCI Database with PostgreSQL o
+  # destino e um FQDN privado fora do cluster: e preciso ipBlock com o CIDR da
+  # subnet do DB. Sem isso o pod sobe e /readyz responde 503 com database=down.
+  # ---------------------------------------------------------------------------
+  - target: { kind: NetworkPolicy, name: lukato }
+    patch: |-
+      - op: replace
+        path: /spec/egress/1
+        value:
+          to:
+            - ipBlock:
+                cidr: "<PREENCHER: CIDR da subnet do OCI Database with PostgreSQL, ex. 10.0.20.0/24>"
+          ports:
+            - protocol: TCP
+              port: 5432
+
+  # ---------------------------------------------------------------------------
+  # INCERTO — agendamento no cluster oke-gpu-prd
+  #
+  # O nome do cluster sugere node pool com GPU. Se os nodes GPU tiverem taint
+  # (ex. nvidia.com/gpu=present:NoSchedule), o lukato (CPU-only) fica Pending para
+  # sempre; se NAO tiverem, ele pode ser agendado numa GPU e desperdica-la.
+  # Confirme taints/labels dos node pools e descomente com os valores reais.
+  #
+  # - target: { kind: Deployment, name: lukato }
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/template/spec/nodeSelector
+  #       value:
+  #         <PREENCHER: chave do label do node pool CPU-only>: "<PREENCHER: valor>"
+  # - target: { kind: Job, name: lukato-migrate }
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/template/spec/nodeSelector
+  #       value:
+  #         <PREENCHER: chave do label do node pool CPU-only>: "<PREENCHER: valor>"
+
+  # ---------------------------------------------------------------------------
+  # ALTERNATIVA (a) — Service type=LoadBalancer com OCI Load Balancer
+  #
+  # Use ISTO no lugar do Ingress se o cluster nao tiver ingress controller
+  # padronizado. Nomes das annotations lidos do codigo do proprio controller
+  # Oracle (oci-cloud-controller-manager, docs/load-balancer-annotations.md).
+  #
+  # Cuidados confirmados na pesquisa:
+  #   * "...oci-load-balancer-internal" e IMUTAVEL apos a criacao do LB: errar
+  #     publico/privado exige recriar o Service.
+  #   * "security-list-management-mode: All" (default) faz o CCM EDITAR as security
+  #     lists da VCN. Em rede governada por outro time isso costuma ser proibido;
+  #     nesse caso use "None" + NSG pre-provisionado.
+  #   * Habilitar "delete protection" no LB pelo Console congela o CCM: ele para de
+  #     ATUALIZAR o LB, em silencio.
+  #   * Existe quota REGIONAL de Load Balancer. Confirme antes.
+  #   * As annotations mais novas (ingress-ip-mode, is-ppv2-enabled,
+  #     security-attributes) podem nao existir na versao do CCM instalada.
+  #
+  # - target: { kind: Service, name: lukato }
+  #   patch: |-
+  #     - op: replace
+  #       path: /spec/type
+  #       value: LoadBalancer
+  #     - op: add
+  #       path: /metadata/annotations
+  #       value:
+  #         oci.oraclecloud.com/load-balancer-type: "lb"
+  #         service.beta.kubernetes.io/oci-load-balancer-internal: "<PREENCHER: true (privado) | false (publico)>"
+  #         service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+  #         service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+  #         service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "100"
+  #         service.beta.kubernetes.io/oci-load-balancer-subnet1: "<PREENCHER: OCID da subnet do LB>"
+  #         service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "<PREENCHER: None (recomendado com NSG) | All | Frontend>"
+  #         oci.oraclecloud.com/oci-network-security-groups: "<PREENCHER: OCIDs de NSG separados por virgula>"
+  #         service.beta.kubernetes.io/oci-load-balancer-backend-protocol: "HTTP"
+  #         service.beta.kubernetes.io/oci-load-balancer-ssl-ports: "443"
+  #         service.beta.kubernetes.io/oci-load-balancer-tls-secret: "lukato/lukato-tls"
+  #         service.beta.kubernetes.io/oci-load-balancer-health-check-interval: "10000"
+  #         service.beta.kubernetes.io/oci-load-balancer-health-check-timeout: "3000"
+  #         service.beta.kubernetes.io/oci-load-balancer-health-check-retries: "3"
+  #     - op: replace
+  #       path: /spec/ports
+  #       value:
+  #         - name: https
+  #           port: 443
+  #           targetPort: http
+  #           protocol: TCP
+
+  # ---------------------------------------------------------------------------
+  # ALTERNATIVA (b) — OCI Native Ingress Controller (NIC)
+  #
+  # Annotations lidas do repositorio oracle/oci-native-ingress-controller.
+  # Requer IngressClass + IngressClassParameters (CRD ingress.oraclecloud.com/v1beta1)
+  # ja criados no cluster pelo time de plataforma — nao ha como declara-los aqui
+  # sem OCIDs de compartment e subnet.
+  #
+  # INCERTO: se o NIC exige policy IAM propria para criar LB e importar
+  # certificado no OCI Certificates Service. A doc menciona pre-requisitos de
+  # policy; nao consegui ler os statements exatos. Pergunte.
+  #
+  # - target: { kind: Ingress, name: lukato }
+  #   patch: |-
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1protocol
+  #       value: "HTTP"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-protocol
+  #       value: "HTTP"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-path
+  #       value: "/healthz"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-port
+  #       value: "8000"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-interval-milliseconds
+  #       value: "10000"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-timeout-milliseconds
+  #       value: "3000"
+  #     - op: add
+  #       path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1healthcheck-retries
+  #       value: "3"
+  #     # TLS: ou o Secret k8s ja referenciado em spec.tls (o NIC importa o cert
+  #     # para o OCI Certificates Service), ou o OCID de um cert ja existente:
+  #     # - op: add
+  #     #   path: /metadata/annotations/oci-native-ingress.oraclecloud.com~1certificate-ocid
+  #     #   value: "<PREENCHER: OCID do certificado no OCI Certificates Service>"
+  #
+  # Com o NIC, as annotations nginx.ingress.kubernetes.io/* herdadas do base ficam
+  # inertes (nao quebram nada, mas mentem sobre o comportamento). Se adotar o NIC,
+  # remova-as:
+  #     - op: remove
+  #       path: /metadata/annotations/nginx.ingress.kubernetes.io~1proxy-body-size
+  #
+  # A NetworkPolicy de ingresso do base tambem assume nginx: ela libera apenas o
+  # namespace "ingress-nginx". Com o NIC o trafego chega do LB (fora do cluster) e
+  # a regra precisa virar ipBlock com o CIDR da subnet do LB.
