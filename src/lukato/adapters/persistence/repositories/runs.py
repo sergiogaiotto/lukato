@@ -130,14 +130,13 @@ class SqlAlchemyRunRepository:
     async def add(self, run: AgentRun) -> AgentRun:
         """Insere a execucao e os passos que ja acompanham o modelo."""
         details = {"id": run.id, "module_slug": run.module_slug}
+        conflict = f"ja existe uma execucao com o id '{run.id}'"
+        if await self._load(run.id) is not None:
+            raise ConflictError(conflict, details=details)
         row = AgentRunRow()
         run_apply(row, run)
         self._session.add(row)
-        await _flush(
-            self._session,
-            conflict=f"ja existe uma execucao com o id '{run.id}'",
-            details=details,
-        )
+        await _flush(self._session, conflict=conflict, details=details)
         step_rows = self._attach_steps(run.id, run.steps)
         if step_rows:
             await _flush(

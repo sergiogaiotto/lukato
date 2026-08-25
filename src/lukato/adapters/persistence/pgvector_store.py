@@ -25,7 +25,7 @@ from typing import Any, Final
 
 import numpy as np
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ColumnElement, cast, delete, select
+from sqlalchemy import ColumnElement, Float, delete, literal, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -91,16 +91,17 @@ def _cosine_distance(vector: Sequence[float], dimensions: int) -> ColumnElement[
 
     `ChunkRow.embedding` e um `TypeDecorator` portatil (pgvector no PostgreSQL, JSON
     nos demais dialetos). Quando o comparador nativo esta exposto no atributo mapeado,
-    usa-se `ChunkRow.embedding.cosine_distance(vector)` diretamente; caso contrario a
-    coluna e convertida para `vector(dim)` — que no PostgreSQL ja e o tipo real da
-    coluna — para obter o mesmo operador `<=>`.
+    usa-se `ChunkRow.embedding.cosine_distance(vector)` diretamente; caso contrario
+    emite-se o mesmo operador `<=>` com o vetor ligado como literal `vector(dim)`,
+    sem converter a coluna — assim o indice HNSW continua utilizavel.
     """
     values = [float(item) for item in vector]
     native = getattr(ChunkRow.embedding, "cosine_distance", None)
     if callable(native):
         distance: ColumnElement[float] = native(values)
         return distance
-    return cast(ChunkRow.embedding, Vector(dimensions)).cosine_distance(values)
+    operand = literal(values, Vector(dimensions))
+    return ChunkRow.embedding.op("<=>", return_type=Float)(operand)
 
 
 def _clamp(score: float) -> float:
