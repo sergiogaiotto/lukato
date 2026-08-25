@@ -59,9 +59,18 @@ DEFAULT_MODEL_PRICES: Final[dict[str, dict[str, float]]] = {
 """Tabela de precos padrao (USD por 1k tokens) dos modelos liberados."""
 
 WEAK_JWT_SECRETS: Final[frozenset[str]] = frozenset(
-    {"", "change-me", "troque-este-segredo-em-producao"}
+    {"", "change-me", "troque-este-segredo-em-producao", "secret", "changeme", "lukato"}
 )
 """Segredos de JWT proibidos quando a autenticacao roda em producao."""
+
+MIN_JWT_SECRET_CHARS: Final[int] = 32
+"""Tamanho minimo do segredo HS256 em producao (RFC 7518 secao 3.2).
+
+Uma lista de valores proibidos nao basta: `JWT_SECRET=abc` nao esta nela e mesmo
+assim e uma chave HMAC de 3 bytes, quebravel por forca bruta em segundos. O PyJWT
+inclusive emite `InsecureKeyLengthWarning` abaixo de 32 bytes — em producao isso
+vira erro de configuracao, nao aviso.
+"""
 
 _GROUP_CONFIG: Final[ConfigDict] = ConfigDict(extra="ignore", validate_assignment=True)
 
@@ -425,15 +434,31 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> Settings:
-        """Proibe segredo de JWT padrao quando ha autenticacao em producao."""
-        if (
-            self.is_production
-            and self.security.auth_enabled
-            and self.security.jwt_secret_value.strip() in WEAK_JWT_SECRETS
-        ):
+        """Exige autenticacao ligada e segredo de JWT forte em producao (SPEC-0006)."""
+        if not self.is_production:
+            return self
+
+        if not self.security.auth_enabled:
             raise ValueError(
-                "LUKATO_SECURITY__JWT_SECRET nao pode manter o valor padrao em producao "
-                "com autenticacao habilitada; gere um segredo forte (openssl rand -hex 32)"
+                "LUKATO_SECURITY__AUTH_ENABLED=false em producao expoe a API inteira "
+                "como root anonimo: toda rota passaria a responder sem credencial. "
+                "Ligue a autenticacao (LUKATO_SECURITY__AUTH_ENABLED=true) ou nao "
+                "declare este ambiente como producao (LUKATO_APP__ENV)"
+            )
+
+        secret = self.security.jwt_secret_value.strip()
+        remedio = "gere um segredo forte com: openssl rand -hex 32"
+
+        if secret in WEAK_JWT_SECRETS:
+            raise ValueError(
+                f"LUKATO_SECURITY__JWT_SECRET esta com um valor conhecido/padrao e nao "
+                f"pode ir para producao com autenticacao habilitada; {remedio}"
+            )
+        if len(secret) < MIN_JWT_SECRET_CHARS:
+            raise ValueError(
+                f"LUKATO_SECURITY__JWT_SECRET tem {len(secret)} caracteres; em producao "
+                f"o minimo e {MIN_JWT_SECRET_CHARS} (RFC 7518 secao 3.2 para HS256). "
+                f"Uma chave HMAC curta e quebravel por forca bruta; {remedio}"
             )
         return self
 

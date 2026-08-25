@@ -34,8 +34,10 @@ Segredo de API key: `secrets.token_urlsafe(32)`, exibido **uma unica vez**.
 
 ## Antes de ir para producao
 
-- [ ] `LUKATO_SECURITY__AUTH_ENABLED=true` (o boot falha em `prod` se estiver `false`)
+- [ ] `LUKATO_SECURITY__AUTH_ENABLED=true` — o boot **falha** em `prod` se estiver
+      `false`, porque isso exporia toda a API como root anonimo
 - [ ] `LUKATO_SECURITY__JWT_SECRET` forte, vindo do cofre (`openssl rand -hex 32`)
+      — o boot recusa segredo com menos de 32 caracteres quando `env=prod` e auth ligada
 - [ ] `LUKATO_SECURITY__CORS_ORIGINS` restrito — nunca `["*"]`
 - [ ] `LUKATO_APP__DEBUG=false`, `LUKATO_DB__AUTO_FALLBACK=false`
 - [ ] guardrails de entrada e saida vinculados a todos os modulos ativos

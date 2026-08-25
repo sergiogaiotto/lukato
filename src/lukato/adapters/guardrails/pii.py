@@ -178,7 +178,13 @@ class _Detector:
 # reivindica o trecho antes dos mais genericos (telefone e o ultimo de proposito).
 _DETECTORS: Final[tuple[_Detector, ...]] = (
     _Detector("email", re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
-    _Detector("ip", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])"), _is_valid_ipv4),
+    # O `(?!\.\d)` final evita casar um prefixo de sequencia mais longa (1.2.3.4.5)
+    # sem recusar o IP que fecha uma frase ("... IP 192.168.0.15.").
+    _Detector(
+        "ip",
+        re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\d)(?!\.\d)"),
+        _is_valid_ipv4,
+    ),
     _Detector(
         "cnpj",
         re.compile(r"(?<!\d)(?:\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}|\d{14})(?!\d)"),
