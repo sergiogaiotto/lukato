@@ -24,9 +24,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Final, TypeAlias
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse
 
 from lukato import __version__
 from lukato.composition import build_container, dispose_container
@@ -138,8 +141,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=API_TITLE,
         version=resolved.app.version or __version__,
-        docs_url=DOCS_URL,
-        redoc_url=REDOC_URL,
+        # `None` nos dois: as rotas de documentacao sao registradas a mao em
+        # `_install_docs`, porque as embutidas do FastAPI apontam para um CDN fixo
+        # que a CSP desta aplicacao proibe — 200 com a pagina em branco.
+        docs_url=None,
+        redoc_url=None,
         openapi_url=OPENAPI_URL,
         root_path=resolved.app.root_path,
         lifespan=_lifespan(resolved),
@@ -151,6 +157,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     _install_middlewares(app, resolved)
 
+    _install_docs(app, resolved)
     app.include_router(api_router)
     app.include_router(root_router)
     app.include_router(ui_router)
@@ -158,6 +165,68 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     customize_openapi(app)
     return app
+
+
+def _install_docs(app: FastAPI, settings: Settings) -> None:
+    """Registra `/api/docs` e `/api/redoc` servindo os bundles da origem configurada.
+
+    As rotas embutidas do FastAPI apontam para `cdn.jsdelivr.net` num literal, e a
+    CSP desta aplicacao e `script-src 'self'`. O resultado era uma pagina que
+    respondia **200 e nao renderizava nada**: a propria resposta proibia o script
+    que ela mandava o navegador buscar. E os dois enderecos estao documentados na
+    secao 4 do readme, ou seja, e a primeira porta em que o usuario bate.
+
+    Aqui a origem dos bundles vem de `LUKATO_APP__DOCS_ASSETS_BASE` e a CSP destas
+    duas rotas — e so delas — libera exatamente essa origem. O middleware de
+    seguranca usa `setdefault`, entao o cabecalho definido aqui e o que vale. O
+    console continua com a politica fechada, sem CDN nenhum.
+    """
+    base = settings.app.docs_assets_base.rstrip("/")
+    origem = _origin_of(base)
+    csp = (
+        f"default-src 'self'; style-src 'self' 'unsafe-inline' {origem}; "
+        f"img-src 'self' data: {origem} https://fastapi.tiangolo.com; "
+        f"script-src 'self' 'unsafe-inline' {origem}; "
+        "worker-src 'self' blob:; frame-ancestors 'none'"
+    )
+
+    @app.get(DOCS_URL, include_in_schema=False)
+    async def swagger_ui() -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """Swagger UI apontado para os bundles da origem configurada."""
+        pagina = get_swagger_ui_html(
+            openapi_url=f"{settings.app.root_path}{OPENAPI_URL}",
+            title=f"{API_TITLE} — Swagger UI",
+            swagger_js_url=f"{base}/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url=f"{base}/swagger-ui-dist@5/swagger-ui.css",
+        )
+        pagina.headers["Content-Security-Policy"] = csp
+        return pagina
+
+    @app.get(REDOC_URL, include_in_schema=False)
+    async def redoc() -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """ReDoc apontado para os bundles da origem configurada."""
+        pagina = get_redoc_html(
+            openapi_url=f"{settings.app.root_path}{OPENAPI_URL}",
+            title=f"{API_TITLE} — ReDoc",
+            redoc_js_url=f"{base}/redoc@next/bundles/redoc.standalone.js",
+            with_google_fonts=False,
+        )
+        pagina.headers["Content-Security-Policy"] = csp
+        return pagina
+
+
+def _origin_of(url: str) -> str:
+    """Esquema + host + porta de uma URL, que e a unidade que a CSP entende.
+
+    A CSP casa por ORIGEM, nao por caminho: liberar
+    `https://cdn.exemplo/npm/swagger-ui-dist@5` nao existe como conceito. Reduzir
+    aqui evita uma diretiva silenciosamente invalida — que o navegador descarta,
+    devolvendo a pagina em branco que este codigo existe para impedir.
+    """
+    partes = urlsplit(url)
+    if not partes.scheme or not partes.netloc:
+        return "'self'"
+    return f"{partes.scheme}://{partes.netloc}"
 
 
 def _install_middlewares(app: FastAPI, settings: Settings) -> None:

@@ -89,6 +89,19 @@ modulo (uma linha no banco), nao um arquivo Python.
    http://localhost:8000/readyz              readiness (banco, LLM, embeddings, tracer)
    http://localhost:8000/metrics             metricas Prometheus
 
+ A porta e o host vem do .env (LUKATO_APP__PORT e LUKATO_APP__HOST) — `make run`
+ usa o que estiver la, nao um valor fixo. Trocou para 9100 no .env? A aplicacao
+ sobe em http://localhost:9100.
+
+ /api/docs e /api/redoc carregam os bundles do Swagger e do ReDoc de um CDN, e a
+ CSP dessas duas rotas libera exatamente essa origem — o console continua fechado.
+ Numa rede sem saida para a internet, aponte para o espelho interno:
+
+   LUKATO_APP__DOCS_ASSETS_BASE=https://npm.interno.exemplo/npm
+
+ Sem isso as duas paginas respondem 200 e ficam em branco: o navegador nao alcanca
+ o CDN. O contrato em si (/api/openapi.json) nao depende de nada externo.
+
 
 -------------------------------------------------------------------------------
  5. DOCKER
