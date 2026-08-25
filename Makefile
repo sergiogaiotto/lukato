@@ -36,7 +36,16 @@ env: ## cria .env a partir do modelo
 	@test -f .env || (cp .env.example .env && echo "criado .env — preencha os segredos")
 
 # --- execucao ----------------------------------------------------------------
-.PHONY: run dev seed shell
+.PHONY: start run dev seed shell
+start: ## do zero ao ar em um comando: instala, configura, semeia e sobe
+	@$(MAKE) --no-print-directory install
+	@$(MAKE) --no-print-directory env
+	@$(MAKE) --no-print-directory seed
+	@echo
+	@echo "  lukato no ar em http://localhost:$$(sed -n 's/^LUKATO_APP__PORT=\([0-9]*\).*/\1/p' .env | head -1 | grep . || echo 8000)"
+	@echo
+	@$(MAKE) --no-print-directory run
+
 run: ## sobe a API + console no host/porta do .env
 	$(PY) -m lukato.interfaces.cli serve
 

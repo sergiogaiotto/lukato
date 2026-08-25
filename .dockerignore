@@ -26,5 +26,9 @@ docs/
 specs/
 tests/
 deploy/
+# ... menos as CAs: o builder as acrescenta ao conjunto de confianca antes de
+# baixar qualquer coisa por HTTPS, e sem isto elas nao chegam ao contexto.
+!deploy/ca
+!deploy/ca/**
 *.md
 !README.md

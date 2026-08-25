@@ -30,6 +30,7 @@ from lukato.adapters.persistence.orm import (
     UserRow,
 )
 from lukato.adapters.persistence.session import (
+    EngineResolution,
     build_engine,
     build_sessionmaker,
     create_all,
@@ -69,6 +70,7 @@ __all__ = [
     "CommercialRow",
     "DetectionRow",
     "DocumentRow",
+    "EngineResolution",
     "GuardrailPolicyRow",
     "JSONType",
     "MediaAssetRow",
