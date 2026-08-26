@@ -63,6 +63,7 @@ from lukato.application.use_cases.guardrails import (
     ListPolicies,
     ListRuleKinds,
     PolicyFilter,
+    TestPolicy,
 )
 from lukato.application.use_cases.identity import (
     ApiKeyFilter,
@@ -77,16 +78,17 @@ from lukato.application.use_cases.knowledge import (
     ListDocuments,
 )
 from lukato.application.use_cases.modules import GetModule, ListModules, class_candidates
-from lukato.application.use_cases.prompts import ListPrompts, PromptFilter
+from lukato.application.use_cases.prompts import ListPrompts, PreviewPrompt, PromptFilter
 from lukato.application.use_cases.runs import GetRun, GetRunSteps, ListRuns
 from lukato.config import get_logger
 from lukato.domain.errors import LukatoError
 from lukato.domain.models.adwatch import DetectionStatus
 from lukato.domain.models.guardrail import GuardrailStage
-from lukato.domain.models.identity import Role
+from lukato.domain.models.identity import Principal, Role
 from lukato.domain.models.module import ModuleKind, ModuleStatus
 from lukato.domain.models.run import RunStatus
 from lukato.domain.types import Json, utcnow
+from lukato.interfaces.http.console_forms import form_para_json
 from lukato.interfaces.http.deps import ContainerDep, PrincipalDep
 from lukato.interfaces.ui.context import (
     Crumb,
@@ -520,6 +522,20 @@ async def modules_detail(
             ],
             "runs": runs,
             "runtimes": container.runtimes,
+            # A resposta da invocacao, quando `?sel=` aponta para a execucao que
+            # acabou de rodar.
+            #
+            # Invocar um modulo GRAVA (cria a execucao) e tambem PRODUZ um texto
+            # para ser lido. O 303 estava certo para a primeira metade e perdia a
+            # segunda: o usuario clicava em Executar, a execucao entrava em
+            # /runs, e o card "Resultado" dizia "Nenhum resultado nesta sessao".
+            #
+            # Diferente do preview de prompt e do testador de politica — que nao
+            # gravam nada e por isso viraram rotas de console —, aqui a resposta
+            # ja esta persistida na execucao. Entao o caminho honesto e o 303
+            # levar o identificador dela e a pagina buscar o texto de volta: o F5
+            # continua sem reinvocar (e sem gastar token do provedor).
+            "result": await _resultado_da_execucao(container, principal, module.slug, sel),
         }
 
     return await _page(
@@ -537,6 +553,35 @@ async def modules_detail(
 # ---------------------------------------------------------------------------
 # Prompts e guardrails
 # ---------------------------------------------------------------------------
+async def _resultado_da_execucao(
+    container: Container, principal: Principal, slug: str, sel: str | None
+) -> Json | None:
+    """A execucao apontada por `?sel=`, no formato que o card "Resultado" espera.
+
+    Devolve `None` sem alarde quando `sel` nao e uma execucao (na pagina de
+    modulo ele tambem seleciona outras entidades) ou quando a execucao pertence a
+    outro modulo — mostrar a resposta de um modulo na tela de outro seria pior do
+    que nao mostrar nada.
+    """
+    if not sel:
+        return None
+    try:
+        run = await GetRun(container).execute(sel, principal)
+    except LukatoError:
+        return None
+    if run.module_slug != slug:
+        return None
+    saida = run.output if isinstance(run.output, dict) else {}
+    return {
+        "output": saida.get("output", ""),
+        "usage": run.usage,
+        "cost_usd": run.cost_usd,
+        "metadata": {"latency_ms": run.latency_ms},
+        "run_id": str(run.id),
+        "findings": [],
+    }
+
+
 @router.get("/prompts", response_class=HTMLResponse, summary="Prompts")
 async def prompts_page(
     request: Request,
@@ -699,6 +744,111 @@ async def run_detail(
 # ---------------------------------------------------------------------------
 # Conhecimento
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# POST que CALCULA para exibir
+#
+# Preview de prompt e teste de politica nao gravam nada: eles produzem um
+# resultado para a tela. Os dois formularios apontavam para `/api/v1/...`, e a
+# ponte de formularios converte todo 2xx em 303 de volta para a pagina — o que
+# esta certo para quem gravou, e joga fora justamente o que o usuario pediu para
+# ver aqui. Na pratica: clicar em "Pre-visualizar" ou em "Testar" devolvia a
+# mesma tela, sem resultado nenhum e sem erro nenhum.
+#
+# Os dois templates ja descreviam a saida (`preview` em pages/prompts.html,
+# `verdict` em pages/guardrails.html). Faltava a rota que a entrega — a mesma
+# forma do defeito da ponte de formularios: a convencao estava escrita, o codigo
+# que a cumpria nao existia.
+#
+# Rota de console, e nao de API: `/prompts/preview` fica fora do prefixo `/api/`,
+# entao a ponte nao toca nela e o resultado chega inteiro ao template.
+# ---------------------------------------------------------------------------
+async def _campos(request: Request) -> Json:
+    """Le o formulario aplicando a MESMA convencao de nome da ponte de /api/."""
+    corpo = await request.body()
+    dados, _ = form_para_json(corpo)
+    return dados
+
+
+@router.post("/prompts/preview", response_class=HTMLResponse, summary="Pre-visualizar prompt")
+async def prompts_preview(
+    request: Request, container: ContainerDep, principal: PrincipalDep
+) -> HTMLResponse:
+    """Renderiza o prompt com as variaveis digitadas e devolve a PAGINA com o texto."""
+    campos = await _campos(request)
+    referencia = str(campos.get("prompt") or campos.get("slug") or "")
+    variaveis = campos.get("variables")
+    preview = await PreviewPrompt(container).execute(
+        referencia, variaveis if isinstance(variaveis, dict) else {}, principal
+    )
+    page_limit, page_offset = _window(DEFAULT_PAGE_SIZE, 0)
+
+    # Lista FILTRADA pelo slug do prompt pre-visualizado. O bloco do resultado
+    # mora dentro de `{% if prompt_atual %}`, e `prompt_atual` sai da lista da
+    # pagina: com 30 prompts cadastrados, o selecionado caia na segunda pagina, a
+    # rota devolvia 200 e a tela nao mostrava resultado nenhum. Filtrar garante
+    # que ele esteja ali — e deixa a tela no mesmo estado de quem buscou por ele.
+    busca = str(preview.get("slug") or "")
+
+    async def build() -> Json:
+        prompts = await ListPrompts(container).execute(
+            PromptFilter(search=busca or None, limit=page_limit, offset=page_offset), principal
+        )
+        return {
+            "prompts": prompts,
+            "filters": {"q": busca, "active": ""},
+            "preview": preview,
+        }
+
+    return await _page(
+        request,
+        container,
+        template="pages/prompts.html",
+        active="/prompts",
+        title="Prompts",
+        breadcrumb=[Crumb("Prompts")],
+        build=build,
+        selected_id=str(campos.get("sel") or referencia),
+    )
+
+
+@router.post("/guardrails/test", response_class=HTMLResponse, summary="Testar politica")
+async def guardrails_test(
+    request: Request, container: ContainerDep, principal: PrincipalDep
+) -> HTMLResponse:
+    """Aplica a politica ao texto digitado e devolve a PAGINA com o veredito."""
+    campos = await _campos(request)
+    verdict = await TestPolicy(container).execute(
+        str(campos.get("policy") or "") or None,
+        str(campos.get("content") or ""),
+        principal,
+        stage=str(campos.get("stage") or "") or None,
+    )
+    page_limit, page_offset = _window(DEFAULT_PAGE_SIZE, 0)
+
+    async def build() -> Json:
+        policies = await ListPolicies(container).execute(
+            PolicyFilter(limit=page_limit, offset=page_offset), principal
+        )
+        return {
+            "policies": policies,
+            "rule_kinds": await ListRuleKinds(container).execute(principal),
+            "stages": list(GuardrailStage),
+            "filters": {"q": "", "stage": "", "active": ""},
+            "verdict": verdict,
+        }
+
+    return await _page(
+        request,
+        container,
+        template="pages/guardrails.html",
+        active="/guardrails",
+        title="Guardrails",
+        breadcrumb=[Crumb("Guardrails")],
+        build=build,
+        selected_id=str(campos.get("sel") or ""),
+    )
+
+
 @router.get("/knowledge", response_class=HTMLResponse, summary="Conhecimento")
 async def knowledge_page(
     request: Request,

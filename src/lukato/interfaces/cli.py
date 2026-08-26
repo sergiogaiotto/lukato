@@ -36,6 +36,7 @@ import sys
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final
 
 from lukato import __version__
@@ -43,6 +44,7 @@ from lukato.adapters.guardrails.policies import default_policies
 from lukato.application.container import Container
 from lukato.application.dto import ModuleCreateInput, ModuleFilter
 from lukato.application.use_cases.adwatch import (
+    CommercialFilter,
     CommercialInput,
     CreateCommercial,
     DeleteCommercial,
@@ -52,6 +54,7 @@ from lukato.application.use_cases.adwatch import (
     GetCommercialByCode,
     GetMedia,
     ImportTranscript,
+    ListCommercials,
     ListMedia,
     MediaFilter,
     MediaInput,
@@ -61,7 +64,9 @@ from lukato.application.use_cases.guardrails import (
     CreatePolicy,
     DeletePolicy,
     GetPolicyBySlug,
+    ListPolicies,
     PolicyCreateInput,
+    PolicyFilter,
 )
 from lukato.application.use_cases.health import GetProviderDetails, GetReadiness
 from lukato.application.use_cases.identity import CreateUser, GetUser, UserCreateInput
@@ -76,7 +81,9 @@ from lukato.application.use_cases.prompts import (
     CreatePrompt,
     DeletePrompt,
     GetPromptBySlug,
+    ListPrompts,
     PromptCreateInput,
+    PromptFilter,
 )
 from lukato.composition import build_container, dispose_container
 from lukato.config import Settings, configure_logging, get_logger, get_settings
@@ -722,6 +729,231 @@ async def _run_seed(settings: Settings, *, reset: bool) -> int:
 
 
 # ---------------------------------------------------------------------------
+# export
+# ---------------------------------------------------------------------------
+LIMITE_EXPORT: Final[int] = 200
+"""Teto por pagina das listagens. O export pagina ate acabar; o teto so evita
+uma unica consulta gigante contra o banco."""
+
+
+async def _todos(executar, filtro_de) -> list[Json]:
+    """Percorre uma listagem paginada ate o fim e devolve os itens crus."""
+    itens: list[Json] = []
+    offset = 0
+    while True:
+        pagina = await executar(filtro_de(LIMITE_EXPORT, offset))
+        lote = list(pagina.items)
+        itens.extend(item.model_dump(mode="json") for item in lote)
+        if len(lote) < LIMITE_EXPORT or len(itens) >= pagina.total:
+            return itens
+        offset += LIMITE_EXPORT
+
+
+async def _montar_export(settings: Settings) -> Json:
+    """Escreve num JSO o que esta instalacao tem de configuracao e catalogo.
+
+    Existe porque um banco de demonstracao morre com o ambiente que o hospeda, e
+    o que foi montado ali — prompts, politicas, modulos, catalogo de comerciais,
+    base de conhecimento — e trabalho que se quer consultar depois, em outra
+    maquina. `seed` planta o minimo; `export` leva o que VOCE montou.
+
+    O que NAO sai daqui, de proposito:
+
+    * segredo de chave de API — o valor so existe no instante em que a chave e
+      criada ou rotacionada, e um arquivo de export circula por e-mail, anexo e
+      repositorio. Exportar segredo seria transformar um arquivo de conveniencia
+      numa via de vazamento;
+    * hash de senha de usuario, pelo mesmo motivo;
+    * execucoes e deteccoes — sao DERIVADAS. Reimportar uma deteccao criaria uma
+      evidencia que nunca foi calculada naquela instalacao, que e o oposto do que
+      a trilha de auditoria significa. Elas voltam rodando o funil de novo.
+    """
+    principal = _root()
+    async with _container_scope(settings) as container:
+        prompts = await _todos(
+            lambda f: ListPrompts(container).execute(f, principal),
+            lambda limite, salto: PromptFilter(limit=limite, offset=salto),
+        )
+        policies = await _todos(
+            lambda f: ListPolicies(container).execute(f, principal),
+            lambda limite, salto: PolicyFilter(limit=limite, offset=salto),
+        )
+        modules = await _todos(
+            lambda f: ListModules(container).execute(f, principal),
+            lambda limite, salto: ModuleFilter(limit=limite, offset=salto),
+        )
+        commercials = await _todos(
+            lambda f: ListCommercials(container).execute(f, principal),
+            lambda limite, salto: CommercialFilter(limit=limite, offset=salto),
+        )
+        media = await _todos(
+            lambda f: ListMedia(container).execute(f, principal),
+            lambda limite, salto: MediaFilter(limit=limite, offset=salto),
+        )
+
+    documento: Json = {
+        "lukato_export": 1,
+        "versao_da_aplicacao": __version__,
+        "prompts": prompts,
+        "guardrails": policies,
+        "modules": modules,
+        "commercials": commercials,
+        "media": media,
+        "nao_exportado": {
+            "segredos": "chave de API e hash de senha nunca saem daqui",
+            "derivados": "execucoes e deteccoes voltam rodando o funil de novo",
+        },
+    }
+    return documento
+
+
+def _run_import(settings: Settings, *, origem: str) -> int:
+    """Le o arquivo fora do laco e aplica dentro dele — ver `_run_export`."""
+    dados = json.loads(Path(origem).read_text(encoding="utf-8"))
+    if dados.get("lukato_export") != 1:
+        raise ValueError(f"{origem} nao parece um export do lukato (falta `lukato_export: 1`)")
+    return asyncio.run(_aplicar_import(settings, dados))
+
+
+def _run_export(settings: Settings, *, destino: str | None) -> int:
+    """Monta o documento no laco e grava FORA dele.
+
+    Escrever arquivo dentro de corotina bloqueia o laco de eventos. Numa CLI de
+    um tiro so isso nao doi, mas a regra existe para o dia em que este mesmo
+    codigo for chamado de dentro de um servidor — e ai doeria.
+    """
+    documento = asyncio.run(_montar_export(settings))
+    texto = json.dumps(documento, ensure_ascii=False, indent=2, default=str)
+    if destino:
+        Path(destino).write_text(texto + "\n", encoding="utf-8")
+        _out(f"export gravado em {destino}")
+        for chave in ("prompts", "guardrails", "modules", "commercials", "media"):
+            _out(f"  {chave:<13} {len(documento[chave])}")
+    else:
+        print(texto)
+    return EXIT_OK
+
+
+async def _aplicar_import(settings: Settings, dados: Json) -> int:
+    """Recria numa instalacao o que `export` levou de outra.
+
+    Idempotente pelo mesmo criterio do `seed`: o que ja existe pelo identificador
+    (slug ou codigo do comercial) e mantido, nao sobrescrito. Rodar duas vezes o
+    mesmo arquivo nao duplica nada e nao apaga nada.
+
+    Midia NAO e recriada: `uri` aponta para um caminho da maquina de origem, e
+    registrar aqui um caminho que nao existe cria um ativo que nenhuma etapa
+    consegue ler. A tela de AdWatch registra a midia em tres campos — e o
+    caminho e a unica coisa que so quem esta na maquina sabe.
+
+    HISTORICO DE VERSAO NAO VIAJA. O export lista as versoes de prompt que
+    existem na origem; a importacao cria a PRIMEIRA versao de cada slug, com o
+    texto da versao mais recente. Um export de 18 linhas de prompt sobre 13 slugs
+    vira 13 prompts em v1. Fingir o contrario seria escrever no destino uma
+    trilha de auditoria que nunca aconteceu ali.
+    """
+    principal = _root()
+    contagem = {"criado": 0, "ja existia": 0}
+
+    def marcar(rotulo: str, nome: str, novo: bool) -> None:
+        chave = "criado" if novo else "ja existia"
+        contagem[chave] += 1
+        _out(f"  {rotulo:<12} {'+' if novo else '='} {nome}")
+
+    async with _container_scope(settings) as container:
+        for item in dados.get("prompts", []):
+            try:
+                await CreatePrompt(container).execute(
+                    PromptCreateInput(
+                        slug=item["slug"],
+                        name=item.get("name", ""),
+                        description=item.get("description", ""),
+                        role=item.get("role", "system"),
+                        template=item.get("template", ""),
+                        labels=item.get("labels", []),
+                        is_active=item.get("is_active", True),
+                    ),
+                    principal,
+                )
+                marcar("prompt", item["slug"], True)
+            except ConflictError:
+                marcar("prompt", item["slug"], False)
+
+        for item in dados.get("guardrails", []):
+            try:
+                await CreatePolicy(container).execute(
+                    PolicyCreateInput(
+                        slug=item["slug"],
+                        name=item.get("name", ""),
+                        description=item.get("description", ""),
+                        stage=item.get("stage", "input"),
+                        rules=item.get("rules", []),
+                        fail_open=item.get("fail_open", False),
+                        is_active=item.get("is_active", True),
+                    ),
+                    principal,
+                )
+                marcar("guardrail", item["slug"], True)
+            except ConflictError:
+                marcar("guardrail", item["slug"], False)
+
+        for item in dados.get("modules", []):
+            try:
+                await CreateModule(container).execute(
+                    ModuleCreateInput(
+                        slug=item["slug"],
+                        name=item.get("name", ""),
+                        description=item.get("description", ""),
+                        kind=item.get("kind", "agent"),
+                        status=item.get("status", "active"),
+                        runtime=item.get("runtime", "direct"),
+                        config=item.get("config", {}),
+                        tags=item.get("tags", []),
+                    ),
+                    principal,
+                )
+                marcar("modulo", item["slug"], True)
+            except ConflictError:
+                marcar("modulo", item["slug"], False)
+
+        for item in dados.get("commercials", []):
+            codigo = item["commercial_id"]
+            try:
+                await CreateCommercial(container).execute(
+                    CommercialInput(
+                        commercial_id=codigo,
+                        campaign=item.get("campaign", ""),
+                        brand=item.get("brand", ""),
+                        text=item.get("text", ""),
+                        duration_expected=item.get("duration_expected", 30.0),
+                        keywords=item.get("keywords", []),
+                        key_phrases=item.get("key_phrases", []),
+                        language=item.get("language", "pt-BR"),
+                        is_active=item.get("is_active", True),
+                    ),
+                    principal,
+                )
+                marcar("comercial", codigo, True)
+            except ConflictError:
+                marcar("comercial", codigo, False)
+
+    _out()
+    _out(f"{contagem['criado']} criados, {contagem['ja existia']} ja existiam")
+    slugs = {item["slug"] for item in dados.get("prompts", [])}
+    if len(dados.get("prompts", [])) > len(slugs):
+        _out(
+            f"{len(dados['prompts'])} linhas de prompt sobre {len(slugs)} slugs: cada slug "
+            "chega em v1. Historico de versao nao viaja entre instalacoes."
+        )
+    if dados.get("media"):
+        _out(
+            f"{len(dados['media'])} midia(s) NAO foram recriadas: o caminho do arquivo e da "
+            "maquina de origem. Registre a sua em /adwatch."
+        )
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
 # health
 # ---------------------------------------------------------------------------
 async def _run_health(settings: Settings) -> int:
@@ -955,6 +1187,23 @@ def build_parser(settings: Settings) -> argparse.ArgumentParser:
     openapi.add_argument("--out", required=True, metavar="CAMINHO", help="arquivo de destino")
     openapi.set_defaults(handler="openapi")
 
+    export = commands.add_parser(
+        "export",
+        help="grava em JSON os prompts, guardrails, modulos, comerciais e midias desta instalacao",
+    )
+    export.add_argument(
+        "--out",
+        metavar="CAMINHO",
+        help="arquivo de destino; sem ele o JSON sai na saida padrao",
+    )
+    export.set_defaults(handler="export")
+
+    importar = commands.add_parser(
+        "import", help="recria nesta instalacao o que um `lukato export` levou de outra"
+    )
+    importar.add_argument("arquivo", metavar="ARQUIVO", help="JSON gerado por `lukato export`")
+    importar.set_defaults(handler="import")
+
     health = commands.add_parser("health", help="imprime o relatorio de prontidao em JSON")
     health.set_defaults(handler="health")
 
@@ -1017,6 +1266,10 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> int:
         return _run_openapi(settings, out=args.out)
     if handler == "seed":
         return asyncio.run(_run_seed(settings, reset=args.reset))
+    if handler == "export":
+        return _run_export(settings, destino=args.out)
+    if handler == "import":
+        return _run_import(settings, origem=args.arquivo)
     if handler == "health":
         return asyncio.run(_run_health(settings))
     if handler == "modules.list":

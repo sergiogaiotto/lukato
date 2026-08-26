@@ -213,6 +213,37 @@
 
       <div class="lk-context__section">
         <p class="lk-label">Efeito do que falta</p>
+
+        {#- O teto do que ESTA instalado, e a consequencia dele.
+
+             As duas linhas abaixo respondem "quanto se perde sem OCR?" e "quanto
+             se perde sem juiz visual?" — hipoteses uteis, mas nenhuma responde a
+             pergunta que decide o funil: com esta maquina, ate onde uma deteccao
+             consegue chegar? Sem OCR o teto e 85,0%, abaixo do limiar de aceite:
+             nenhuma deteccao e aceita sozinha e TODAS vao para revisao humana.
+             Medido nesta instalacao: 81 deteccoes, maior confianca 84,5%, zero
+             acima de 90,0%. A tela mostrava "score maximo 85,0%" e parava ai. -#}
+        {% if capabilities.max_score_effective < thresholds.accept %}
+          <p class="lk-finding">
+            Com o que está instalado, o teto é
+            <strong>{{ capabilities.max_score_effective | pct }}</strong> — abaixo do limiar de
+            aceite ({{ thresholds.accept | pct }}). <strong>Nenhuma detecção será aceita
+            automaticamente</strong>; todas param em revisão humana
+            {% if capabilities.max_score_effective < thresholds.review %}
+              ou são rejeitadas, porque o teto também não alcança o limiar de revisão
+              ({{ thresholds.review | pct }}).
+            {% else %}
+              enquanto a modalidade que falta não voltar.
+            {% endif %}
+          </p>
+        {% else %}
+          <p class="lk-hint">
+            Com o que está instalado, o teto é
+            <span class="lk-mono">{{ capabilities.max_score_effective | pct }}</span> — o limiar
+            de aceite ({{ thresholds.accept | pct }}) é alcançável.
+          </p>
+        {% endif %}
+
         <dl class="lk-kv">
           <dt>Sem OCR</dt>
           <dd class="lk-mono">score máximo {{ capabilities.max_score_without.ocr | pct }}</dd>

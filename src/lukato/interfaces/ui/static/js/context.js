@@ -115,6 +115,24 @@
     }
 
     document.addEventListener("click", function (event) {
+      /*
+       * Controle dentro da linha AGE; a linha so abre o painel.
+       *
+       * A linha da tabela carrega `data-context-id`, e este ouvinte pegava
+       * qualquer clique dentro dela — inclusive o do botao de um formulario —
+       * e chamava `preventDefault()`. O efeito: TODA acao de linha do console
+       * ficava morta. Aceitar e rejeitar deteccao, remover comercial, remover
+       * usuario, rotacionar e revogar chave de API, remover orcamento: o
+       * usuario clicava, o painel da direita abria, e nada era gravado. Nao
+       * havia mensagem de erro nenhuma, porque o formulario nunca chegava a ser
+       * enviado.
+       *
+       * O link da primeira celula continua abrindo o painel: `<a>` nao esta na
+       * lista, e e ele que carrega `data-context-id` de proposito.
+       */
+      if (event.target.closest("button, input, select, textarea, form")) {
+        return;
+      }
       var trigger = event.target.closest("[data-context-id]");
       if (!trigger) {
         return;

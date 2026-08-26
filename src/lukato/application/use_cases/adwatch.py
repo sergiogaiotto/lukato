@@ -1319,6 +1319,25 @@ class GetMediaCapabilities(_AdWatchUseCase):
                 "ocr": round(1.0 - settings.weight_ocr, 4),
                 "vision": round(1.0 - settings.weight_visual, 4),
             },
+            # Teto do que ESTA instalado, e nao de cada modalidade isolada.
+            #
+            # `max_score_without` responde "quanto se perde sem OCR?" e "quanto se
+            # perde sem juiz visual?" — duas perguntas hipoteticas. Nenhuma
+            # responde a que o operador precisa: com esta maquina, do jeito que
+            # ela esta, ate onde uma deteccao consegue chegar?
+            #
+            # A diferenca decide o funil inteiro. Sem OCR o teto e 0,85, abaixo do
+            # limiar de aceite de 0,90: NENHUMA deteccao e aceita
+            # automaticamente, todas caem em revisao humana. Medido: em 81
+            # deteccoes reais, a maior confianca foi 0,845 e zero passaram de
+            # 0,90. A tela dizia "score maximo 85,0%" e ficava por isso mesmo.
+            #
+            # Sem juiz visual nao se perde peso: `visual_match` herda
+            # `speech_match` (secao 3.4 da SPEC-0010), entao `vision` ausente NAO
+            # entra nesta conta — so OCR entra.
+            "max_score_effective": round(
+                1.0 - (0.0 if capabilities["ocr"] else settings.weight_ocr), 4
+            ),
         }
 
 

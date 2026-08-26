@@ -278,13 +278,15 @@
             <textarea
               class="lk-textarea"
               id="bulk-items"
-              name="items"
+              name="items{}"
               rows="10"
               placeholder='[{"commercial_id": "COM_000234", "campaign": "Verão", "brand": "Marca", "text": "..."}]'
               required
             ></textarea>
             <span class="lk-field__hint">
-              Array de comerciais ou o objeto <span class="lk-mono">{items, update_existing}</span>.
+              Array de comerciais. O <span class="lk-mono">{}</span> no nome do campo e a
+              convencao que faz a borda tratar o texto como JSON: sem ele o array chegaria
+              como string e o endpoint recusaria com <span class="lk-mono">list_type</span>.
             </span>
           </div>
 

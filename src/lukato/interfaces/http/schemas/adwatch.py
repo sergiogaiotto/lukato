@@ -862,6 +862,13 @@ class CapabilitiesOut(OutSchema):
     thresholds: AdWatchThresholds = Field(default_factory=AdWatchThresholds)
     top_k: AdWatchTopK = Field(default_factory=AdWatchTopK)
     max_score_without: AdWatchMaxScoreWithout = Field(default_factory=AdWatchMaxScoreWithout)
+    max_score_effective: float = Field(
+        default=1.0,
+        description=(
+            "Teto alcancavel com as capacidades REALMENTE instaladas. Comparado ao "
+            "limiar de aceite, diz se alguma deteccao pode ser aceita sem revisao."
+        ),
+    )
 
     @classmethod
     def from_result(cls, report: Json) -> CapabilitiesOut:
