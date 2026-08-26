@@ -346,3 +346,80 @@ def test_controle_dentro_da_linha_nao_e_engolido_pelo_painel() -> None:
     assert 'closest("button, input, select, textarea, form")' in origem, (
         "o guarda que deixa o controle da linha agir sumiu do context.js"
     )
+
+
+async def test_invocar_modulo_mostra_a_resposta_na_tela(client: AsyncClient) -> None:
+    """Executar um modulo grava a execucao E devolve a resposta para ser lida.
+
+    Terceira ocorrencia da mesma classe do preview de prompt e do testador de
+    politica: o 303 da ponte descartava o que o usuario pediu para ver. Aqui,
+    porem, a invocacao GRAVA — a resposta ja esta persistida na execucao. Entao
+    o conserto nao e virar rota de console: e o 303 levar o `run_id` e a pagina
+    buscar o texto de volta, de modo que o F5 nao reinvoque nem gaste token.
+    """
+    criado = await client.post(
+        "/api/v1/modules",
+        json={
+            "slug": "modulo-que-responde",
+            "name": "Modulo que responde",
+            "kind": "agent",
+            # `active` de proposito: um modulo nasce em `draft` e invocar draft e
+            # `409` — comportamento correto, e nao o que este teste mede.
+            "status": "active",
+            "config": {"module": "processing"},
+        },
+    )
+    assert criado.status_code in {200, 201}, criado.text
+
+    corpo = urllib.parse.urlencode({"input": "Explique a cobranca de julho.", "variables{}": "{}"})
+    resposta = await client.post(
+        "/api/v1/modules/modulo-que-responde/invoke",
+        content=corpo,
+        headers={
+            **CABECALHOS_DE_NAVEGADOR,
+            "Referer": "http://testserver/modules/modulo-que-responde",
+        },
+    )
+    assert resposta.status_code == 303, resposta.text[:300]
+    destino = resposta.headers["location"]
+    assert "sel=" in destino, f"o 303 nao levou a execucao criada: {destino}"
+
+    pagina = await client.get(destino)
+    assert pagina.status_code == 200
+    assert "Nenhum resultado nesta sessão" not in pagina.text, (
+        "a execucao gravou mas a tela continua dizendo que nao ha resultado"
+    )
+    assert "Explique a cobranca de julho." in pagina.text
+
+
+async def test_adwatch_diz_quando_o_aceite_automatico_e_inalcancavel(
+    client: AsyncClient,
+) -> None:
+    """A tela precisa dizer a CONSEQUENCIA do que falta, nao so o teto isolado.
+
+    `max_score_without` respondia "quanto se perde sem OCR?" e "sem juiz
+    visual?" — hipoteses. Nenhuma respondia o que decide o funil: com esta
+    maquina, ate onde uma deteccao chega? Sem OCR o teto e 85%, abaixo do limiar
+    de aceite de 90%: nenhuma deteccao e aceita sozinha e todas param em revisao
+    humana. Medido numa instalacao real: 81 deteccoes, maior confianca 84,5%,
+    zero acima de 90%. A tela mostrava "score maximo 85,0%" e parava ai.
+    """
+    capacidades = await client.get("/api/v1/adwatch/capabilities")
+    assert capacidades.status_code == 200
+    dados = capacidades.json()
+    teto = dados["max_score_effective"]
+    aceite = dados["thresholds"]["accept"]
+
+    esperado = 1.0 if dados["capabilities"]["ocr"] else 1.0 - dados["weights"]["ocr"]
+    assert abs(teto - esperado) < 1e-6, (
+        f"o teto efetivo ({teto}) nao reflete as capacidades instaladas ({esperado})"
+    )
+
+    pagina = await client.get("/adwatch")
+    assert pagina.status_code == 200
+    if teto < aceite:
+        assert "Nenhuma detecção será aceita" in pagina.text, (
+            "o teto nao alcanca o limiar de aceite e a tela nao avisa"
+        )
+    else:
+        assert "é alcançável" in pagina.text

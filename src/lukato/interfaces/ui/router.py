@@ -84,7 +84,7 @@ from lukato.config import get_logger
 from lukato.domain.errors import LukatoError
 from lukato.domain.models.adwatch import DetectionStatus
 from lukato.domain.models.guardrail import GuardrailStage
-from lukato.domain.models.identity import Role
+from lukato.domain.models.identity import Principal, Role
 from lukato.domain.models.module import ModuleKind, ModuleStatus
 from lukato.domain.models.run import RunStatus
 from lukato.domain.types import Json, utcnow
@@ -522,6 +522,20 @@ async def modules_detail(
             ],
             "runs": runs,
             "runtimes": container.runtimes,
+            # A resposta da invocacao, quando `?sel=` aponta para a execucao que
+            # acabou de rodar.
+            #
+            # Invocar um modulo GRAVA (cria a execucao) e tambem PRODUZ um texto
+            # para ser lido. O 303 estava certo para a primeira metade e perdia a
+            # segunda: o usuario clicava em Executar, a execucao entrava em
+            # /runs, e o card "Resultado" dizia "Nenhum resultado nesta sessao".
+            #
+            # Diferente do preview de prompt e do testador de politica — que nao
+            # gravam nada e por isso viraram rotas de console —, aqui a resposta
+            # ja esta persistida na execucao. Entao o caminho honesto e o 303
+            # levar o identificador dela e a pagina buscar o texto de volta: o F5
+            # continua sem reinvocar (e sem gastar token do provedor).
+            "result": await _resultado_da_execucao(container, principal, module.slug, sel),
         }
 
     return await _page(
@@ -539,6 +553,35 @@ async def modules_detail(
 # ---------------------------------------------------------------------------
 # Prompts e guardrails
 # ---------------------------------------------------------------------------
+async def _resultado_da_execucao(
+    container: Container, principal: Principal, slug: str, sel: str | None
+) -> Json | None:
+    """A execucao apontada por `?sel=`, no formato que o card "Resultado" espera.
+
+    Devolve `None` sem alarde quando `sel` nao e uma execucao (na pagina de
+    modulo ele tambem seleciona outras entidades) ou quando a execucao pertence a
+    outro modulo — mostrar a resposta de um modulo na tela de outro seria pior do
+    que nao mostrar nada.
+    """
+    if not sel:
+        return None
+    try:
+        run = await GetRun(container).execute(sel, principal)
+    except LukatoError:
+        return None
+    if run.module_slug != slug:
+        return None
+    saida = run.output if isinstance(run.output, dict) else {}
+    return {
+        "output": saida.get("output", ""),
+        "usage": run.usage,
+        "cost_usd": run.cost_usd,
+        "metadata": {"latency_ms": run.latency_ms},
+        "run_id": str(run.id),
+        "findings": [],
+    }
+
+
 @router.get("/prompts", response_class=HTMLResponse, summary="Prompts")
 async def prompts_page(
     request: Request,

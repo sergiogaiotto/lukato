@@ -540,9 +540,14 @@ class _Redirecionador:
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
         if isinstance(corpo, dict):
-            valor = corpo.get("id")
-            if isinstance(valor, str) and valor:
-                return valor
+            # `run_id` alem de `id`: a invocacao de modulo nao devolve um recurso
+            # chamado `id`, ela devolve a EXECUCAO que acabou de criar. Sem esta
+            # linha o redirecionamento perdia justamente o identificador que leva
+            # a resposta do modulo de volta para a tela.
+            for chave in ("id", "run_id"):
+                valor = corpo.get(chave)
+                if isinstance(valor, str) and valor:
+                    return valor
         return None
 
 
