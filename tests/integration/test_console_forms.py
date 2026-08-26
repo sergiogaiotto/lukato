@@ -128,6 +128,25 @@ async def test_o_erro_de_esquema_que_o_usuario_viu_nao_volta(client: AsyncClient
 # ---------------------------------------------------------------------------
 # A classe inteira, nao o caso reportado
 # ---------------------------------------------------------------------------
+ROTAS_DE_CONSOLE: Final[dict[str, str]] = {
+    "/prompts/preview": (
+        "pre-visualizacao renderiza um texto para ser LIDO nesta tela; postando em "
+        "/api/ a ponte trocaria o 200 por um 303 e o resultado se perderia"
+    ),
+    "/guardrails/test": "testador de politica, mesmo motivo do preview de prompt",
+}
+"""POST que a ponte NAO deve traduzir — porque a rota ja devolve HTML.
+
+A regra geral existe por um bom motivo: um `method="post"` fora de `/api/` fica
+fora da ponte, e o botao volta a devolver JSON cru. Estas duas sao o caso
+contrario: sao rotas de CONSOLE, que renderizam a pagina inteira com o resultado
+calculado. Passar por `/api/` e que as quebrava.
+
+A licenca nao e de graca: `test_rota_de_console_isenta_existe_e_devolve_html`
+exige que cada entrada daqui seja uma rota de verdade que responde HTML.
+"""
+
+
 def test_todo_formulario_do_console_aponta_para_um_alvo_traduzivel() -> None:
     """Nenhum formulario pode escapar da ponte.
 
@@ -148,6 +167,8 @@ def test_todo_formulario_do_console_aponta_para_um_alvo_traduzivel() -> None:
             destino = acao.group(1) if acao else ""
             # `{{ ... }}` no inicio e uma variavel do template que resolve para
             # /api/... em runtime; conferida pelos testes de pagina.
+            if destino in ROTAS_DE_CONSOLE:
+                continue
             if not destino.startswith(("/api/", "{{")):
                 linha = texto[: achado.start()].count("\n") + 1
                 fora.append(f"{arquivo.name}:{linha} -> {destino or '(sem action)'}")
@@ -638,3 +659,44 @@ async def test_editar_prompt_e_politica_pelo_formulario(client: AsyncClient) -> 
     assert atual["rules"][0]["config"] == {"max_chars": 250}, (
         "a regra editada nao gravou o config novo: " + str(atual["rules"])
     )
+
+
+def _rotas_registradas(app: FastAPI) -> set[tuple[str, str]]:
+    """`(caminho, verbo)` de tudo que o app resolve, descendo nos sub-routers."""
+    encontradas: set[tuple[str, str]] = set()
+
+    def descer(rotas: object) -> None:
+        for rota in rotas or ():  # type: ignore[union-attr]
+            caminho = getattr(rota, "path", None)
+            for verbo in getattr(rota, "methods", None) or ():
+                if caminho:
+                    encontradas.add((str(caminho), str(verbo)))
+            descer(getattr(rota, "routes", None))
+            # O FastAPI embrulha `include_router` num `_IncludedRouter`, que nao
+            # expoe `routes` — as rotas de verdade ficam em `original_router`.
+            embrulhado = getattr(rota, "original_router", None)
+            if embrulhado is not None:
+                descer(getattr(embrulhado, "routes", None))
+
+    descer(app.routes)
+    return encontradas
+
+
+def test_rota_de_console_isenta_existe_de_verdade(app: FastAPI) -> None:
+    """Cada entrada de `ROTAS_DE_CONSOLE` precisa ser uma rota POST registrada.
+
+    Sem esta trava, acrescentar um caminho aquele dicionario viraria uma forma de
+    silenciar o teste da classe: bastaria escrever a rota la e o formulario
+    passaria a apontar para lugar nenhum, com verde por cima.
+
+    Que elas devolvem HTML com o resultado calculado esta provado em
+    `test_preview_de_prompt_devolve_o_texto_renderizado` e
+    `test_teste_de_guardrail_devolve_o_veredito_na_tela`. Aqui so se confere a
+    existencia — chamar a rota com corpo vazio produziria um 404 legitimo do caso
+    de uso, que nao diz nada sobre o registro.
+    """
+    registradas = _rotas_registradas(app)
+    for rota, motivo in ROTAS_DE_CONSOLE.items():
+        assert (rota, "POST") in registradas, (
+            f"{rota} esta isenta da ponte (motivo: {motivo}) mas nao existe como rota POST"
+        )

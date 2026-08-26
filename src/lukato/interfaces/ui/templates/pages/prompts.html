@@ -297,11 +297,15 @@
     {#- --------------------------------------------------------------- PREVIEW -#}
     {% call card('Pré-visualização', dot='ai') %}
       {% if prompt_atual %}
-        <form
-          method="post"
-          action="/api/v1/prompts/{{ prompt_atual.id }}/preview"
-          class="lk-stack"
-        >
+        {#- Rota de CONSOLE, nao de API: o preview calcula um texto para ser lido
+             nesta tela. Postando em `/api/v1/...`, a ponte de formularios trocava
+             o 200 por um 303 de volta — comportamento certo para quem gravou, e
+             que aqui jogava fora exatamente o que o usuario pediu para ver.
+             `/prompts/preview` fica fora do prefixo `/api/`, entao o resultado
+             chega inteiro e este template o renderiza em `preview`. -#}
+        <form method="post" action="/prompts/preview" class="lk-stack">
+          <input type="hidden" name="prompt" value="{{ prompt_atual.id }}" />
+          <input type="hidden" name="sel" value="{{ prompt_atual.id }}" />
 
           {% if prompt_atual.variables %}
             <div class="lk-form-grid">

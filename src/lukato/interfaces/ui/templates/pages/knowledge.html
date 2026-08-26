@@ -97,11 +97,38 @@
           <dd>{{ badge('ok' if embedder.get('healthy') else 'down',
                        label='respondendo' if embedder.get('healthy') else 'sem resposta') }}</dd>
         </dl>
-        <p class="lk-hint">
-          A ingestão e a busca continuam funcionando, mas a vizinhança recuperada é pior do que
-          a do provedor configurado. Coleções indexadas por outro embedder ficam marcadas como
-          incompatíveis e não são consultadas.
-        </p>
+        {#- Dois estados diferentes moravam sob o mesmo texto.
+
+             Quando um FALLBACK entrou em uso (`configurado` != `em uso`), a
+             ingestão e a busca realmente continuam funcionando, com vizinhança
+             pior. Mas a sondagem, por projeto, apenas CLASSIFICA: ela não troca
+             o adaptador (SPEC-0000 seção 14). Então existe o outro estado — o
+             provedor configurado continua em uso e não responde — e nele nada
+             funciona: toda ingestão morre com erro de rede do hub.
+
+             A tela afirmava "a ingestão e a busca continuam funcionando" nos
+             dois casos. Quem batia no segundo lia uma promessa e recebia um
+             erro, sem nenhuma pista de que faltava alcançar o hub. -#}
+        {% if embedder.get('configured_provider') and
+              embedder.get('configured_provider') != embedder.get('provider') %}
+          <p class="lk-hint">
+            A ingestão e a busca continuam funcionando, mas a vizinhança recuperada é pior do que
+            a do provedor configurado. Coleções indexadas por outro embedder ficam marcadas como
+            incompatíveis e não são consultadas.
+          </p>
+        {% else %}
+          <p class="lk-finding">
+            O provedor configurado continua em uso e não respondeu à sondagem: enquanto ele não
+            voltar, <strong>ingerir documento e buscar vão falhar</strong> com erro de rede. A
+            sondagem classifica o estado, não troca o adaptador.
+          </p>
+          <p class="lk-hint">
+            Para trabalhar offline, defina
+            <span class="lk-mono">LUKATO_EMBEDDING__PROVIDER=hashing</span> e reinicie o
+            processo: o embedder local assume, a ingestão volta a funcionar e a vizinhança
+            recuperada fica pior — o que esta mesma tela passa a dizer.
+          </p>
+        {% endif %}
       {% endcall %}
     {% endif %}
 

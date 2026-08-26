@@ -343,7 +343,7 @@ def _quer_html(cabecalhos: Headers) -> bool:
     return "text/html" in cabecalhos.get("accept", "").lower()
 
 
-def _volta_para(cabecalhos: Headers, aviso: str) -> str:
+def _volta_para(cabecalhos: Headers, aviso: str, *, selecionado: str | None = None) -> str:
     """Monta o destino do 303: a pagina de onde o formulario veio, com o aviso.
 
     Sem `Referer` o navegador nao disse de onde veio; o cockpit e o unico destino
@@ -351,8 +351,11 @@ def _volta_para(cabecalhos: Headers, aviso: str) -> str:
     """
     origem = cabecalhos.get("referer") or "/"
     partes = urlsplit(origem)
-    consulta = [(c, v) for c, v in parse_qsl(partes.query) if c != _PARAM_AVISO]
+    descartar = {_PARAM_AVISO} | ({"sel"} if selecionado else set())
+    consulta = [(c, v) for c, v in parse_qsl(partes.query) if c not in descartar]
     consulta.append((_PARAM_AVISO, aviso))
+    if selecionado:
+        consulta.append(("sel", selecionado))
     # Descarta esquema e host: redirecionar para o que o cliente mandou no
     # Referer seria um open redirect. So o caminho do proprio console sobrevive.
     return urlunsplit(("", "", partes.path or "/", urlencode(consulta), partes.fragment))
@@ -471,34 +474,76 @@ def _corpo_unico(corpo: bytes) -> Receive:
     return receive
 
 
+_TAMANHO_RESPOSTA: Final[int] = 256 * 1024
+"""Teto do corpo de resposta que vale a pena juntar so para achar o `id`. Acima
+disto o redirecionamento acontece sem `sel` — perder o realce e barato, segurar
+um corpo grande na memoria nao e."""
+
+
 class _Redirecionador:
     """Troca a resposta JSON de sucesso por um 303 de volta para a pagina.
 
     Padrao POST-Redirect-GET: sem ele o navegador ficaria parado numa tela de
     JSON depois de salvar, e o F5 reenviaria o formulario. So mexe em 2xx —
     erro continua indo para o tratador, que ja devolve a pagina de erro em HTML.
+
+    O 303 leva `sel=<id>` do que acabou de ser gravado. Sem isso, salvar um item
+    devolvia a lista na ordem alfabetica de sempre: com 27 prompts cadastrados, o
+    que o usuario acabou de criar caia na SEGUNDA pagina e sumia da vista. A tela
+    dizia "salvo" e nao mostrava o que foi salvo. Para achar o `id` e preciso ler
+    o corpo da resposta, entao o desvio espera o corpo terminar em vez de
+    disparar no `http.response.start`.
     """
 
     def __init__(self, send: Send, *, cabecalhos: Headers) -> None:
         self._send = send
         self._cabecalhos = cabecalhos
         self._desviando = False
+        self._corpo: list[bytes] = []
+        self._tamanho = 0
 
     async def __call__(self, evento: Message) -> None:
-        """Intercepta o inicio da resposta e decide se desvia."""
-        if evento["type"] == "http.response.start":
-            status = int(evento["status"])
-            if 200 <= status < 300:
+        """Segura a resposta de sucesso, junta o corpo e desvia no fim."""
+        tipo = evento["type"]
+        if tipo == "http.response.start":
+            if 200 <= int(evento["status"]) < 300:
                 self._desviando = True
-                destino = _volta_para(self._cabecalhos, "salvo")
-                resposta = RedirectResponse(destino, status_code=303)
-                await resposta(  # type: ignore[call-arg]
-                    {"type": "http"}, _corpo_unico(b""), self._send
-                )
                 return
-        if self._desviando and evento["type"] in {"http.response.body", "http.response.start"}:
-            return  # a resposta original ja foi substituida
-        await self._send(evento)
+            await self._send(evento)
+            return
+
+        if not self._desviando:
+            await self._send(evento)
+            return
+
+        if tipo == "http.response.body":
+            pedaco: bytes = evento.get("body", b"")
+            self._tamanho += len(pedaco)
+            if self._tamanho <= _TAMANHO_RESPOSTA:
+                self._corpo.append(pedaco)
+            if evento.get("more_body", False):
+                return
+            await self._desviar()
+
+    async def _desviar(self) -> None:
+        """Emite o 303 para a pagina de origem, realcando o item gravado."""
+        destino = _volta_para(self._cabecalhos, "salvo", selecionado=self._identificador())
+        resposta = RedirectResponse(destino, status_code=303)
+        await resposta({"type": "http"}, _corpo_unico(b""), self._send)  # type: ignore[call-arg]
+
+    def _identificador(self) -> str | None:
+        """`id` do recurso gravado, quando a resposta o traz."""
+        if self._tamanho > _TAMANHO_RESPOSTA:
+            return None
+        try:
+            corpo = json.loads(b"".join(self._corpo).decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+        if isinstance(corpo, dict):
+            valor = corpo.get("id")
+            if isinstance(valor, str) and valor:
+                return valor
+        return None
 
 
 def resposta_de_redirecionamento(request: Request, aviso: str) -> Response:

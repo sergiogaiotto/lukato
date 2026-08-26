@@ -511,7 +511,9 @@
 
   {#- ---------------------------------------------------------------- TESTADOR -#}
   {% call card('Testador', dot='ai') %}
-    <form method="post" action="/api/v1/guardrails/test" class="lk-stack">
+    {#- Rota de console pelo mesmo motivo do preview de prompt: o testador
+         produz um veredito para ler aqui, e o 303 da ponte o descartava. -#}
+    <form method="post" action="/guardrails/test" class="lk-stack">
       <div class="lk-form-grid">
         <div class="lk-field">
           <label for="teste-politica">Política</label>
