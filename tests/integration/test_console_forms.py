@@ -22,10 +22,12 @@ navegador manda, com `Content-Type: application/x-www-form-urlencoded` e
 from __future__ import annotations
 
 import re
+import urllib.parse
 from pathlib import Path
 from typing import Final
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 
 from lukato.interfaces.http.console_forms import form_para_json
@@ -153,3 +155,178 @@ def test_todo_formulario_do_console_aponta_para_um_alvo_traduzivel() -> None:
     assert not fora, "formulario POST fora do alcance da ponte console->API:\n  " + "\n  ".join(
         fora
     )
+
+
+# ---------------------------------------------------------------------------
+# Cada formulario contra o schema do endpoint que ele chama
+# ---------------------------------------------------------------------------
+# Endpoints que leem o corpo inteiro (RootModel ou arquivo enviado), e por isso
+# nao tem propriedades nomeadas para comparar. Cada um com o motivo, para a
+# isencao nao virar um lugar onde se esconde formulario quebrado.
+ISENTOS: Final[dict[str, str]] = {
+    "/api/v1/adwatch/media/{media_id}/transcript": "recebe o JSON inteiro (RootModel) por textarea ou upload; ver _import_payload",
+    "/api/v1/adwatch/media/{media_id}/scenes": "idem transcript",
+    "/api/v1/adwatch/media/{media_id}/ocr": "idem transcript",
+    "/api/v1/adwatch/commercials/bulk": "aceita array puro ou {items, update_existing}; ver o hint do proprio formulario",
+    "/api/v1/prompts/{prompt_id}/preview": "variables e dicionario de chave livre, resolvido por variables[<nome>]",
+}
+
+
+def _rota_do_openapi(app_openapi: dict, acao: str, metodo: str) -> tuple[str, dict] | None:
+    """Casa a `action` do formulario com a rota do OpenAPI e devolve o schema."""
+    concreto = re.sub(r"\{\{[^}]*\}\}", "X", acao)
+    for rota, ops in app_openapi["paths"].items():
+        if not re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", rota), concreto):
+            continue
+        op = ops.get(metodo.lower())
+        corpo = (op or {}).get("requestBody", {}).get("content", {}).get("application/json")
+        if not corpo:
+            continue
+        return rota, _resolver(corpo["schema"], app_openapi)
+    return None
+
+
+def _resolver(esquema: dict, documento: dict) -> dict:
+    """Desembrulha `$ref` e corpo opcional (`anyOf: [Modelo, null]`).
+
+    Sem isto, uma rota de corpo opcional aparece sem propriedade nenhuma e o
+    teste acusa todo campo do formulario como invalido — foi o que aconteceu com
+    `/detect`, que declara `anyOf: [DetectRequest, null]`.
+    """
+    if "$ref" in esquema:
+        alvo: object = documento
+        for parte in esquema["$ref"].lstrip("#/").split("/"):
+            alvo = alvo[parte]  # type: ignore[index]
+        return _resolver(dict(alvo), documento)  # type: ignore[arg-type]
+    for combinador in ("anyOf", "oneOf", "allOf"):
+        for ramo in esquema.get(combinador, []):
+            if ramo.get("type") != "null":
+                return _resolver(ramo, documento)
+    return esquema
+    return None
+
+
+def _tipo_de(propriedade: dict, documento: dict) -> str | None:
+    """Tipo efetivo da propriedade, atravessando `$ref` e `anyOf`."""
+    if not propriedade:
+        return None
+    resolvida = _resolver(propriedade, documento)
+    tipo = resolvida.get("type")
+    return str(tipo) if tipo else None
+
+
+PAGINAS: Final[tuple[str, ...]] = (
+    "/",
+    "/modules",
+    "/prompts",
+    "/guardrails",
+    "/runs",
+    "/knowledge",
+    "/finops",
+    "/observability",
+    "/registry",
+    "/adwatch",
+    "/adwatch/commercials",
+    "/adwatch/detections",
+    "/identity",
+    "/settings",
+)
+
+
+async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
+    client: AsyncClient, app: FastAPI
+) -> None:
+    """Nenhum formulario pode mandar um campo que o endpoint recusa.
+
+    Confere o HTML RENDERIZADO, nao o arquivo de template. A primeira versao deste
+    teste lia os templates e pulava todo `action="{{ form_action }}"` — que e
+    justamente o formulario de cadastro de comercial, o unico que o usuario tinha
+    clicado. O teste passava verde sobre o defeito que existia.
+
+    Alem do nome, confere o TIPO: `keywords` existe em CommercialCreate e e
+    `list[str]`; um input de texto sem `[]` manda a string inteira e o endpoint
+    recusa com `list_type`. Nome certo e tipo errado foi o 422 que so apareceu
+    quando alguem clicou no botao.
+
+    Os nomes passam pela MESMA traducao do middleware (`form_para_json`), entao a
+    convencao — `campo[]`, `pai.filho`, `campo[chave]`, `campo{}` — e verificada
+    de verdade, e nao so escrita na documentacao.
+    """
+    openapi = app.openapi()
+    problemas: list[str] = []
+    conferidos: set[str] = set()
+
+    for rota_pagina in PAGINAS:
+        pagina = await client.get(rota_pagina)
+        assert pagina.status_code == 200, f"{rota_pagina} respondeu {pagina.status_code}"
+        texto = pagina.text
+
+        for achado in re.finditer(r"<form\b[^>]*>(.*?)</form>", texto, re.S):
+            cabeca = achado.group(0)[: achado.group(0).find(">") + 1]
+            if 'method="post"' not in cabeca.lower():
+                continue
+            acao_m = re.search(r'action="([^"]*)"', cabeca)
+            if not acao_m or not acao_m.group(1).startswith("/api/"):
+                continue
+            acao = acao_m.group(1)
+            corpo = achado.group(1)
+            nomes = set(re.findall(r'\bname="([^"]+)"', corpo))
+            metodo_m = re.search(r'name="_method"\s+value="(\w+)"', corpo)
+            metodo = metodo_m.group(1).upper() if metodo_m else "POST"
+            nomes.discard("_method")
+            if not nomes:
+                continue
+
+            casado = _rota_do_openapi(openapi, acao, metodo)
+            if not casado:
+                continue
+            rota, esquema = casado
+            if rota in ISENTOS:
+                continue
+
+            simulado = "&".join(
+                f"{urllib.parse.quote(n)}=" + urllib.parse.quote("{}" if n.endswith("{}") else "x")
+                for n in sorted(nomes)
+            )
+            traduzido, _ = form_para_json(simulado.encode())
+            propriedades = esquema.get("properties", {})
+            props = set(propriedades)
+            conferidos.add(f"{metodo} {rota}")
+
+            sobrando = set(traduzido) - props
+            if sobrando:
+                problemas.append(
+                    f"{rota_pagina} ({metodo} {rota}) manda {sorted(sobrando)}, que o schema "
+                    f"nao aceita. Campos validos: {sorted(props)[:8]}"
+                )
+
+            for campo, valor in traduzido.items():
+                tipo = _tipo_de(propriedades.get(campo, {}), openapi)
+                if tipo == "array" and not isinstance(valor, list):
+                    problemas.append(
+                        f"{rota_pagina} ({metodo} {rota}) manda '{campo}' como texto, mas o "
+                        f"schema quer LISTA. Renomeie o input para '{campo}[]'."
+                    )
+                if tipo == "object" and not isinstance(valor, dict):
+                    problemas.append(
+                        f"{rota_pagina} ({metodo} {rota}) manda '{campo}' como texto, mas o "
+                        f"schema quer OBJETO. Use '{campo}.<subcampo>', '{campo}[<chave>]' "
+                        f"ou '{campo}{{}}' se a tela pedir o JSON inteiro."
+                    )
+
+    # Piso numerico e fragil: quantos formularios existem depende de quantas linhas
+    # o seed criou. O que precisa estar coberto sao as rotas de escrita, nomeadas.
+    # Sem isto o teste passa verde quando o casamento de rota para de funcionar.
+    obrigatorias = {
+        "POST /api/v1/adwatch/commercials",
+        "POST /api/v1/modules",
+        "POST /api/v1/identity/users",
+        "POST /api/v1/guardrails",
+        "POST /api/v1/prompts",
+    }
+    faltando = obrigatorias - conferidos
+    assert not faltando, (
+        f"estas rotas de escrita nao foram conferidas: {sorted(faltando)}. "
+        f"Conferidas: {sorted(conferidos)}"
+    )
+    assert not problemas, "formulario incompativel com o endpoint:\n  " + "\n  ".join(problemas)

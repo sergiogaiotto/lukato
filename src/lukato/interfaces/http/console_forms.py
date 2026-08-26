@@ -52,6 +52,7 @@ O QUE ELE FAZ
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Final
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -64,6 +65,7 @@ from lukato.config import get_logger
 
 __all__ = [
     "CAMPO_METODO",
+    "MARCA_CONSOLE",
     "ConsoleFormMiddleware",
     "form_para_json",
 ]
@@ -78,6 +80,7 @@ _VERBOS_PERMITIDOS: Final[frozenset[str]] = frozenset({"PUT", "PATCH", "DELETE"}
 cliente: um formulario forjado nao pode escolher qualquer verbo."""
 
 _FORM_MIME: Final[str] = "application/x-www-form-urlencoded"
+_MULTIPART_MIME: Final[str] = "multipart/form-data"
 
 _VERDADEIROS: Final[frozenset[str]] = frozenset({"true", "on", "1", "yes", "sim"})
 _FALSOS: Final[frozenset[str]] = frozenset({"false", "off", "0", "no", "nao"})
@@ -85,6 +88,20 @@ _FALSOS: Final[frozenset[str]] = frozenset({"false", "off", "0", "no", "nao"})
 _TAMANHO_MAXIMO: Final[int] = 1 * 1024 * 1024
 """1 MiB. Um formulario do console nao chega perto; o limite existe para o corpo
 nao ser lido inteiro na memoria quando alguem manda outra coisa."""
+
+MARCA_CONSOLE: Final[str] = "console_form"
+"""Marca deixada em `request.state` quando a requisicao veio de um formulario.
+
+O tratador de erro decidia HTML x JSON so pelo prefixo do caminho: tudo sob
+`/api/` respondia JSON. A regra estava certa quando so cliente de API postava
+ali. Com esta ponte, o NAVEGADOR tambem posta em `/api/v1/...` — e um slug
+repetido devolvia ao usuario a tela
+
+    {"error":{"code":"conflict","message":"Ja existe o prompt ..."}}
+
+texto cru, sem moldura e sem caminho de volta, depois de clicar em Salvar. O
+prefixo nao distingue mais os dois clientes; esta marca distingue.
+"""
 
 _PARAM_AVISO: Final[str] = "ok"
 """Query param do aviso de sucesso. Escolhido em vez de sessao ou cookie porque
@@ -107,6 +124,200 @@ def _valor(bruto: str) -> Any:
     return texto
 
 
+# --------------------------------------------------------------------------
+# A convencao de nome de campo
+#
+# HTML nao tem tipo: todo campo e uma string plana, e `name` e o unico lugar
+# onde da para dizer mais. Os schemas, do outro lado, tem lista, objeto
+# aninhado, dicionario de chave livre e lista de objetos. A ponte e uma
+# convencao NO NOME, declarada no template ao lado do input:
+#
+#     keywords[]              lista, quebrada por virgula (ou repetida)
+#     binding.model           objeto aninhado: {"binding": {"model": ...}}
+#     variables[empresa]      dicionario de chave livre
+#     variables{}             o proprio valor e JSON, digitado numa textarea
+#     rules[0].kind           lista de objetos: {"rules": [{"kind": ...}]}
+#
+# E a convencao de Rails e PHP, escolhida por ser conhecida e por caber no
+# atributo `name` — sem campo escondido, sem JavaScript, sem uma tabela de
+# tipos separada que ia divergir do schema no primeiro campo novo.
+#
+# Colchete com numero so e INDICE quando vem seguido de mais caminho
+# (`rules[0].kind`). No fim do nome ele e chave de dicionario (`variables[2]`
+# e a chave "2"). Sem essa regra os dois casos seriam indistinguiveis.
+# --------------------------------------------------------------------------
+_FINAL_LISTA = re.compile(r"^(?P<campo>[^.\[\]{}]+)\[\]$")
+_FINAL_JSON = re.compile(r"^(?P<campo>[^.\[\]{}]+)\{\}$")
+_FINAL_CHAVE = re.compile(r"^(?P<campo>[^.\[\]{}]+)\[(?P<chave>[^\]]+)\]$")
+_INDICE = re.compile(r"^(?P<campo>[^.\[\]{}]+)\[(?P<indice>\d+)\]$")
+
+CHAVE_ANCORA: Final[str] = "id"
+"""Chave que ancora uma entrada de lista indexada.
+
+O editor de politicas documenta, no proprio template, duas frases: "apagar o
+identificador remove a regra ao salvar" e, na linha nova, "em branco, a linha e
+ignorada ao salvar". As duas sao a mesma regra — uma entrada que chega sem `id`
+e descartada — e e assim que se apaga uma regra sem JavaScript.
+
+So vale para lista cujo formulario DECLARA um campo `id`; sem isso as entradas
+passam todas. Uma lista de objetos sem identificador seria esvaziada em silencio
+pela regra acima, que e o pior desfecho possivel para quem clicou em salvar.
+"""
+
+
+class _Indexada(dict[int, dict[str, Any]]):
+    """Lista de objetos em construcao, ainda endereçada por indice.
+
+    Os campos chegam fora de ordem e com buracos (`rules[0]`, `rules[2]`), entao
+    a lista so vira lista no fim, em `_compactar`. `ancorada` lembra se o
+    formulario chegou a declarar `id` para alguma entrada.
+    """
+
+    ancorada: bool = False
+
+
+def _lista(bruto: str) -> list[str]:
+    """Quebra `"a, b , c"` em `["a", "b", "c"]`, sem vazios."""
+    return [pedaco.strip() for pedaco in bruto.split(",") if pedaco.strip()]
+
+
+def _descer(
+    dados: dict[str, Any], caminho: list[str], *, criando: bool
+) -> tuple[dict[str, Any] | None, _Indexada | None]:
+    """Percorre o caminho ate o dicionario que hospeda a folha.
+
+    Devolve tambem a lista indexada mais interna do caminho, quando existe, para
+    quem chamou poder marcar `ancorada`. `criando=False` nao inventa nivel
+    nenhum: e o modo do campo vazio, que so precisa remover o que ja esta la.
+    """
+    atual = dados
+    ancora: _Indexada | None = None
+    for segmento in caminho:
+        if achado := _INDICE.match(segmento):
+            campo, indice = achado["campo"], int(achado["indice"])
+            lista = atual.setdefault(campo, _Indexada()) if criando else atual.get(campo)
+            if not isinstance(lista, _Indexada):
+                return None, None
+            ancora = lista
+            if criando:
+                atual = lista.setdefault(indice, {})
+            elif indice in lista:
+                atual = lista[indice]
+            else:
+                return None, None
+            continue
+        filho = atual.setdefault(segmento, {}) if criando else atual.get(segmento)
+        if not isinstance(filho, dict):
+            return None, None
+        atual = filho
+    return atual, ancora
+
+
+def _pousar(alvo: dict[str, Any], folha: str, bruto: str) -> None:
+    """Grava a folha no dicionario que a hospeda, lendo a forma do nome."""
+    if achado := _FINAL_LISTA.match(folha):
+        # Acumula: `tools[]` pode vir de um campo com virgulas OU de varias
+        # caixas de selecao com o mesmo nome, e as duas formas sao HTML legitimo.
+        anterior = alvo.get(achado["campo"])
+        itens = list(anterior) if isinstance(anterior, list) else []
+        itens.extend(_lista(bruto))
+        alvo[achado["campo"]] = itens
+        return
+
+    if achado := _FINAL_JSON.match(folha):
+        # Campo que carrega JSON digitado a mao (uma textarea de variaveis, um
+        # lote de itens). JSON malformado NAO e engolido: fica como string e o
+        # Pydantic recusa com a mensagem dele, que diz o campo e o motivo. Um
+        # `except: pass` aqui mandaria o texto cru adiante e o erro apareceria
+        # tres camadas depois, sem dizer que o usuario digitou JSON invalido.
+        try:
+            alvo[achado["campo"]] = json.loads(bruto)
+        except json.JSONDecodeError:
+            alvo[achado["campo"]] = bruto
+        return
+
+    if achado := _FINAL_CHAVE.match(folha):
+        dicionario = alvo.setdefault(achado["campo"], {})
+        if isinstance(dicionario, dict):
+            dicionario[achado["chave"]] = _valor(bruto)
+        return
+
+    alvo[folha] = _valor(bruto)
+
+
+def _nome_da_folha(folha: str) -> str:
+    """Nome do campo de uma folha, descontando a forma (`config{}` -> `config`)."""
+    for regex in (_FINAL_LISTA, _FINAL_JSON, _FINAL_CHAVE):
+        if achado := regex.match(folha):
+            return achado["campo"]
+    return folha
+
+
+def _acomodar(dados: dict[str, Any], chave: str, bruto: str) -> None:
+    """Guarda um campo, entendendo as formas de nome descritas acima."""
+    *caminho, folha = chave.split(".")
+    alvo, ancora = _descer(dados, caminho, criando=True)
+    if alvo is None:
+        return
+    if ancora is not None and _nome_da_folha(folha) == CHAVE_ANCORA:
+        ancora.ancorada = True
+    _pousar(alvo, folha, bruto)
+
+
+def _esvaziar(dados: dict[str, Any], chave: str) -> None:
+    """Remove um campo vazio, respeitando as mesmas formas de nome.
+
+    Poda os niveis que ficaram vazios ao longo do caminho: um `binding.model` em
+    branco nao pode deixar para tras um `{"binding": {}}` que o schema veria como
+    "o usuario mandou um binding vazio" em vez de "o usuario nao mexeu nisso".
+    """
+    *caminho, folha = chave.split(".")
+    alvo, ancora = _descer(dados, caminho, criando=False)
+    if ancora is not None and _nome_da_folha(folha) == CHAVE_ANCORA:
+        # Marca mesmo em branco: e exatamente assim que se apaga uma regra.
+        ancora.ancorada = True
+    if alvo is None:
+        return
+    alvo.pop(_nome_da_folha(folha), None)
+    _podar(dados, caminho)
+
+
+def _podar(dados: dict[str, Any], caminho: list[str]) -> None:
+    """Descarta, de dentro para fora, os niveis do caminho que ficaram vazios."""
+    for fim in range(len(caminho), 0, -1):
+        pai, _ = _descer(dados, caminho[: fim - 1], criando=False)
+        if pai is None:
+            return
+        segmento = caminho[fim - 1]
+        if achado := _INDICE.match(segmento):
+            lista = pai.get(achado["campo"])
+            if isinstance(lista, _Indexada) and not lista.get(int(achado["indice"])):
+                lista.pop(int(achado["indice"]), None)
+                if not lista:
+                    pai.pop(achado["campo"], None)
+            continue
+        if pai.get(segmento) == {}:
+            pai.pop(segmento, None)
+
+
+def _compactar(valor: Any) -> Any:
+    """Transforma as listas indexadas em listas de verdade, na ordem do indice.
+
+    Entrada sem `id` cai fora quando o formulario declarou `id` para a lista —
+    ver `CHAVE_ANCORA`. O buraco de indice nao vira `null`: `rules[0]` e
+    `rules[2]` viram uma lista de dois, porque quem apagou a regra do meio
+    espera uma politica com duas regras, nao uma com um furo.
+    """
+    if isinstance(valor, _Indexada):
+        entradas = [_compactar(entrada) for _, entrada in sorted(valor.items())]
+        if valor.ancorada:
+            entradas = [entrada for entrada in entradas if entrada.get(CHAVE_ANCORA)]
+        return entradas
+    if isinstance(valor, dict):
+        return {chave: _compactar(item) for chave, item in valor.items()}
+    return valor
+
+
 def form_para_json(corpo: bytes) -> tuple[dict[str, Any], str | None]:
     """Traduz um corpo form-urlencoded em `(dados, metodo_pedido)`.
 
@@ -121,10 +332,10 @@ def form_para_json(corpo: bytes) -> tuple[dict[str, Any], str | None]:
             metodo = bruto.strip().upper()
             continue
         if not bruto.strip():
-            dados.pop(chave, None)
+            _esvaziar(dados, chave)
             continue
-        dados[chave] = _valor(bruto)
-    return dados, metodo
+        _acomodar(dados, chave, bruto)
+    return _compactar(dados), metodo
 
 
 def _quer_html(cabecalhos: Headers) -> bool:
@@ -167,7 +378,18 @@ class ConsoleFormMiddleware:
 
         cabecalhos = Headers(scope=scope)
         tipo = cabecalhos.get("content-type", "")
-        if not tipo.startswith(_FORM_MIME) or not scope["path"].startswith(self.prefixo):
+        do_console = scope["path"].startswith(self.prefixo)
+
+        # Formulario multipart (upload de arquivo): o corpo NAO e traduzido — os
+        # endpoints de importacao ja leem multipart nativamente. O que faltava era
+        # o outro lado: sem isto o usuario terminava a importacao olhando o JSON
+        # da resposta, com a URL parada em /api/v1/..., e o F5 reenviava o arquivo.
+        if do_console and tipo.startswith(_MULTIPART_MIME) and _quer_html(cabecalhos):
+            _marcar(scope)
+            await self.app(scope, receive, _Redirecionador(send, cabecalhos=cabecalhos))
+            return
+
+        if not tipo.startswith(_FORM_MIME) or not do_console:
             await self.app(scope, receive, send)
             return
 
@@ -180,6 +402,7 @@ class ConsoleFormMiddleware:
         novo_corpo = json.dumps(dados).encode("utf-8")
 
         novo_scope = dict(scope)
+        _marcar(novo_scope)
         if pedido in _VERBOS_PERMITIDOS:
             novo_scope["method"] = pedido
         novos_cabecalhos = MutableHeaders(scope=novo_scope)
@@ -197,6 +420,23 @@ class ConsoleFormMiddleware:
         origem = cabecalhos
         enviador = _Redirecionador(send, cabecalhos=origem) if html else send
         await self.app(novo_scope, _corpo_unico(novo_corpo), enviador)
+
+
+def _marcar(scope: Scope) -> None:
+    """Anota no `state` do scope que esta requisicao nasceu de um formulario.
+
+    `scope["state"]` e o mesmo dicionario que vira `request.state`; o Starlette o
+    cria por requisicao. Se ele nao existir (scope montado a mao num teste), a
+    marca simplesmente nao acontece e o comportamento antigo vale.
+    """
+    estado = scope.get("state")
+    if not isinstance(estado, dict):
+        # O ASGI so obriga `state` quando o lifespan publicou algum; o Starlette
+        # o cria sob demanda em `Request.state`. Criar aqui garante que a marca
+        # chegue ao tratador de erro em qualquer servidor.
+        estado = {}
+        scope["state"] = estado
+    estado[MARCA_CONSOLE] = True
 
 
 async def _ler_corpo(receive: Receive) -> bytes | None:

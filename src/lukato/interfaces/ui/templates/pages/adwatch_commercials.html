@@ -229,7 +229,7 @@
               <input
                 class="lk-input"
                 id="commercial-keywords"
-                name="keywords"
+                name="keywords[]"
                 type="text"
                 value="{{ editing.keywords | join(', ') if editing else '' }}"
                 placeholder="200 GB, R$ 79,90, internet"
@@ -244,7 +244,7 @@
               <input
                 class="lk-input"
                 id="commercial-phrases"
-                name="key_phrases"
+                name="key_phrases[]"
                 type="text"
                 value="{{ editing.key_phrases | join(', ') if editing else '' }}"
                 placeholder="aproveite muito mais, sua internet"

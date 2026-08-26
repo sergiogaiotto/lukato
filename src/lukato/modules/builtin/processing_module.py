@@ -300,19 +300,26 @@ class ProcessingModule(BaseModule):
         """Publica os itens do agente generico na secao FUNCIONALIDADE."""
         return UIDescriptor(
             nav=[
+                # `/modules/{slug}` recebe o slug de uma INSTANCIA de modulo, e
+                # `processing` e o nome da implementacao, nao de uma instancia:
+                # as instancias que rodam este codigo nascem com nome de dominio
+                # (`assistente`, `triagem`). O item apontava para
+                # `/modules/processing` e dava 404 em toda pagina do console —
+                # e o unico link quebrado do menu. `?kind=agent` lista
+                # exatamente as instancias deste agente generico, que e o que o
+                # item sempre quis mostrar.
+                #
+                # O segundo item, "Execucoes do agente" -> `/runs?module=processing`,
+                # saiu pelo mesmo motivo: `module` filtra por slug de instancia,
+                # entao a lista chegava sempre vazia. Um filtro por implementacao
+                # nao existe hoje, e "Execucoes" no nivel da plataforma ja leva a
+                # `/runs` — o item era, na melhor das hipoteses, uma duplicata.
                 UINavItem(
                     label="Processamento",
                     icon="blocks",
-                    endpoint="/modules/processing",
+                    endpoint="/modules?kind=agent",
                     section="FUNCIONALIDADE",
                     order=20,
-                ),
-                UINavItem(
-                    label="Execucoes do agente",
-                    icon="activity",
-                    endpoint="/runs?module=processing",
-                    section="FUNCIONALIDADE",
-                    order=25,
                 ),
             ],
             center_template="pages/modules_detail.html",

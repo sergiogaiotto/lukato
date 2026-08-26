@@ -93,6 +93,7 @@ __all__ = [
     "SetModuleStatus",
     "UpdateModule",
     "authorize",
+    "class_candidates",
 ]
 
 _logger = get_logger(__name__)
@@ -123,6 +124,27 @@ def _clip(text: str, limit: int = MAX_STEP_TEXT_CHARS) -> str:
     if len(text) <= limit:
         return text
     return f"{text[:limit]}..."
+
+
+def class_candidates(definition: ModuleDefinition) -> list[str]:
+    """Slugs de building block que podem atender a definicao, na ordem de busca.
+
+    A definicao (`assistente`) e a classe (`processing`) sao coisas diferentes:
+    duas definicoes rodam sobre a mesma classe, com bindings distintos. Quem
+    invoca sempre soube disso; o painel do console nao — ele procurava a classe
+    pelo slug da DEFINICAO e, nao achando, escrevia "nenhuma classe registrada
+    com este slug; a invocacao precisa de um building block no Registry". O aviso
+    aparecia em todo modulo cuja definicao tem nome de dominio, e era falso: a
+    invocacao funcionava. Com a regra num lugar so, painel e invocacao nao tem
+    como divergir de novo.
+    """
+    candidatos = [
+        valor.strip()
+        for chave in CLASS_CONFIG_KEYS
+        if isinstance(valor := definition.config.get(chave), str) and valor.strip()
+    ]
+    candidatos.append(definition.slug)
+    return candidatos
 
 
 def authorize(principal: Principal, permission: Permission, action: str) -> None:
@@ -1052,12 +1074,7 @@ class InvokeModule(_UseCase):
     def _resolve_module(self, definition: ModuleDefinition) -> BaseModule:
         """Instancia a classe do building block que atende a definicao."""
         registry = self._container.registry
-        candidates: list[str] = []
-        for key in CLASS_CONFIG_KEYS:
-            value = definition.config.get(key)
-            if isinstance(value, str) and value.strip():
-                candidates.append(value.strip())
-        candidates.append(definition.slug)
+        candidates = class_candidates(definition)
         for candidate in candidates:
             if candidate in registry:
                 return registry.instantiate(candidate)

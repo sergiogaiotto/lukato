@@ -22,6 +22,11 @@
   * filtros — `GET /guardrails`.
   * editor  — politica nova vai para `POST /api/v1/guardrails`; politica em
               edicao vai para `/api/v1/guardrails/{id}` com `_method=put`.
+                 As regras viajam INDEXADAS — `rules[0].kind`, `rules[1].id` —
+                 porque `PolicyCreate.rules` e uma lista de objetos e HTML nao
+                 sabe expressar isso sozinho. A linha nova usa o indice
+                 seguinte ao da ultima regra existente, e uma entrada que
+                 chega sem `id` e descartada: e assim que se apaga uma regra.
               Campos da politica: `slug`, `name`, `description`, `stage`,
               `is_active`, `fail_open`.
               As regras viajam em **listas paralelas**: `rule_id`, `rule_kind`,
@@ -280,7 +285,7 @@
                 class="lk-input lk-input--mono"
                 type="text"
                 id="regra-id-{{ loop.index }}"
-                name="rule_id"
+                name="rules[{{ loop.index0 }}].id"
                 value="{{ rule.id }}"
               />
               <span class="lk-field__hint">Apagar o identificador remove a regra ao salvar.</span>
@@ -288,7 +293,7 @@
 
             <div class="lk-field">
               <label for="regra-tipo-{{ loop.index }}">Tipo</label>
-              <select class="lk-select" id="regra-tipo-{{ loop.index }}" name="rule_kind">
+              <select class="lk-select" id="regra-tipo-{{ loop.index }}" name="rules[{{ loop.index0 }}].kind">
                 {% for tipo in tipos %}
                   <option value="{{ tipo }}" {{ 'selected' if tipo == rule.kind.value }}>
                     {{ tipo }}
@@ -302,7 +307,7 @@
 
             <div class="lk-field">
               <label for="regra-acao-{{ loop.index }}">Ação</label>
-              <select class="lk-select" id="regra-acao-{{ loop.index }}" name="rule_action">
+              <select class="lk-select" id="regra-acao-{{ loop.index }}" name="rules[{{ loop.index0 }}].action">
                 {% for acao in acoes %}
                   <option value="{{ acao }}" {{ 'selected' if acao == rule.action.value }}>
                     {{ acao }}
@@ -313,7 +318,7 @@
 
             <div class="lk-field">
               <label for="regra-gravidade-{{ loop.index }}">Gravidade</label>
-              <select class="lk-select" id="regra-gravidade-{{ loop.index }}" name="rule_severity">
+              <select class="lk-select" id="regra-gravidade-{{ loop.index }}" name="rules[{{ loop.index0 }}].severity">
                 {% for gravidade in gravidades %}
                   <option value="{{ gravidade }}" {{ 'selected' if gravidade == rule.severity.value }}>
                     {{ gravidade }}
@@ -328,7 +333,7 @@
                 class="lk-input"
                 type="number"
                 id="regra-ordem-{{ loop.index }}"
-                name="rule_order"
+                name="rules[{{ loop.index0 }}].order"
                 step="1"
                 value="{{ rule.order }}"
               />
@@ -336,7 +341,7 @@
 
             <div class="lk-field">
               <label for="regra-ligada-{{ loop.index }}">Situação</label>
-              <select class="lk-select" id="regra-ligada-{{ loop.index }}" name="rule_enabled">
+              <select class="lk-select" id="regra-ligada-{{ loop.index }}" name="rules[{{ loop.index0 }}].enabled">
                 <option value="true" {{ 'selected' if rule.enabled }}>ligada</option>
                 <option value="false" {{ 'selected' if not rule.enabled }}>desligada</option>
               </select>
@@ -349,7 +354,7 @@
               class="lk-input"
               type="text"
               id="regra-mensagem-{{ loop.index }}"
-              name="rule_message"
+              name="rules[{{ loop.index0 }}].message"
               value="{{ rule.message }}"
               placeholder="Texto mostrado quando a regra dispara."
             />
@@ -360,7 +365,7 @@
             <textarea
               class="lk-textarea"
               id="regra-config-{{ loop.index }}"
-              name="rule_config"
+              name="rules[{{ loop.index0 }}].config{}"
               rows="3"
               spellcheck="false"
             >{{ rule.config | json_pretty }}</textarea>
@@ -368,6 +373,7 @@
         </details>
       {% endfor %}
 
+      {% set indice_novo = (policy_atual.rules | length) if policy_atual else 0 %}
       <details class="lk-details" open>
         <summary>Nova regra</summary>
         <div class="lk-form-grid">
@@ -377,7 +383,7 @@
               class="lk-input lk-input--mono"
               type="text"
               id="regra-nova-id"
-              name="rule_id"
+              name="rules[{{ indice_novo }}].id"
               value=""
               placeholder="pii"
             />
@@ -386,7 +392,7 @@
 
           <div class="lk-field">
             <label for="regra-nova-tipo">Tipo</label>
-            <select class="lk-select" id="regra-nova-tipo" name="rule_kind">
+            <select class="lk-select" id="regra-nova-tipo" name="rules[{{ indice_novo }}].kind">
               {% for tipo in tipos %}
                 <option value="{{ tipo }}">{{ tipo }}</option>
               {% endfor %}
@@ -398,7 +404,7 @@
 
           <div class="lk-field">
             <label for="regra-nova-acao">Ação</label>
-            <select class="lk-select" id="regra-nova-acao" name="rule_action">
+            <select class="lk-select" id="regra-nova-acao" name="rules[{{ indice_novo }}].action">
               {% for acao in acoes %}
                 <option value="{{ acao }}" {{ 'selected' if acao == 'block' }}>{{ acao }}</option>
               {% endfor %}
@@ -407,7 +413,7 @@
 
           <div class="lk-field">
             <label for="regra-nova-gravidade">Gravidade</label>
-            <select class="lk-select" id="regra-nova-gravidade" name="rule_severity">
+            <select class="lk-select" id="regra-nova-gravidade" name="rules[{{ indice_novo }}].severity">
               {% for gravidade in gravidades %}
                 <option value="{{ gravidade }}" {{ 'selected' if gravidade == 'medium' }}>
                   {{ gravidade }}
@@ -422,7 +428,7 @@
               class="lk-input"
               type="number"
               id="regra-nova-ordem"
-              name="rule_order"
+              name="rules[{{ indice_novo }}].order"
               step="1"
               value="{{ (policy_atual.rules | length) + 1 if policy_atual else 1 }}"
             />
@@ -430,7 +436,7 @@
 
           <div class="lk-field">
             <label for="regra-nova-ligada">Situação</label>
-            <select class="lk-select" id="regra-nova-ligada" name="rule_enabled">
+            <select class="lk-select" id="regra-nova-ligada" name="rules[{{ indice_novo }}].enabled">
               <option value="true" selected>ligada</option>
               <option value="false">desligada</option>
             </select>
@@ -443,7 +449,7 @@
             class="lk-input"
             type="text"
             id="regra-nova-mensagem"
-            name="rule_message"
+            name="rules[{{ indice_novo }}].message"
             value=""
             placeholder="Texto mostrado quando a regra dispara."
           />
@@ -454,7 +460,7 @@
           <textarea
             class="lk-textarea"
             id="regra-nova-config"
-            name="rule_config"
+            name="rules[{{ indice_novo }}].config{}"
             rows="3"
             spellcheck="false"
           >{}</textarea>

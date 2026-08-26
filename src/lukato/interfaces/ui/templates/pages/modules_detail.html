@@ -120,7 +120,7 @@
       <div class="lk-binding">
         <div class="lk-field">
           <label for="guardrail-entrada">Guardrail de entrada</label>
-          <select class="lk-select" id="guardrail-entrada" name="input_guardrail_id">
+          <select class="lk-select" id="guardrail-entrada" name="binding.input_guardrail_id">
             <option value="">sem guardrail de entrada</option>
             {% for policy in input_policies %}
               <option
@@ -142,7 +142,7 @@
 
         <div class="lk-field">
           <label for="system-prompt">System prompt</label>
-          <select class="lk-select" id="system-prompt" name="system_prompt_id">
+          <select class="lk-select" id="system-prompt" name="binding.system_prompt_id">
             <option value="">sem system prompt</option>
             {% for prompt in prompts %}
               <option value="{{ prompt.id }}" {{ 'selected' if prompt.id == binding.system_prompt_id }}>
@@ -163,7 +163,7 @@
 
         <div class="lk-field">
           <label for="guardrail-saida">Guardrail de saída</label>
-          <select class="lk-select" id="guardrail-saida" name="output_guardrail_id">
+          <select class="lk-select" id="guardrail-saida" name="binding.output_guardrail_id">
             <option value="">sem guardrail de saída</option>
             {% for policy in output_policies %}
               <option
@@ -191,7 +191,7 @@
             class="lk-input lk-input--mono"
             type="text"
             id="binding-modelo"
-            name="model"
+            name="binding.model"
             value="{{ binding.model or '' }}"
             placeholder="padrão do provedor"
           />
@@ -203,7 +203,7 @@
             class="lk-input"
             type="number"
             id="binding-temperatura"
-            name="temperature"
+            name="binding.temperature"
             min="0"
             max="2"
             step="0.05"
@@ -219,7 +219,7 @@
             class="lk-input"
             type="number"
             id="binding-tokens"
-            name="max_tokens"
+            name="binding.max_tokens"
             min="1"
             max="8192"
             step="1"
@@ -234,7 +234,7 @@
             class="lk-input"
             type="number"
             id="binding-timeout"
-            name="timeout_seconds"
+            name="binding.timeout_seconds"
             min="1"
             step="1"
             value="{{ binding.timeout_seconds }}"
@@ -268,7 +268,7 @@
             class="lk-input lk-input--mono"
             type="text"
             id="binding-ferramentas"
-            name="tools"
+            name="binding.tools[]"
             value="{{ binding.tools | join(', ') }}"
             placeholder="nenhuma"
           />
@@ -304,7 +304,7 @@
         <textarea
           class="lk-textarea"
           id="invoke-variaveis"
-          name="variables"
+          name="variables{}"
           rows="3"
           spellcheck="false"
           placeholder='{"canal": "app"}'
