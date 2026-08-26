@@ -22,7 +22,11 @@
   * editor     — prompt novo vai para `POST /api/v1/prompts`; prompt em edicao
                  vai para `/api/v1/prompts/{id}` com `_method=put`, que **gera uma
                  versao nova** em vez de sobrescrever. Campos: `slug`, `name`,
-                 `description`, `role`, `template`, `labels`, `is_active`.
+                 `description`, `role`, `template`, `labels[]`, `is_active`.
+                 `labels[]` e a convencao de nome que a borda le como lista:
+                 o campo e um so, com virgulas, e chega no schema como
+                 `list[str]`. Sem o `[]` viria a string inteira e o Pydantic
+                 recusaria com `list_type`.
   * preview    — `POST /api/v1/prompts/{id}/preview`. Cada variavel viaja em um
                  campo `var:<nome>` e a borda junta tudo em `variables`.
 
@@ -222,7 +226,7 @@
               class="lk-input"
               type="text"
               id="prompt-labels"
-              name="labels"
+              name="labels[]"
               value="{{ prompt_atual.labels | join(', ') if prompt_atual else '' }}"
               placeholder="suporte, revisado"
             />
@@ -303,7 +307,7 @@
                     class="lk-input"
                     type="text"
                     id="var-{{ loop.index }}"
-                    name="var:{{ variable }}"
+                    name="variables[{{ variable }}]"
                     placeholder="valor de {{ variable }}"
                   />
                 </div>

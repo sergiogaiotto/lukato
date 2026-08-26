@@ -29,6 +29,7 @@ from lukato.config import get_logger
 from lukato.domain.errors import GuardrailViolation, LukatoError
 from lukato.domain.models.guardrail import GuardrailFinding
 from lukato.domain.types import Json
+from lukato.interfaces.http.console_forms import MARCA_CONSOLE
 
 __all__ = [
     "GENERIC_MESSAGE",
@@ -123,11 +124,15 @@ def _quer_html(request: Request) -> bool:
     volta. A negociacao e por `Accept` **e** por prefixo: um cliente de API que
     aceite `*/*` continua recebendo JSON.
     """
-    caminho = request.url.path
-    if caminho.startswith(_CAMINHOS_DE_API):
-        return False
     aceita = request.headers.get("accept", "")
-    return "text/html" in aceita
+    if "text/html" not in aceita:
+        return False
+    # Formulario do console: posta em `/api/v1/...` mas quem esta do outro lado e
+    # uma pessoa num navegador, nao um cliente de API. A marca vem do
+    # `ConsoleFormMiddleware`, unico lugar que sabe distinguir os dois.
+    if getattr(request.state, MARCA_CONSOLE, False):
+        return True
+    return not request.url.path.startswith(_CAMINHOS_DE_API)
 
 
 async def _pagina_de_erro(
@@ -182,7 +187,28 @@ def _details_of(exc: LukatoError) -> Json:
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
-async def _handle_lukato_error(request: Request, exc: Exception) -> JSONResponse:
+async def _responder(
+    request: Request, *, status_code: int, code: str, message: str, details: Json | None = None
+) -> Response:
+    """Resposta de erro na moldura certa para quem pediu.
+
+    A negociacao morava so no tratador de `HTTPException`, entao 404 e 405 viravam
+    pagina e o RESTO nao. Justamente o resto e o que um formulario produz: slug
+    repetido e `409 conflict`, campo fora do schema e `422 validation_error`. Era
+    esse o JSON cru que aparecia depois de clicar em Salvar. Negociar aqui, no
+    unico ponto por onde todos os erros passam, fecha a classe inteira em vez de
+    um caso.
+    """
+    if _quer_html(request):
+        pagina = await _pagina_de_erro(
+            request, status_code=status_code, code=code, message=message, details=details
+        )
+        if pagina is not None:
+            return pagina
+    return _respond(request, status_code=status_code, code=code, message=message, details=details)
+
+
+async def _handle_lukato_error(request: Request, exc: Exception) -> Response:
     """Traduz um erro de dominio no envelope, preservando `code` e `http_status`."""
     error = exc if isinstance(exc, LukatoError) else LukatoError(str(exc))
     details = _details_of(error)
@@ -198,7 +224,7 @@ async def _handle_lukato_error(request: Request, exc: Exception) -> JSONResponse
         message=error.message,
         details=details,
     )
-    return _respond(
+    return await _responder(
         request,
         status_code=error.http_status,
         code=error.code,
@@ -207,7 +233,7 @@ async def _handle_lukato_error(request: Request, exc: Exception) -> JSONResponse
     )
 
 
-async def _handle_validation_error(request: Request, exc: Exception) -> JSONResponse:
+async def _handle_validation_error(request: Request, exc: Exception) -> Response:
     """Traduz a recusa do pydantic em `422 validation_error` com os erros de campo."""
     raw_errors = exc.errors() if isinstance(exc, RequestValidationError) else []
     errors = jsonable_encoder(raw_errors)
@@ -220,7 +246,7 @@ async def _handle_validation_error(request: Request, exc: Exception) -> JSONResp
         path=request.url.path,
         errors=errors,
     )
-    return _respond(
+    return await _responder(
         request,
         status_code=422,
         code=VALIDATION_ERROR_CODE,
@@ -246,23 +272,17 @@ async def _handle_http_exception(request: Request, exc: Exception) -> Response:
         route=_route(request),
         path=request.url.path,
     )
-    if _quer_html(request):
-        pagina = await _pagina_de_erro(
-            request, status_code=status_code, code=code, message=message, details=details
-        )
-        if pagina is not None:
-            for chave, valor in headers.items():
-                pagina.headers.setdefault(chave, valor)
-            return pagina
-    response = _respond(
+    response = await _responder(
         request, status_code=status_code, code=code, message=message, details=details
     )
+    # `setdefault`: um cabecalho que a pagina ja definiu (CSP, por exemplo) vence
+    # o do erro; `WWW-Authenticate` e `Allow`, que so o erro tem, entram.
     for name, value in headers.items():
-        response.headers[str(name)] = str(value)
+        response.headers.setdefault(str(name), str(value))
     return response
 
 
-async def _handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+async def _handle_unexpected(request: Request, exc: Exception) -> Response:
     """Ultimo anteparo: registra o traceback e devolve `500` sem vazar nada."""
     request_id = _request_id(request)
     _logger.exception(
@@ -273,7 +293,7 @@ async def _handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
         path=request.url.path,
         error=f"{type(exc).__name__}: {exc}",
     )
-    return _respond(
+    return await _responder(
         request,
         status_code=500,
         code=INTERNAL_ERROR_CODE,

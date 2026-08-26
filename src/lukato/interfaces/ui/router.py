@@ -76,7 +76,7 @@ from lukato.application.use_cases.knowledge import (
     ListCollections,
     ListDocuments,
 )
-from lukato.application.use_cases.modules import GetModule, ListModules
+from lukato.application.use_cases.modules import GetModule, ListModules, class_candidates
 from lukato.application.use_cases.prompts import ListPrompts, PromptFilter
 from lukato.application.use_cases.runs import GetRun, GetRunSteps, ListRuns
 from lukato.config import get_logger
@@ -266,6 +266,13 @@ async def render_error_page(
             "error_message": message,
             "error_details": details or {},
             "error_status": status_code,
+            # Esta tela deixou de ser so a do 404: desde que o formulario do
+            # console passou a poder falhar aqui (409 de slug repetido, 422 de
+            # campo invalido), a mesma pagina atende "nao consegui ABRIR" e "nao
+            # consegui GRAVAR". O texto muda conforme o verbo — dizer "nao foi
+            # possivel abrir esta tela" para quem clicou em Salvar descreve
+            # errado o que aconteceu e esconde que o dado nao foi gravado.
+            "error_escrita": request.method not in {"GET", "HEAD"},
         }
     )
     if _template_exists("pages/error.html"):
@@ -494,9 +501,15 @@ async def modules_detail(
             RunFilter(module_slug=module.slug, limit=RECENT_RUNS), principal
         )
         descriptors = {item.slug: item for item in container.registry.describe()}
+        # Mesma ordem de busca que a invocacao usa (`class_candidates`): a classe
+        # vem de `config.module`/`config.implementation` e so depois do slug.
+        descriptor = next(
+            (descriptors[nome] for nome in class_candidates(module) if nome in descriptors),
+            None,
+        )
         return {
             "module": module,
-            "descriptor": descriptors.get(module.slug),
+            "descriptor": descriptor,
             "prompts": prompts.items,
             "policies": policies.items,
             "input_policies": [

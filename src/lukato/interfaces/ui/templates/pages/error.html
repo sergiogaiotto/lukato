@@ -11,6 +11,9 @@
     `error_message`  frase em pt-BR ja pronta para leitura humana.
     `error_status`   status HTTP correspondente.
     `error_details`  mapa auxiliar do erro; vai para o bloco colapsavel.
+    `error_escrita`  True quando a falha veio de um POST/PUT/DELETE — ou seja, de
+                     um formulario que nao gravou, e nao de uma pagina que nao
+                     abriu. Muda o titulo e acrescenta o aviso do botao voltar.
 -#}
 {% extends "base.html" %}
 
@@ -23,11 +26,20 @@
         {{ error_status | default(500, true) }} · {{ error_code | default('internal_error', true) }}
       </p>
 
-      <h1 class="lk-error__title">Não foi possível abrir esta tela</h1>
+      <h1 class="lk-error__title">
+        {{ 'Não foi possível salvar' if error_escrita else 'Não foi possível abrir esta tela' }}
+      </h1>
 
       <p class="lk-error__message">
         {{ error_message | default('Ocorreu uma falha inesperada ao montar a página.', true) }}
       </p>
+
+      {% if error_escrita %}
+        <p class="lk-error__message">
+          Nada foi gravado. Use o botão <strong>voltar</strong> do navegador para
+          recuperar o formulário com o que você digitou e corrigir o campo.
+        </p>
+      {% endif %}
 
       <div class="lk-error__actions">
         <a class="lk-btn lk-btn--primary" href="/">Voltar ao cockpit</a>
@@ -55,7 +67,7 @@
 
 {% block context %}
   <div class="lk-context__title">
-    <span class="lk-truncate">Falha ao renderizar</span>
+    <span class="lk-truncate">{{ 'Falha ao gravar' if error_escrita else 'Falha ao renderizar' }}</span>
     <span class="lk-badge lk-badge--danger">{{ error_status | default(500, true) }}</span>
   </div>
 
