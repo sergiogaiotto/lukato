@@ -21,6 +21,7 @@ navegador manda, com `Content-Type: application/x-www-form-urlencoded` e
 
 from __future__ import annotations
 
+import json
 import re
 import urllib.parse
 from pathlib import Path
@@ -164,12 +165,27 @@ def test_todo_formulario_do_console_aponta_para_um_alvo_traduzivel() -> None:
 # nao tem propriedades nomeadas para comparar. Cada um com o motivo, para a
 # isencao nao virar um lugar onde se esconde formulario quebrado.
 ISENTOS: Final[dict[str, str]] = {
-    "/api/v1/adwatch/media/{media_id}/transcript": "recebe o JSON inteiro (RootModel) por textarea ou upload; ver _import_payload",
-    "/api/v1/adwatch/media/{media_id}/scenes": "idem transcript",
-    "/api/v1/adwatch/media/{media_id}/ocr": "idem transcript",
-    "/api/v1/adwatch/commercials/bulk": "aceita array puro ou {items, update_existing}; ver o hint do proprio formulario",
-    "/api/v1/prompts/{prompt_id}/preview": "variables e dicionario de chave livre, resolvido por variables[<nome>]",
+    "/api/v1/adwatch/media/{media_id}/transcript": (
+        "form multipart: o endpoint le o corpo cru (`_import_payload`) em vez de um "
+        "schema de campos, entao nao ha propriedades para conferir. Coberto por "
+        "test_importar_transcricao_pelo_formulario_multipart, que prova o caminho."
+    ),
 }
+"""Rotas que a conferencia campo-a-campo nao alcanca — e o motivo de cada uma.
+
+Esta lista foi onde um defeito se escondeu: `/adwatch/commercials/bulk` estava
+isento com a justificativa "aceita array puro ou {items, update_existing}", e o
+formulario mandava `items` como texto plano. O endpoint recusava com `list_type`
+e a importacao em lote simplesmente nao funcionava — com o teste verde por cima.
+
+Duas travas agora impedem que isso se repita:
+
+* `test_toda_isencao_ainda_corresponde_a_um_formulario` recusa entrada morta.
+  `/scenes` e `/ocr` estavam aqui sem que o console tivesse formulario para elas;
+  isencao que nao protege nada so ensina a confiar na lista.
+* toda rota isenta precisa de um teste FUNCIONAL nomeado no proprio motivo. Uma
+  isencao vale "o teste generico nao alcanca isto", nunca "isto nao e testado".
+"""
 
 
 def _rota_do_openapi(app_openapi: dict, acao: str, metodo: str) -> tuple[str, dict] | None:
@@ -182,7 +198,9 @@ def _rota_do_openapi(app_openapi: dict, acao: str, metodo: str) -> tuple[str, di
         corpo = (op or {}).get("requestBody", {}).get("content", {}).get("application/json")
         if not corpo:
             continue
-        return rota, _resolver(corpo["schema"], app_openapi)
+        # Cru de proposito: quem desembrulha e `_propriedades`, que olha TODOS os
+        # ramos da uniao. Resolver aqui escolheria o primeiro e perderia os outros.
+        return rota, corpo["schema"]
     return None
 
 
@@ -204,6 +222,48 @@ def _resolver(esquema: dict, documento: dict) -> dict:
                 return _resolver(ramo, documento)
     return esquema
     return None
+
+
+def _deref(esquema: dict, documento: dict) -> dict:
+    """Segue um `$ref` e para ai — sem tocar em `anyOf`/`oneOf`/`allOf`."""
+    alvo: object = documento
+    for parte in esquema["$ref"].lstrip("#/").split("/"):
+        alvo = alvo[parte]  # type: ignore[index]
+    return dict(alvo)  # type: ignore[arg-type]
+
+
+def _ramos(esquema: dict, documento: dict) -> list[dict]:
+    """Todos os ramos de um corpo em uniao, resolvidos, sem o ramo nulo.
+
+    `_resolver` devolve o PRIMEIRO ramo, o que basta para `anyOf: [Modelo, null]`
+    mas erra em `anyOf: [array, object]` — que e o corpo de
+    `/adwatch/commercials/bulk`. Ele pegava o ramo `array`, que nao tem
+    propriedade nenhuma, e o teste acusava TODO campo do formulario como
+    invalido. Um formulario HTML so sabe mandar objeto, entao o que importa e o
+    ramo objeto; olhar todos e a forma de nao depender da ordem em que o
+    Pydantic escreveu a uniao.
+    """
+    if "$ref" in esquema:
+        # So o `$ref`, nunca `_resolver`: ele tambem desembrulha `anyOf` e ja
+        # teria escolhido um ramo, que e exatamente o que se quer evitar aqui.
+        return _ramos(_deref(esquema, documento), documento)
+    for combinador in ("anyOf", "oneOf"):
+        if ramos := esquema.get(combinador):
+            achados: list[dict] = []
+            for ramo in ramos:
+                if ramo.get("type") == "null":
+                    continue
+                achados.extend(_ramos(ramo, documento))
+            return achados
+    return [esquema]
+
+
+def _propriedades(esquema: dict, documento: dict) -> dict:
+    """Uniao das propriedades de todos os ramos objeto do corpo."""
+    juntas: dict = {}
+    for ramo in _ramos(esquema, documento):
+        juntas.update(ramo.get("properties", {}))
+    return juntas
 
 
 def _tipo_de(propriedade: dict, documento: dict) -> str | None:
@@ -252,11 +312,75 @@ async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
     convencao — `campo[]`, `pai.filho`, `campo[chave]`, `campo{}` — e verificada
     de verdade, e nao so escrita na documentacao.
     """
+    # Semeia UMA midia e UM comercial antes de varrer.
+    #
+    # Sem isto o banco da fixture nasce vazio e as paginas nao renderizam os
+    # formularios que dependem de dado: importar transcricao, detectar, remover
+    # uma linha — todos moram DENTRO da linha de um ativo. O teste varria as
+    # telas e via so os formularios de cadastro, ficando cego para a metade do
+    # console que so aparece depois que existe alguma coisa cadastrada.
+    midia = await client.post(
+        "/api/v1/adwatch/media",
+        json={"uri": "/tmp/conformidade.mp4", "title": "conformidade", "kind": "video"},
+    )
+    assert midia.status_code in {200, 201}, midia.text
+    comercial = await client.post(
+        "/api/v1/adwatch/commercials",
+        json={
+            "commercial_id": "CONFORMIDADE_1",
+            "brand": "Marca",
+            "campaign": "conformidade",
+            "text": "texto conhecido do comercial de conformidade",
+        },
+    )
+    assert comercial.status_code in {200, 201}, comercial.text
+
+    modulo = await client.post(
+        "/api/v1/modules",
+        json={
+            "slug": "conformidade-modulo",
+            "name": "Conformidade",
+            "kind": "agent",
+            "config": {"module": "processing"},
+        },
+    )
+    assert modulo.status_code in {200, 201}, modulo.text
+    prompt = await client.post(
+        "/api/v1/prompts",
+        json={"slug": "conformidade-prompt", "role": "system", "template": "Ola {{ marca }}."},
+    )
+    assert prompt.status_code in {200, 201}, prompt.text
+    politica = await client.post(
+        "/api/v1/guardrails",
+        json={
+            "slug": "conformidade-politica",
+            "name": "Conformidade",
+            "stage": "input",
+            "rules": [{"id": "tamanho", "kind": "max_length", "config": {"max_chars": 100}}],
+        },
+    )
+    assert politica.status_code in {200, 201}, politica.text
+
+    # As telas de EDICAO e as de detalhe so existem com algo selecionado. Um terco
+    # dos formularios de escrita do console mora nelas — `PUT /modules/{slug}` com
+    # a trinca inteira, `PUT /guardrails/{id}` com as regras indexadas, o preview
+    # de prompt, o invocar. Varrer so as listas deixava tudo isso invisivel, que e
+    # a mesma cegueira do banco vazio, um nivel acima.
+    paginas = [
+        *PAGINAS,
+        "/modules/conformidade-modulo",
+        f"/prompts?sel={prompt.json()['id']}",
+        f"/guardrails?sel={politica.json()['id']}",
+        f"/adwatch/commercials?sel={comercial.json()['id']}",
+        f"/adwatch/detections?sel={comercial.json()['id']}",
+    ]
+
     openapi = app.openapi()
     problemas: list[str] = []
     conferidos: set[str] = set()
+    rotas_com_formulario: set[str] = set()
 
-    for rota_pagina in PAGINAS:
+    for rota_pagina in paginas:
         pagina = await client.get(rota_pagina)
         assert pagina.status_code == 200, f"{rota_pagina} respondeu {pagina.status_code}"
         texto = pagina.text
@@ -281,6 +405,7 @@ async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
             if not casado:
                 continue
             rota, esquema = casado
+            rotas_com_formulario.add(rota)
             if rota in ISENTOS:
                 continue
 
@@ -289,7 +414,7 @@ async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
                 for n in sorted(nomes)
             )
             traduzido, _ = form_para_json(simulado.encode())
-            propriedades = esquema.get("properties", {})
+            propriedades = _propriedades(esquema, openapi)
             props = set(propriedades)
             conferidos.add(f"{metodo} {rota}")
 
@@ -300,8 +425,22 @@ async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
                     f"nao aceita. Campos validos: {sorted(props)[:8]}"
                 )
 
+            # Campos `campo{}` carregam o JSON que o usuario digitar: o formato
+            # e escolhido por quem preenche, e quem o valida com mensagem util e
+            # o Pydantic. Aqui so se cobra que o schema espere ALGO estruturado —
+            # um `{}` sobre um campo que o schema declara string continua sendo
+            # defeito, e continua sendo pego.
+            json_livre = {n[:-2] for n in nomes if n.endswith("{}")}
+
             for campo, valor in traduzido.items():
                 tipo = _tipo_de(propriedades.get(campo, {}), openapi)
+                if campo in json_livre:
+                    if tipo not in {None, "array", "object"}:
+                        problemas.append(
+                            f"{rota_pagina} ({metodo} {rota}) manda '{campo}{{}}' como JSON, "
+                            f"mas o schema declara '{tipo}'. Tire o '{{}}' do nome."
+                        )
+                    continue
                 if tipo == "array" and not isinstance(valor, list):
                     problemas.append(
                         f"{rota_pagina} ({metodo} {rota}) manda '{campo}' como texto, mas o "
@@ -319,14 +458,183 @@ async def test_todo_campo_de_formulario_existe_no_schema_do_endpoint(
     # Sem isto o teste passa verde quando o casamento de rota para de funcionar.
     obrigatorias = {
         "POST /api/v1/adwatch/commercials",
+        "POST /api/v1/adwatch/commercials/bulk",
         "POST /api/v1/modules",
         "POST /api/v1/identity/users",
         "POST /api/v1/guardrails",
         "POST /api/v1/prompts",
+        # Edicao: `_method=put` muda o verbo, e o schema de update nao e o de
+        # create. Sem estas linhas o teste podia passar cobrindo so o cadastro.
+        "PUT /api/v1/prompts/{prompt_id}",
+        "PUT /api/v1/guardrails/{policy_id}",
+        "PUT /api/v1/modules/{slug}",
+        "POST /api/v1/modules/{slug}/invoke",
     }
+    mortas = set(ISENTOS) - rotas_com_formulario
+    assert not mortas, (
+        f"isencoes que nao correspondem a formulario nenhum: {sorted(mortas)}. "
+        "Apague a entrada: uma isencao morta so ensina a confiar na lista."
+    )
+
     faltando = obrigatorias - conferidos
     assert not faltando, (
         f"estas rotas de escrita nao foram conferidas: {sorted(faltando)}. "
         f"Conferidas: {sorted(conferidos)}"
     )
     assert not problemas, "formulario incompativel com o endpoint:\n  " + "\n  ".join(problemas)
+
+
+# ---------------------------------------------------------------------------
+# Os dois caminhos que a conferencia campo-a-campo nao alcanca
+#
+# Um formulario cujos nomes batem com o schema ainda pode nao gravar nada. Estes
+# dois testes clicam de verdade: mandam o corpo do jeito que o navegador manda e
+# depois conferem que a coisa apareceu no catalogo.
+# ---------------------------------------------------------------------------
+async def test_importar_lote_de_comerciais_pelo_formulario(client: AsyncClient) -> None:
+    """A importacao em lote grava o que foi colado na textarea.
+
+    Este e o defeito que a isencao escondia. O campo se chamava `items` e o
+    endpoint espera uma LISTA; sem a marca `{}` no nome, o array colado chegava
+    como string e voltava `422 list_type`. A importacao em lote — o caminho para
+    subir um catalogo inteiro de uma vez — simplesmente nao funcionava, com a
+    bateria verde por cima.
+    """
+    lote = json.dumps(
+        [
+            {
+                "commercial_id": "LOTE_0001",
+                "brand": "Marca",
+                "campaign": "lote",
+                "text": "primeiro comercial do lote de teste",
+            },
+            {
+                "commercial_id": "LOTE_0002",
+                "brand": "Marca",
+                "campaign": "lote",
+                "text": "segundo comercial do lote de teste",
+            },
+        ]
+    )
+    corpo = urllib.parse.urlencode({"items{}": lote, "update_existing": "false"})
+    resposta = await client.post(
+        "/api/v1/adwatch/commercials/bulk",
+        content=corpo,
+        headers={**CABECALHOS_DE_NAVEGADOR, "Referer": "http://testserver/adwatch/commercials"},
+    )
+    assert resposta.status_code == 303, f"o lote nao gravou: {resposta.text[:300]}"
+
+    catalogo = await client.get("/api/v1/adwatch/commercials?q=LOTE_")
+    codigos = {item["commercial_id"] for item in catalogo.json()["items"]}
+    assert {"LOTE_0001", "LOTE_0002"} <= codigos, f"o catalogo tem {sorted(codigos)}"
+
+
+async def test_importar_transcricao_pelo_formulario_multipart(client: AsyncClient) -> None:
+    """A unica rota isenta da conferencia, provada pelo caminho que o console usa.
+
+    O formulario de "importar colado" e `multipart/form-data`, e o endpoint le o
+    corpo cru em vez de um schema de campos — por isso a conferencia campo-a-campo
+    nao tem o que conferir la. O que ela nao alcanca, este teste alcanca: cola a
+    transcricao e confere que as palavras ficaram gravadas na midia.
+    """
+    midia = await client.post(
+        "/api/v1/adwatch/media",
+        json={"uri": "/tmp/transcricao.mp4", "title": "transcricao", "kind": "video"},
+    )
+    assert midia.status_code in {200, 201}, midia.text
+    media_id = midia.json()["id"]
+
+    palavras = [
+        {"word": "chegou", "start": 10.0, "end": 10.4},
+        {"word": "a", "start": 10.4, "end": 10.5},
+        {"word": "promocao", "start": 10.5, "end": 11.0},
+    ]
+    resposta = await client.post(
+        f"/api/v1/adwatch/media/{media_id}/transcript",
+        files={"payload": (None, json.dumps(palavras))},
+        headers={"Accept": "text/html", "Referer": "http://testserver/adwatch"},
+    )
+    assert resposta.status_code == 303, f"a transcricao nao entrou: {resposta.text[:300]}"
+
+    detalhe = await client.get(f"/api/v1/adwatch/media/{media_id}")
+    artefatos = detalhe.json()["artifacts"]
+    assert artefatos["transcript"] is True
+    assert artefatos["transcript_words"] == len(palavras)
+    assert artefatos["transcript_source"] == "import"
+
+
+async def test_editar_prompt_e_politica_pelo_formulario(client: AsyncClient) -> None:
+    """Editar tem que gravar — o caminho que a navegacao gravada nao exercitou.
+
+    Os dois editores mostram o slug num input `readonly`, e navegador ENVIA campo
+    readonly (so `disabled` fica de fora). `PromptUpdate` e `PolicyUpdate` tem
+    `extra="forbid"`, entao todo Salvar em cima de um item existente voltava
+    `422 extra_forbidden` por causa de um campo que o usuario nem tocava.
+
+    Cadastrar funcionava e editar nao: a diferenca so aparece com algo ja
+    cadastrado na tela, que e o estado em que o console passa a maior parte do
+    tempo.
+    """
+    criado = await client.post(
+        "/api/v1/prompts",
+        json={"slug": "editavel", "name": "Antes", "role": "system", "template": "v1"},
+    )
+    assert criado.status_code in {200, 201}, criado.text
+    prompt_id = criado.json()["id"]
+
+    corpo = urllib.parse.urlencode(
+        {
+            "_method": "put",
+            "name": "Depois",
+            "role": "system",
+            "template": "v2 do template",
+            "labels[]": "editado",
+        }
+    )
+    salvo = await client.post(
+        f"/api/v1/prompts/{prompt_id}",
+        content=corpo,
+        headers={**CABECALHOS_DE_NAVEGADOR, "Referer": "http://testserver/prompts"},
+    )
+    assert salvo.status_code == 303, f"editar o prompt falhou: {salvo.text[:300]}"
+
+    biblioteca = await client.get("/api/v1/prompts?q=editavel")
+    versoes = {(i["version"], i["name"]) for i in biblioteca.json()["items"]}
+    assert (2, "Depois") in versoes, f"a nova versao nao apareceu: {sorted(versoes)}"
+    assert (1, "Antes") in versoes, "a versao anterior tem que continuar auditavel"
+
+    politica = await client.post(
+        "/api/v1/guardrails",
+        json={
+            "slug": "editavel-politica",
+            "name": "Antes",
+            "stage": "input",
+            "rules": [{"id": "tamanho", "kind": "max_length", "config": {"max_chars": 100}}],
+        },
+    )
+    assert politica.status_code in {200, 201}, politica.text
+
+    corpo = urllib.parse.urlencode(
+        {
+            "_method": "put",
+            "name": "Depois",
+            "stage": "input",
+            "rules[0].id": "tamanho",
+            "rules[0].kind": "max_length",
+            "rules[0].action": "block",
+            "rules[0].config{}": json.dumps({"max_chars": 250}),
+        }
+    )
+    salvo = await client.post(
+        f"/api/v1/guardrails/{politica.json()['id']}",
+        content=corpo,
+        headers={**CABECALHOS_DE_NAVEGADOR, "Referer": "http://testserver/guardrails"},
+    )
+    assert salvo.status_code == 303, f"editar a politica falhou: {salvo.text[:300]}"
+
+    lista = await client.get("/api/v1/guardrails?q=editavel-politica")
+    atual = lista.json()["items"][0]
+    assert atual["name"] == "Depois"
+    assert atual["rules"][0]["config"] == {"max_chars": 250}, (
+        "a regra editada nao gravou o config novo: " + str(atual["rules"])
+    )

@@ -208,8 +208,13 @@
             class="lk-input lk-input--mono"
             type="text"
             id="policy-slug"
-            name="slug"
-            required
+              {#- Na EDICAO o slug nao vai no corpo: ele e imutavel, e o schema de
+                 update recusa extras. Um input `readonly` CONTINUA sendo enviado
+                 pelo navegador (so `disabled` nao e), entao editar uma politica
+                 devolvia `422 extra_forbidden`: o campo aparecia na tela, o
+                 usuario nem tocava nele, e o Salvar falhava. Sem `name`, ele
+                 volta a ser so exibicao. -#}
+              {% if not policy_atual %}name="slug" required{% endif %}
             value="{{ policy_atual.slug if policy_atual else '' }}"
             {{ 'readonly' if policy_atual }}
             placeholder="entrada-padrao"
