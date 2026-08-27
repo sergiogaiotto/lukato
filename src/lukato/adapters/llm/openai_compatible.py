@@ -168,6 +168,7 @@ class OpenAICompatibleLLM:
     provider: ClassVar[str] = "openai_compatible"
 
     def __init__(self, settings: Settings, *, client: AsyncOpenAI | None = None) -> None:
+        self.last_health_error: str | None = None
         self._settings = settings
         llm = settings.llm
         self._model = llm.model
@@ -263,10 +264,18 @@ class OpenAICompatibleLLM:
         return [str(model.id) for model in page.data]
 
     async def health(self) -> bool:
-        """Verificacao barata com timeout curto; qualquer falha devolve `False`."""
+        """Verificacao barata com timeout curto; qualquer falha devolve `False`.
+
+        O motivo da falha fica em `last_health_error` para o relatorio de saude
+        exibir. Sem isso o `/readyz` dizia "modelo 'qwen-latest' indisponivel"
+        para QUALQUER falha da sonda — inclusive um 401 de chave ausente — e o
+        diagnostico saia atras do modelo errado enquanto o problema era a
+        credencial. A causa ja estava no log; quem opera olha o relatorio.
+        """
         try:
             await self._client.models.list(timeout=self._health_timeout)
         except Exception as exc:
+            self.last_health_error = f"{type(exc).__name__}: {str(exc)[:160]}"
             _logger.info(
                 "llm_health_unavailable",
                 base_url=self._base_url,
@@ -274,6 +283,7 @@ class OpenAICompatibleLLM:
                 detail=str(exc)[:200],
             )
             return False
+        self.last_health_error = None
         return True
 
     async def aclose(self) -> None:

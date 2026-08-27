@@ -808,10 +808,24 @@ async def _montar_export(settings: Settings) -> Json:
 
 
 def _run_import(settings: Settings, *, origem: str) -> int:
-    """Le o arquivo fora do laco e aplica dentro dele — ver `_run_export`."""
-    dados = json.loads(Path(origem).read_text(encoding="utf-8"))
+    """Le a origem fora do laco e aplica dentro dele — ver `_run_export`.
+
+    `-` le da entrada padrao. Existe porque o caminho mais comum de usar isto e
+    de fora do contentor::
+
+        docker compose exec -T api lukato import - < fixtures/demo-export.json
+
+    Sem o `-`, o arquivo teria de ser copiado para DENTRO do contentor antes
+    (`docker compose cp`), e o `import` falha com `FileNotFoundError` apontando
+    um caminho de dentro enquanto o arquivo esta do lado de fora — um erro que
+    nao diz onde esta o problema. `export` ja escreve em stdout quando nao recebe
+    `--out`; ler de stdin fecha o par e torna `export | import` um cano so.
+    """
+    bruto = sys.stdin.read() if origem == "-" else Path(origem).read_text(encoding="utf-8")
+    dados = json.loads(bruto)
     if dados.get("lukato_export") != 1:
-        raise ValueError(f"{origem} nao parece um export do lukato (falta `lukato_export: 1`)")
+        rotulo = "a entrada padrao" if origem == "-" else origem
+        raise ValueError(f"{rotulo} nao parece um export do lukato (falta `lukato_export: 1`)")
     return asyncio.run(_aplicar_import(settings, dados))
 
 
@@ -1201,7 +1215,11 @@ def build_parser(settings: Settings) -> argparse.ArgumentParser:
     importar = commands.add_parser(
         "import", help="recria nesta instalacao o que um `lukato export` levou de outra"
     )
-    importar.add_argument("arquivo", metavar="ARQUIVO", help="JSON gerado por `lukato export`")
+    importar.add_argument(
+        "arquivo",
+        metavar="ARQUIVO",
+        help="JSON gerado por `lukato export`; use `-` para ler da entrada padrao",
+    )
     importar.set_defaults(handler="import")
 
     health = commands.add_parser("health", help="imprime o relatorio de prontidao em JSON")
@@ -1313,6 +1331,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_ERROR
     except ValueError as exc:
         _err(f"erro: {exc}")
+        return EXIT_ERROR
+    except OSError as exc:
+        # Arquivo que nao existe, diretorio sem permissao, disco cheio: falha de
+        # ambiente, nao defeito. Sem este ramo a CLI despejava um traceback de
+        # doze linhas terminando em `FileNotFoundError` — e quem le precisa
+        # procurar a causa no meio da pilha, num caminho que provavelmente so
+        # esta errado por uma letra.
+        alvo = getattr(exc, "filename", None)
+        _err(f"erro: {exc.strerror or exc}" + (f": {alvo}" if alvo else ""))
         return EXIT_ERROR
 
 

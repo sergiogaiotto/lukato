@@ -1,0 +1,5379 @@
+{
+  "lukato_export": 1,
+  "versao_da_aplicacao": "1.0.0",
+  "prompts": [
+    {
+      "id": "f1be39b5-c88f-4a4c-bfab-eeb4d0f2b39d",
+      "created_at": "2026-08-26T01:14:37.015786Z",
+      "updated_at": "2026-08-26T01:14:37.017464Z",
+      "slug": "adwatch-revisor",
+      "name": "Revisor editado",
+      "description": "Prompt de revisao humana assistida.",
+      "role": "system",
+      "template": "texto novo",
+      "variables": [],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch"
+      ]
+    },
+    {
+      "id": "0f1e7875-c5a3-49fd-810d-2f27527faaa8",
+      "created_at": "2026-08-26T00:32:16.040848Z",
+      "updated_at": "2026-08-26T01:14:37.021952Z",
+      "slug": "adwatch-revisor",
+      "name": "AdWatch - revisor de deteccao",
+      "description": "Prompt de revisao humana assistida.",
+      "role": "system",
+      "template": "Voce revisa deteccoes de comerciais de {{ marca }}. Responda somente com aceito ou rejeitado e uma frase de motivo.",
+      "variables": [
+        "marca"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "ce84180a-eafb-4b78-8f0e-d63a95d46d99",
+      "created_at": "2026-08-26T00:31:50.709260Z",
+      "updated_at": "2026-08-26T00:31:50.716039Z",
+      "slug": "assistente-geral",
+      "name": "Assistente geral",
+      "description": "Conversa aberta, em portugues do Brasil, sem inventar informacao.",
+      "role": "system",
+      "template": "Voce e o assistente geral do lukato. Responda em portugues do Brasil, com objetividade e sem inventar informacao. Quando nao souber, diga que nao sabe e indique exatamente qual dado esta faltando.",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "seed"
+      ]
+    },
+    {
+      "id": "4033d2cc-d9d6-467a-a84f-d37ce40a0181",
+      "created_at": "2026-08-26T01:39:15.079241Z",
+      "updated_at": "2026-08-26T01:39:15.085589Z",
+      "slug": "atendimento-qa",
+      "name": "Atendimento QA",
+      "description": "",
+      "role": "system",
+      "template": "Voce atende {{ cliente }} no canal {{ canal }}.",
+      "variables": [
+        "cliente",
+        "canal"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": []
+    },
+    {
+      "id": "766d547d-817b-4d44-a678-2640964e1761",
+      "created_at": "2026-08-26T01:55:38.308350Z",
+      "updated_at": "2026-08-26T01:55:38.315084Z",
+      "slug": "atendimento-qa-1787709335",
+      "name": "Atendimento QA",
+      "description": "",
+      "role": "system",
+      "template": "Ola {{ cliente }}, falamos pelo canal {{ canal }}.",
+      "variables": [
+        "cliente",
+        "canal"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": []
+    },
+    {
+      "id": "def25645-7785-4fbb-9379-4ec15d398025",
+      "created_at": "2026-08-26T01:43:49.692619Z",
+      "updated_at": "2026-08-26T01:43:49.698530Z",
+      "slug": "cetico-qa-h1",
+      "name": "Etiquetado QA",
+      "description": "",
+      "role": "system",
+      "template": "Voce atende clientes pelo canal {{ canal }}.",
+      "variables": [
+        "canal"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "suporte",
+        "revisado"
+      ]
+    },
+    {
+      "id": "52885c30-1340-41da-a507-cad013881ddc",
+      "created_at": "2026-08-26T01:41:24.277583Z",
+      "updated_at": "2026-08-26T01:41:24.283825Z",
+      "slug": "etiquetado-qa-c",
+      "name": "QA C",
+      "description": "",
+      "role": "system",
+      "template": "oi",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "suporte",
+        "revisado"
+      ]
+    },
+    {
+      "id": "ad45967b-6ce1-4873-9857-06c18b758ed3",
+      "created_at": "2026-08-26T01:40:59.048205Z",
+      "updated_at": "2026-08-26T01:40:59.053209Z",
+      "slug": "etiquetado-qa-curl",
+      "name": "Etiquetado QA",
+      "description": "",
+      "role": "system",
+      "template": "oi",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "suporte",
+        "revisado"
+      ]
+    },
+    {
+      "id": "d6f1fc6d-2754-47b8-92b4-57df36f87a6b",
+      "created_at": "2026-08-26T01:41:24.306528Z",
+      "updated_at": "2026-08-26T01:41:24.311339Z",
+      "slug": "etiquetado-qa-d",
+      "name": "QA D",
+      "description": "",
+      "role": "system",
+      "template": "oi",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "suporte",
+        "revisado"
+      ]
+    },
+    {
+      "id": "45782dcd-018c-4b2b-a7c0-4183650bd754",
+      "created_at": "2026-08-26T00:31:50.725217Z",
+      "updated_at": "2026-08-26T00:31:50.728213Z",
+      "slug": "extrator-json",
+      "name": "Extrator JSON",
+      "description": "Saida estruturada, para uso com a politica de guardrail saida-json.",
+      "role": "system",
+      "template": "Voce e um extrator de dados. Leia o texto recebido e responda SOMENTE com um objeto JSON valido, sem cercas de codigo e sem texto antes ou depois. Use exatamente as chaves assunto, entidades, sentimento e resumo. Campo sem valor recebe null.",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "seed"
+      ]
+    },
+    {
+      "id": "7a7c56f2-4370-4d8a-9234-571918e1126d",
+      "created_at": "2026-08-26T01:34:29.971937Z",
+      "updated_at": "2026-08-26T01:34:29.976611Z",
+      "slug": "inativo-qa-sg",
+      "name": "Inativo QA SG",
+      "description": "",
+      "role": "system",
+      "template": "Este prompt deveria nascer INATIVO.",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": []
+    },
+    {
+      "id": "50f4f13d-72ad-41aa-99da-8826ee8b8c09",
+      "created_at": "2026-08-26T01:38:05.930880Z",
+      "updated_at": "2026-08-26T01:38:05.936821Z",
+      "slug": "inativo-qa-sg8000",
+      "name": "Inativo QA SG8000",
+      "description": "",
+      "role": "system",
+      "template": "Este prompt deveria nascer INATIVO.",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": []
+    },
+    {
+      "id": "e95b5e21-6b9a-4e4c-939b-3e28901225f9",
+      "created_at": "2026-08-26T01:46:42.807402Z",
+      "updated_at": "2026-08-26T01:46:42.849920Z",
+      "slug": "prova-do-sel",
+      "name": "Prova",
+      "description": "",
+      "role": "system",
+      "template": "oi",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "teste"
+      ]
+    },
+    {
+      "id": "f6f34c15-218c-4647-b01e-13fa8b49a8a9",
+      "created_at": "2026-08-26T01:21:49.626198Z",
+      "updated_at": "2026-08-26T01:21:49.635447Z",
+      "slug": "revisor-adwatch-r1",
+      "name": "Revisor AdWatch 1",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "74e441ae-3cc8-445e-8628-6fd53108fb50",
+      "created_at": "2026-08-26T01:47:04.671765Z",
+      "updated_at": "2026-08-26T01:47:04.673180Z",
+      "slug": "revisor-adwatch-r10",
+      "name": "Revisor AdWatch 10 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "87b2f5df-2ecb-4bb5-925a-fd15bac91a9f",
+      "created_at": "2026-08-26T01:47:01.947354Z",
+      "updated_at": "2026-08-26T01:47:04.675868Z",
+      "slug": "revisor-adwatch-r10",
+      "name": "Revisor AdWatch 10",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "3f61ee4e-0140-408e-8c0b-6b727ec18d49",
+      "created_at": "2026-08-26T01:50:12.815241Z",
+      "updated_at": "2026-08-26T01:50:12.816327Z",
+      "slug": "revisor-adwatch-r11",
+      "name": "Revisor AdWatch 11 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "72a23528-5bf6-45a6-a7dd-d9cb2adbf1dd",
+      "created_at": "2026-08-26T01:50:09.917198Z",
+      "updated_at": "2026-08-26T01:50:12.819137Z",
+      "slug": "revisor-adwatch-r11",
+      "name": "Revisor AdWatch 11",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "3d4804ca-2df9-4e4f-82ff-eaa6b83f0a8b",
+      "created_at": "2026-08-26T01:51:31.237538Z",
+      "updated_at": "2026-08-26T01:51:31.239971Z",
+      "slug": "revisor-adwatch-r12",
+      "name": "Revisor AdWatch 12 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "41a9128a-56fb-4fc6-a4cd-87f1abcdac29",
+      "created_at": "2026-08-26T01:51:28.493747Z",
+      "updated_at": "2026-08-26T01:51:31.243008Z",
+      "slug": "revisor-adwatch-r12",
+      "name": "Revisor AdWatch 12",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "1fa9af32-3801-473d-a288-d384879e984a",
+      "created_at": "2026-08-26T01:56:22.817126Z",
+      "updated_at": "2026-08-26T01:56:22.818712Z",
+      "slug": "revisor-adwatch-r13",
+      "name": "Revisor AdWatch 13 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "ab162183-26a4-40e8-8aa1-66ea2dbff4de",
+      "created_at": "2026-08-26T01:56:19.892051Z",
+      "updated_at": "2026-08-26T01:56:22.822069Z",
+      "slug": "revisor-adwatch-r13",
+      "name": "Revisor AdWatch 13",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "2996fc70-87c6-4722-b3c6-737c7f387a73",
+      "created_at": "2026-08-26T01:58:04.050022Z",
+      "updated_at": "2026-08-26T01:58:04.050825Z",
+      "slug": "revisor-adwatch-r14",
+      "name": "Revisor AdWatch 14 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "c51fe7aa-9640-4366-babb-5f6338c32fa3",
+      "created_at": "2026-08-26T01:58:01.252172Z",
+      "updated_at": "2026-08-26T01:58:04.055238Z",
+      "slug": "revisor-adwatch-r14",
+      "name": "Revisor AdWatch 14",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "b6cf30a3-871f-4b82-bfb1-0ba6a1d0bedf",
+      "created_at": "2026-08-26T02:00:22.713060Z",
+      "updated_at": "2026-08-26T02:00:22.713837Z",
+      "slug": "revisor-adwatch-r15",
+      "name": "Revisor AdWatch 15 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "38f8640c-7080-4e32-9384-395e6f33ee7e",
+      "created_at": "2026-08-26T02:00:20.020802Z",
+      "updated_at": "2026-08-26T02:00:22.716753Z",
+      "slug": "revisor-adwatch-r15",
+      "name": "Revisor AdWatch 15",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "80ecb817-f385-4185-9108-f814693e1450",
+      "created_at": "2026-08-26T02:02:01.216373Z",
+      "updated_at": "2026-08-26T02:02:01.220889Z",
+      "slug": "revisor-adwatch-r16",
+      "name": "Revisor AdWatch 16 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "da9b2c27-6a4d-4ca5-9bea-ffc3e7c4955f",
+      "created_at": "2026-08-26T02:01:58.481069Z",
+      "updated_at": "2026-08-26T02:02:01.223595Z",
+      "slug": "revisor-adwatch-r16",
+      "name": "Revisor AdWatch 16",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "c62ea283-acb2-45f5-b926-110cbc332d4f",
+      "created_at": "2026-08-26T02:03:26.046049Z",
+      "updated_at": "2026-08-26T02:03:26.047159Z",
+      "slug": "revisor-adwatch-r17",
+      "name": "Revisor AdWatch 17 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "8ffc71a6-e7ca-4a6d-961c-14ed9a797192",
+      "created_at": "2026-08-26T02:03:22.977212Z",
+      "updated_at": "2026-08-26T02:03:26.052776Z",
+      "slug": "revisor-adwatch-r17",
+      "name": "Revisor AdWatch 17",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "d8fd049d-ffd6-4a94-a82a-cc5cb7fde3a2",
+      "created_at": "2026-08-26T02:04:39.635592Z",
+      "updated_at": "2026-08-26T02:04:39.636635Z",
+      "slug": "revisor-adwatch-r18",
+      "name": "Revisor AdWatch 18 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "22544b14-b521-4238-ae0f-625d028a2754",
+      "created_at": "2026-08-26T02:04:36.816245Z",
+      "updated_at": "2026-08-26T02:04:39.641862Z",
+      "slug": "revisor-adwatch-r18",
+      "name": "Revisor AdWatch 18",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "9cce38ac-a25a-4f2e-9f07-91adfa9d078c",
+      "created_at": "2026-08-26T02:06:23.359552Z",
+      "updated_at": "2026-08-26T02:06:23.361167Z",
+      "slug": "revisor-adwatch-r19",
+      "name": "Revisor AdWatch 19 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "2106a0e0-619d-403b-8377-f0b4acddc038",
+      "created_at": "2026-08-26T02:06:20.700637Z",
+      "updated_at": "2026-08-26T02:06:23.366985Z",
+      "slug": "revisor-adwatch-r19",
+      "name": "Revisor AdWatch 19",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "28130ef1-787d-4366-ad27-3fbedf982400",
+      "created_at": "2026-08-26T01:24:27.016376Z",
+      "updated_at": "2026-08-26T01:24:27.021691Z",
+      "slug": "revisor-adwatch-r2",
+      "name": "Revisor AdWatch 2",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "679499e9-4ec4-44e7-9372-e879b28f5123",
+      "created_at": "2026-08-26T02:07:39.426361Z",
+      "updated_at": "2026-08-26T02:07:39.427486Z",
+      "slug": "revisor-adwatch-r20",
+      "name": "Revisor AdWatch 20 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "db99c83c-306e-4f6b-b1f8-4c47e87cbc0e",
+      "created_at": "2026-08-26T02:07:36.729148Z",
+      "updated_at": "2026-08-26T02:07:39.430686Z",
+      "slug": "revisor-adwatch-r20",
+      "name": "Revisor AdWatch 20",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "eb62ff07-a1b3-4a25-a102-4f3f1ff0e448",
+      "created_at": "2026-08-26T02:09:41.658372Z",
+      "updated_at": "2026-08-26T02:09:41.660046Z",
+      "slug": "revisor-adwatch-r21",
+      "name": "Revisor AdWatch 21 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "a19ec9d4-ed30-4529-b19e-0adb4e4b3c07",
+      "created_at": "2026-08-26T02:09:38.894352Z",
+      "updated_at": "2026-08-26T02:09:41.666286Z",
+      "slug": "revisor-adwatch-r21",
+      "name": "Revisor AdWatch 21",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "e3164c40-e6d8-4416-9ea9-1af4b4fc0d03",
+      "created_at": "2026-08-26T02:10:58.435922Z",
+      "updated_at": "2026-08-26T02:10:58.437092Z",
+      "slug": "revisor-adwatch-r22",
+      "name": "Revisor AdWatch 22 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "466f1009-f4d0-45b8-84a0-9ed419279565",
+      "created_at": "2026-08-26T02:10:55.807860Z",
+      "updated_at": "2026-08-26T02:10:58.441960Z",
+      "slug": "revisor-adwatch-r22",
+      "name": "Revisor AdWatch 22",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "dfa2a7e9-6802-428a-93fb-9a0dd6ad3eb2",
+      "created_at": "2026-08-26T01:32:26.193286Z",
+      "updated_at": "2026-08-26T01:32:26.198263Z",
+      "slug": "revisor-adwatch-r3",
+      "name": "Revisor AdWatch 3 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "c340d633-e9a8-4087-add9-7cffdc5e9db1",
+      "created_at": "2026-08-26T01:32:24.045197Z",
+      "updated_at": "2026-08-26T01:32:26.210731Z",
+      "slug": "revisor-adwatch-r3",
+      "name": "Revisor AdWatch 3",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "5852e601-28cb-45ec-b5a2-1d03ac6276e3",
+      "created_at": "2026-08-26T01:35:44.604672Z",
+      "updated_at": "2026-08-26T01:35:44.605690Z",
+      "slug": "revisor-adwatch-r4",
+      "name": "Revisor AdWatch 4 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "a612c589-7c0e-49a6-bb46-4d7469b9d3f3",
+      "created_at": "2026-08-26T01:35:42.074323Z",
+      "updated_at": "2026-08-26T01:35:44.608417Z",
+      "slug": "revisor-adwatch-r4",
+      "name": "Revisor AdWatch 4",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "711e063f-7b7a-4396-ad23-e07b74d2949d",
+      "created_at": "2026-08-26T01:38:07.070709Z",
+      "updated_at": "2026-08-26T01:38:07.072193Z",
+      "slug": "revisor-adwatch-r5",
+      "name": "Revisor AdWatch 5 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "63fbaebc-db46-4dd6-85f7-a8804ba611f9",
+      "created_at": "2026-08-26T01:38:04.919414Z",
+      "updated_at": "2026-08-26T01:38:07.076637Z",
+      "slug": "revisor-adwatch-r5",
+      "name": "Revisor AdWatch 5",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "3495cdcf-0c9f-480b-9738-4d883eb1e4c0",
+      "created_at": "2026-08-26T01:39:51.981628Z",
+      "updated_at": "2026-08-26T01:39:51.982678Z",
+      "slug": "revisor-adwatch-r6",
+      "name": "Revisor AdWatch 6 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "1e8b0b52-96b3-473c-956e-a8736841b031",
+      "created_at": "2026-08-26T01:39:49.917319Z",
+      "updated_at": "2026-08-26T01:39:51.985587Z",
+      "slug": "revisor-adwatch-r6",
+      "name": "Revisor AdWatch 6",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "d44736e0-50d4-4ada-8866-5ea9031af31c",
+      "created_at": "2026-08-26T01:41:00.951241Z",
+      "updated_at": "2026-08-26T01:41:00.952125Z",
+      "slug": "revisor-adwatch-r7",
+      "name": "Revisor AdWatch 7 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "2438f545-6276-4ba0-bfa8-dd9f1154bdfe",
+      "created_at": "2026-08-26T01:40:58.893161Z",
+      "updated_at": "2026-08-26T01:41:00.954927Z",
+      "slug": "revisor-adwatch-r7",
+      "name": "Revisor AdWatch 7",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "281ab163-9bab-4835-9f2a-4b6249ffc83e",
+      "created_at": "2026-08-26T01:42:11.891238Z",
+      "updated_at": "2026-08-26T01:42:11.892237Z",
+      "slug": "revisor-adwatch-r8",
+      "name": "Revisor AdWatch 8 (revisado)",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Considere a ordem das frases-chave. Responda 'aceito' ou 'rejeitado'.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 2,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "a4964061-f736-4045-86a0-ed5984eafc1a",
+      "created_at": "2026-08-26T01:42:09.760098Z",
+      "updated_at": "2026-08-26T01:42:11.895363Z",
+      "slug": "revisor-adwatch-r8",
+      "name": "Revisor AdWatch 8",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": false,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "e43b7908-1b01-4b3c-b919-73d095fcb757",
+      "created_at": "2026-08-26T01:44:45.021623Z",
+      "updated_at": "2026-08-26T01:44:45.029876Z",
+      "slug": "revisor-adwatch-r9",
+      "name": "Revisor AdWatch 9",
+      "description": "Revisao humana assistida de deteccao.",
+      "role": "system",
+      "template": "Voce revisa deteccoes da marca {{ marca }} na campanha {{ campanha }}. Responda apenas 'aceito' ou 'rejeitado' e uma frase de motivo.",
+      "variables": [
+        "marca",
+        "campanha"
+      ],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "adwatch",
+        "revisao",
+        "producao"
+      ]
+    },
+    {
+      "id": "45290b6d-dd88-405b-96a7-14cc0c69287a",
+      "created_at": "2026-08-26T00:31:50.720109Z",
+      "updated_at": "2026-08-26T00:31:50.723115Z",
+      "slug": "triagem-atendimento",
+      "name": "Triagem de atendimento",
+      "description": "Classifica o pedido do cliente e indica a proxima acao.",
+      "role": "system",
+      "template": "Voce e o analista de triagem de um atendimento. Leia a mensagem do cliente e responda com: (1) a categoria do pedido, (2) a urgencia entre baixa, media e alta e (3) a proxima acao recomendada. Nao prometa prazo, nao cite valores e nao peca dados pessoais.",
+      "variables": [],
+      "version": 1,
+      "is_active": true,
+      "labels": [
+        "seed"
+      ]
+    }
+  ],
+  "guardrails": [
+    {
+      "id": "54194688-be92-4545-8c7d-edd70ceeb241",
+      "created_at": "2026-08-26T00:32:20.946140Z",
+      "updated_at": "2026-08-26T01:35:09.097560Z",
+      "slug": "adwatch-saida",
+      "name": "Saida editada",
+      "description": "Redige telefone e CPF no laudo.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii-telefone",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf"
+            ]
+          },
+          "message": "",
+          "enabled": true,
+          "order": 0
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "0c5f7b19-ceba-4db4-865e-a8f8ab5b52b6",
+      "created_at": "2026-08-26T00:31:50.689199Z",
+      "updated_at": "2026-08-26T01:37:27.428427Z",
+      "slug": "entrada-estrita",
+      "name": "Entrada estrita",
+      "description": "Tudo da entrada padrao, mais restricao de idioma (pt/en) e bloqueio de topicos sensiveis por densidade de termos.",
+      "stage": "input",
+      "rules": [
+        {
+          "id": "tamanho-maximo",
+          "kind": "max_length",
+          "action": "block",
+          "severity": "medium",
+          "config": {
+            "max_chars": 32000
+          },
+          "message": "Entrada longa demais: reduza o texto e envie novamente.",
+          "enabled": true,
+          "order": 10
+        },
+        {
+          "id": "segredos",
+          "kind": "secret_scan",
+          "action": "redact",
+          "severity": "critical",
+          "config": {},
+          "message": "Credencial detectada na entrada e removida antes do envio ao provedor.",
+          "enabled": true,
+          "order": 20
+        },
+        {
+          "id": "dados-pessoais",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "high",
+          "config": {
+            "types": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "credit_card"
+            ]
+          },
+          "message": "Dado pessoal detectado na entrada e substituido pelo marcador de redacao.",
+          "enabled": true,
+          "order": 30
+        },
+        {
+          "id": "prompt-injection",
+          "kind": "keyword_block",
+          "action": "block",
+          "severity": "high",
+          "config": {
+            "keywords": [
+              "ignore as instrucoes",
+              "ignore todas as instrucoes",
+              "ignore suas instrucoes",
+              "desconsidere as instrucoes",
+              "esqueca as instrucoes",
+              "esqueca tudo que foi dito",
+              "ignore previous instructions",
+              "ignore all previous instructions",
+              "disregard the above",
+              "disregard your instructions",
+              "reveal your system prompt",
+              "show me your system prompt",
+              "print your instructions",
+              "repita o prompt do sistema",
+              "revele o prompt do sistema",
+              "mostre o system prompt",
+              "qual e o seu system prompt",
+              "modo desenvolvedor",
+              "developer mode enabled",
+              "jailbreak",
+              "sem nenhuma restricao",
+              "atue sem restricoes",
+              "act as an unrestricted",
+              "you are now dan"
+            ],
+            "normalize": true,
+            "whole_word": true
+          },
+          "message": "Entrada bloqueada: tentativa de sobrescrever as instrucoes do agente.",
+          "enabled": true,
+          "order": 40
+        },
+        {
+          "id": "idioma",
+          "kind": "language_allow",
+          "action": "block",
+          "severity": "medium",
+          "config": {
+            "languages": [
+              "pt",
+              "en"
+            ],
+            "min_confidence": 0.5
+          },
+          "message": "Entrada bloqueada: este agente atende apenas em portugues ou ingles.",
+          "enabled": true,
+          "order": 50
+        },
+        {
+          "id": "topicos-sensiveis",
+          "kind": "topic_block",
+          "action": "block",
+          "severity": "high",
+          "config": {
+            "topics": [
+              {
+                "name": "violencia",
+                "terms": [
+                  "arma de fogo",
+                  "fabricar bomba",
+                  "explosivo caseiro",
+                  "como matar",
+                  "matar alguem",
+                  "atentado",
+                  "municao"
+                ]
+              },
+              {
+                "name": "drogas-ilicitas",
+                "terms": [
+                  "cocaina",
+                  "metanfetamina",
+                  "sintetizar droga",
+                  "trafico de drogas",
+                  "como produzir droga",
+                  "entorpecente"
+                ]
+              },
+              {
+                "name": "fraude-financeira",
+                "terms": [
+                  "clonar cartao",
+                  "lavagem de dinheiro",
+                  "boleto falso",
+                  "nota fiscal fria",
+                  "fraudar imposto",
+                  "golpe do pix"
+                ]
+              }
+            ],
+            "threshold": 2
+          },
+          "message": "Entrada bloqueada: o assunto esta fora do escopo permitido.",
+          "enabled": true,
+          "order": 60
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "4ac60f16-2838-4907-a25a-0f29c1928fb6",
+      "created_at": "2026-08-26T00:31:50.643272Z",
+      "updated_at": "2026-08-26T00:31:50.684314Z",
+      "slug": "entrada-padrao",
+      "name": "Entrada padrao",
+      "description": "Higiene minima de qualquer entrada: teto de tamanho, redacao de credenciais e de dados pessoais e bloqueio de prompt injection.",
+      "stage": "input",
+      "rules": [
+        {
+          "id": "tamanho-maximo",
+          "kind": "max_length",
+          "action": "block",
+          "severity": "medium",
+          "config": {
+            "max_chars": 32000
+          },
+          "message": "Entrada longa demais: reduza o texto e envie novamente.",
+          "enabled": true,
+          "order": 10
+        },
+        {
+          "id": "segredos",
+          "kind": "secret_scan",
+          "action": "redact",
+          "severity": "critical",
+          "config": {},
+          "message": "Credencial detectada na entrada e removida antes do envio ao provedor.",
+          "enabled": true,
+          "order": 20
+        },
+        {
+          "id": "dados-pessoais",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "high",
+          "config": {
+            "types": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "credit_card"
+            ]
+          },
+          "message": "Dado pessoal detectado na entrada e substituido pelo marcador de redacao.",
+          "enabled": true,
+          "order": 30
+        },
+        {
+          "id": "prompt-injection",
+          "kind": "keyword_block",
+          "action": "block",
+          "severity": "high",
+          "config": {
+            "keywords": [
+              "ignore as instrucoes",
+              "ignore todas as instrucoes",
+              "ignore suas instrucoes",
+              "desconsidere as instrucoes",
+              "esqueca as instrucoes",
+              "esqueca tudo que foi dito",
+              "ignore previous instructions",
+              "ignore all previous instructions",
+              "disregard the above",
+              "disregard your instructions",
+              "reveal your system prompt",
+              "show me your system prompt",
+              "print your instructions",
+              "repita o prompt do sistema",
+              "revele o prompt do sistema",
+              "mostre o system prompt",
+              "qual e o seu system prompt",
+              "modo desenvolvedor",
+              "developer mode enabled",
+              "jailbreak",
+              "sem nenhuma restricao",
+              "atue sem restricoes",
+              "act as an unrestricted",
+              "you are now dan"
+            ],
+            "normalize": true,
+            "whole_word": true
+          },
+          "message": "Entrada bloqueada: tentativa de sobrescrever as instrucoes do agente.",
+          "enabled": true,
+          "order": 40
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "df8046c2-ac47-44e9-b900-8d9a6e76059e",
+      "created_at": "2026-08-26T01:22:43.110486Z",
+      "updated_at": "2026-08-26T01:22:43.117555Z",
+      "slug": "saida-adwatch-r1",
+      "name": "Saida AdWatch 1",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "fe0caa38-9cae-4244-8e42-92f73f19b551",
+      "created_at": "2026-08-26T01:47:10.242606Z",
+      "updated_at": "2026-08-26T01:47:14.173128Z",
+      "slug": "saida-adwatch-r10",
+      "name": "Saida AdWatch 10",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "37286954-92ee-4d6f-9a1c-95765feb3d96",
+      "created_at": "2026-08-26T01:50:20.029371Z",
+      "updated_at": "2026-08-26T01:50:24.419051Z",
+      "slug": "saida-adwatch-r11",
+      "name": "Saida AdWatch 11",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "5f85692f-71e1-40d2-9641-84038c32a008",
+      "created_at": "2026-08-26T01:51:36.881227Z",
+      "updated_at": "2026-08-26T01:51:39.906954Z",
+      "slug": "saida-adwatch-r12",
+      "name": "Saida AdWatch 12",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "af77ce92-a1b2-4fc0-a5e1-40acd1eeb6fb",
+      "created_at": "2026-08-26T01:56:28.595264Z",
+      "updated_at": "2026-08-26T01:56:31.678965Z",
+      "slug": "saida-adwatch-r13",
+      "name": "Saida AdWatch 13",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "37cf92ea-1f8d-4b48-b731-07493eeef8e3",
+      "created_at": "2026-08-26T01:58:08.988425Z",
+      "updated_at": "2026-08-26T01:58:13.067602Z",
+      "slug": "saida-adwatch-r14",
+      "name": "Saida AdWatch 14",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "56fa19d2-4b42-44eb-add8-ede225de1082",
+      "created_at": "2026-08-26T02:00:29.024424Z",
+      "updated_at": "2026-08-26T02:00:32.930512Z",
+      "slug": "saida-adwatch-r15",
+      "name": "Saida AdWatch 15",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "8901ec32-127e-4e0f-bfc9-a788d0f95d63",
+      "created_at": "2026-08-26T02:02:06.773467Z",
+      "updated_at": "2026-08-26T02:02:09.818102Z",
+      "slug": "saida-adwatch-r16",
+      "name": "Saida AdWatch 16",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "547f6ce7-dcae-41eb-af1d-4c9ef1d04194",
+      "created_at": "2026-08-26T02:03:32.641536Z",
+      "updated_at": "2026-08-26T02:03:35.593941Z",
+      "slug": "saida-adwatch-r17",
+      "name": "Saida AdWatch 17",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "824c8a7e-1fb2-4035-9327-1b85ff3089af",
+      "created_at": "2026-08-26T02:06:29.697121Z",
+      "updated_at": "2026-08-26T02:06:33.649171Z",
+      "slug": "saida-adwatch-r19",
+      "name": "Saida AdWatch 19",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "29c754cb-4141-4003-b6ba-6f7b0954a4c2",
+      "created_at": "2026-08-26T01:25:20.244942Z",
+      "updated_at": "2026-08-26T01:25:20.249420Z",
+      "slug": "saida-adwatch-r2",
+      "name": "Saida AdWatch 2",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "d0a65118-54a7-41d9-a593-587101047146",
+      "created_at": "2026-08-26T02:07:44.111730Z",
+      "updated_at": "2026-08-26T02:07:48.112284Z",
+      "slug": "saida-adwatch-r20",
+      "name": "Saida AdWatch 20",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "efe24a27-c39f-42be-982a-e65c3cbe2cba",
+      "created_at": "2026-08-26T02:09:48.210741Z",
+      "updated_at": "2026-08-26T02:09:52.184872Z",
+      "slug": "saida-adwatch-r21",
+      "name": "Saida AdWatch 21",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "a080a527-20d0-4c8c-8c81-f87fabe91799",
+      "created_at": "2026-08-26T02:11:04.191632Z",
+      "updated_at": "2026-08-26T02:11:08.197646Z",
+      "slug": "saida-adwatch-r22",
+      "name": "Saida AdWatch 22",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "742dbf6a-8715-4266-95ed-6f3b140563fd",
+      "created_at": "2026-08-26T01:32:30.168737Z",
+      "updated_at": "2026-08-26T01:32:33.017512Z",
+      "slug": "saida-adwatch-r3",
+      "name": "Saida AdWatch 3",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "c3efd65f-965b-42e5-9af5-42ec28b4c4f4",
+      "created_at": "2026-08-26T01:35:49.257202Z",
+      "updated_at": "2026-08-26T01:35:52.033008Z",
+      "slug": "saida-adwatch-r4",
+      "name": "Saida AdWatch 4",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "b7289ad1-9cf7-411b-8679-fa51953c5cb3",
+      "created_at": "2026-08-26T01:38:11.899154Z",
+      "updated_at": "2026-08-26T01:38:14.286402Z",
+      "slug": "saida-adwatch-r5",
+      "name": "Saida AdWatch 5",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "ff2f8ac7-5947-4717-8256-efcb13ad84f4",
+      "created_at": "2026-08-26T01:39:56.081217Z",
+      "updated_at": "2026-08-26T01:39:58.905575Z",
+      "slug": "saida-adwatch-r6",
+      "name": "Saida AdWatch 6",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "4ea2d552-41fb-4a06-a891-781e919eaccc",
+      "created_at": "2026-08-26T01:41:05.033145Z",
+      "updated_at": "2026-08-26T01:41:08.006195Z",
+      "slug": "saida-adwatch-r7",
+      "name": "Saida AdWatch 7",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "e9814973-a5d4-4b92-bda3-e330f4329e67",
+      "created_at": "2026-08-26T01:42:15.899980Z",
+      "updated_at": "2026-08-26T01:42:18.762039Z",
+      "slug": "saida-adwatch-r8",
+      "name": "Saida AdWatch 8",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "68bbf62c-993c-435a-a6d3-fe7092a16d7e",
+      "created_at": "2026-08-26T01:45:38.622404Z",
+      "updated_at": "2026-08-26T01:45:41.964667Z",
+      "slug": "saida-adwatch-r9",
+      "name": "Saida AdWatch 9",
+      "description": "Redige dado pessoal no laudo de deteccao.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "pii",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "medium",
+          "config": {
+            "types": [
+              "cpf",
+              "phone"
+            ]
+          },
+          "message": "Dado pessoal removido.",
+          "enabled": true,
+          "order": 1
+        },
+        {
+          "id": "tamanho",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "medium",
+          "config": {
+            "max_chars": 4000
+          },
+          "message": "",
+          "enabled": true,
+          "order": 2
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "9c6d4e83-558e-4ca1-ab89-512ab2cbaff3",
+      "created_at": "2026-08-26T00:31:50.703773Z",
+      "updated_at": "2026-08-26T00:31:50.706805Z",
+      "slug": "saida-auditada",
+      "name": "Saida auditada",
+      "description": "Tudo da saida padrao, mais um juiz LLM que barra aconselhamento financeiro, juridico ou medico apresentado como definitivo. Sem juiz configurado a regra vira apenas um aviso.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "segredos",
+          "kind": "secret_scan",
+          "action": "block",
+          "severity": "critical",
+          "config": {},
+          "message": "Resposta bloqueada: continha credencial e nao pode ser entregue.",
+          "enabled": true,
+          "order": 10
+        },
+        {
+          "id": "dados-pessoais",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "high",
+          "config": {
+            "types": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "credit_card",
+              "cep",
+              "ip",
+              "rg"
+            ]
+          },
+          "message": "Dado pessoal removido da resposta.",
+          "enabled": true,
+          "order": 20
+        },
+        {
+          "id": "tamanho-maximo",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "low",
+          "config": {
+            "max_chars": 32000
+          },
+          "message": "Resposta truncada no limite configurado.",
+          "enabled": true,
+          "order": 30
+        },
+        {
+          "id": "juiz-conselho-profissional",
+          "kind": "llm_judge",
+          "action": "block",
+          "severity": "high",
+          "config": {
+            "model": null,
+            "criteria": "A resposta nao pode apresentar recomendacao financeira, juridica, medica ou tributaria como decisao definitiva ou personalizada para o usuario. Orientacao geral e educativa e permitida desde que indique a consulta a um profissional habilitado. Considere violacao qualquer instrucao imperativa do tipo 'invista em X', 'processe a empresa Y' ou 'tome o medicamento Z'.",
+            "threshold": 0.6
+          },
+          "message": "Resposta bloqueada: aconselhamento profissional definitivo.",
+          "enabled": true,
+          "order": 40
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "2f95d0d4-62ad-4da7-98d4-e9d018477e91",
+      "created_at": "2026-08-26T00:31:50.699074Z",
+      "updated_at": "2026-08-26T00:31:50.701751Z",
+      "slug": "saida-json",
+      "name": "Saida JSON",
+      "description": "Contrato de maquina: a resposta precisa ser um JSON valido conforme o envelope padrao. O teto de tamanho tambem bloqueia — truncar um JSON o tornaria invalido.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "schema",
+          "kind": "json_schema",
+          "action": "block",
+          "severity": "high",
+          "config": {
+            "coerce": false,
+            "schema": {
+              "type": "object",
+              "required": [
+                "resposta"
+              ],
+              "properties": {
+                "fontes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "resposta": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "minLength": 1
+                },
+                "categoria": {
+                  "enum": [
+                    "informativo",
+                    "operacional",
+                    "analitico",
+                    "recusa"
+                  ],
+                  "type": "string"
+                },
+                "confianca": {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "message": "Resposta bloqueada: nao e um JSON valido conforme o schema exigido.",
+          "enabled": true,
+          "order": 10
+        },
+        {
+          "id": "tamanho-maximo",
+          "kind": "max_length",
+          "action": "block",
+          "severity": "medium",
+          "config": {
+            "max_chars": 32000
+          },
+          "message": "Resposta bloqueada: JSON acima do limite de tamanho.",
+          "enabled": true,
+          "order": 20
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    },
+    {
+      "id": "8daf5e7f-6960-44fe-819f-3bb442af8de9",
+      "created_at": "2026-08-26T00:31:50.694600Z",
+      "updated_at": "2026-08-26T00:31:50.697163Z",
+      "slug": "saida-padrao",
+      "name": "Saida padrao",
+      "description": "Higiene minima de qualquer resposta: bloqueio de credenciais, redacao de dados pessoais e truncagem no teto configurado.",
+      "stage": "output",
+      "rules": [
+        {
+          "id": "segredos",
+          "kind": "secret_scan",
+          "action": "block",
+          "severity": "critical",
+          "config": {},
+          "message": "Resposta bloqueada: continha credencial e nao pode ser entregue.",
+          "enabled": true,
+          "order": 10
+        },
+        {
+          "id": "dados-pessoais",
+          "kind": "pii_redact",
+          "action": "redact",
+          "severity": "high",
+          "config": {
+            "types": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "credit_card",
+              "cep",
+              "ip",
+              "rg"
+            ]
+          },
+          "message": "Dado pessoal removido da resposta.",
+          "enabled": true,
+          "order": 20
+        },
+        {
+          "id": "tamanho-maximo",
+          "kind": "max_length",
+          "action": "transform",
+          "severity": "low",
+          "config": {
+            "max_chars": 32000
+          },
+          "message": "Resposta truncada no limite configurado.",
+          "enabled": true,
+          "order": 30
+        }
+      ],
+      "fail_open": false,
+      "is_active": true
+    }
+  ],
+  "modules": [
+    {
+      "id": "de95c9fc-4bab-4ed8-a322-eb31947e7454",
+      "created_at": "2026-08-26T00:31:50.754122Z",
+      "updated_at": "2026-08-26T00:31:50.757063Z",
+      "slug": "adwatch",
+      "name": "AdWatch",
+      "description": "Catalogo de comerciais e deteccao temporal multimodal. O prompt 'extrator-json' e o que o juiz visual recebe quando ha VLM disponivel.",
+      "kind": "pipeline",
+      "status": "active",
+      "runtime": "direct",
+      "binding": {
+        "input_guardrail_id": "4ac60f16-2838-4907-a25a-0f29c1928fb6",
+        "system_prompt_id": "45782dcd-018c-4b2b-a7c0-4183650bd754",
+        "output_guardrail_id": "8daf5e7f-6960-44fe-819f-3bb442af8de9",
+        "model": "qwen-latest",
+        "temperature": 0.0,
+        "max_tokens": 2048,
+        "timeout_seconds": 300.0,
+        "tools": [
+          "commercial_lookup"
+        ]
+      },
+      "config": {
+        "module": "adwatch",
+        "keep_rejected": false
+      },
+      "tags": [
+        "seed",
+        "demo",
+        "adwatch"
+      ],
+      "owner": "seed",
+      "version": "1.0.0"
+    },
+    {
+      "id": "8cfba188-ea29-4e51-ae8e-886c600ee5f7",
+      "created_at": "2026-08-26T00:31:50.730722Z",
+      "updated_at": "2026-08-26T02:11:17.925540Z",
+      "slug": "assistente",
+      "name": "Assistente geral",
+      "description": "Agente de conversa aberta sobre a classe 'processing'. Mesma classe da 'triagem'; o que muda e o binding.",
+      "kind": "agent",
+      "status": "active",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": "4ac60f16-2838-4907-a25a-0f29c1928fb6",
+        "system_prompt_id": "ce84180a-eafb-4b78-8f0e-d63a95d46d99",
+        "output_guardrail_id": "8daf5e7f-6960-44fe-819f-3bb442af8de9",
+        "model": "qwen-latest",
+        "temperature": 0.25,
+        "max_tokens": 1500,
+        "timeout_seconds": 60.0,
+        "tools": [
+          "now",
+          "calculator"
+        ]
+      },
+      "config": {
+        "module": "processing",
+        "planning": true,
+        "subagents": [],
+        "max_iterations": 4,
+        "response_schema": null
+      },
+      "tags": [
+        "seed",
+        "demo",
+        "agente"
+      ],
+      "owner": "seed",
+      "version": "1.0.0"
+    },
+    {
+      "id": "fb821c81-25d2-485e-8e32-8e0031c9b297",
+      "created_at": "2026-08-26T00:31:50.749662Z",
+      "updated_at": "2026-08-26T00:31:50.752233Z",
+      "slug": "conhecimento",
+      "name": "Base de conhecimento",
+      "description": "Ingestao, chunking, embeddings e busca semantica sobre a colecao padrao.",
+      "kind": "knowledge",
+      "status": "active",
+      "runtime": "direct",
+      "binding": {
+        "input_guardrail_id": "4ac60f16-2838-4907-a25a-0f29c1928fb6",
+        "system_prompt_id": "ce84180a-eafb-4b78-8f0e-d63a95d46d99",
+        "output_guardrail_id": "8daf5e7f-6960-44fe-819f-3bb442af8de9",
+        "model": "qwen-latest",
+        "temperature": 0.1,
+        "max_tokens": 1024,
+        "timeout_seconds": 90.0,
+        "tools": []
+      },
+      "config": {
+        "top_k": 5,
+        "answer": false,
+        "module": "knowledge",
+        "rerank": false,
+        "collection": "",
+        "use_history": false,
+        "search_limit": 5,
+        "default_action": "search"
+      },
+      "tags": [
+        "seed",
+        "demo",
+        "conhecimento"
+      ],
+      "owner": "seed",
+      "version": "1.0.0"
+    },
+    {
+      "id": "5fd7a9ae-3e4b-45d6-a78d-013f2bf66b94",
+      "created_at": "2026-08-26T00:59:46.123148Z",
+      "updated_at": "2026-08-26T01:02:27.472836Z",
+      "slug": "qa-cetico-refuta",
+      "name": "QA cetico refuta",
+      "description": "Modulo de teste do cetico.",
+      "kind": "agent",
+      "status": "active",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "b9ca44be-a6cc-4061-a0f4-893a321c9cf5",
+      "created_at": "2026-08-26T00:32:37.615552Z",
+      "updated_at": "2026-08-26T00:35:03.730647Z",
+      "slug": "qa-modulo-sergio",
+      "name": "QA modulo sergio",
+      "description": "modulo de QA",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": "4ac60f16-2838-4907-a25a-0f29c1928fb6",
+        "system_prompt_id": "45782dcd-018c-4b2b-a7c0-4183650bd754",
+        "output_guardrail_id": "8daf5e7f-6960-44fe-819f-3bb442af8de9",
+        "model": "qwen-latest",
+        "temperature": 0.0,
+        "max_tokens": 2048,
+        "timeout_seconds": 60.0,
+        "tools": [
+          "commercial_lookup"
+        ]
+      },
+      "config": {
+        "module": "processing",
+        "planning": true,
+        "subagents": [],
+        "max_iterations": 6,
+        "response_schema": null
+      },
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "26bc53d2-2f2e-4ebd-a6e5-b19378147c26",
+      "created_at": "2026-08-26T01:47:20.705467Z",
+      "updated_at": "2026-08-26T01:47:20.712339Z",
+      "slug": "revisor-r10",
+      "name": "Revisor de deteccao 10",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "d59624ff-3d43-49c0-a08e-258491489a98",
+      "created_at": "2026-08-26T01:50:29.520823Z",
+      "updated_at": "2026-08-26T01:50:29.528984Z",
+      "slug": "revisor-r11",
+      "name": "Revisor de deteccao 11",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "b34679b0-d4fa-4567-9ee4-d6e3c35d3ceb",
+      "created_at": "2026-08-26T01:51:46.617117Z",
+      "updated_at": "2026-08-26T01:51:46.621848Z",
+      "slug": "revisor-r12",
+      "name": "Revisor de deteccao 12",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "be83df55-aed9-42be-a8dd-fc2c077be9c2",
+      "created_at": "2026-08-26T01:56:35.468018Z",
+      "updated_at": "2026-08-26T01:56:35.475518Z",
+      "slug": "revisor-r13",
+      "name": "Revisor de deteccao 13",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "3c2e2771-f0bf-4fd9-9996-8db1f881e229",
+      "created_at": "2026-08-26T01:58:19.710215Z",
+      "updated_at": "2026-08-26T01:58:19.715026Z",
+      "slug": "revisor-r14",
+      "name": "Revisor de deteccao 14",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "03751c4c-b85f-4778-bb6d-597a96ab2354",
+      "created_at": "2026-08-26T02:00:37.764999Z",
+      "updated_at": "2026-08-26T02:00:37.769818Z",
+      "slug": "revisor-r15",
+      "name": "Revisor de deteccao 15",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "510d54db-9383-41a1-9784-86c8e42cdfa0",
+      "created_at": "2026-08-26T02:02:13.662476Z",
+      "updated_at": "2026-08-26T02:02:13.667006Z",
+      "slug": "revisor-r16",
+      "name": "Revisor de deteccao 16",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "f5fabebb-d709-4f26-a75e-b4f4f8bcc406",
+      "created_at": "2026-08-26T02:03:42.175916Z",
+      "updated_at": "2026-08-26T02:03:42.179966Z",
+      "slug": "revisor-r17",
+      "name": "Revisor de deteccao 17",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "512432cd-44be-45e0-a8a4-33369d0cd0c3",
+      "created_at": "2026-08-26T02:06:38.502459Z",
+      "updated_at": "2026-08-26T02:06:38.511608Z",
+      "slug": "revisor-r19",
+      "name": "Revisor de deteccao 19",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "cb1e95ce-8742-475c-ac97-c0b59627e8e4",
+      "created_at": "2026-08-26T02:07:54.617925Z",
+      "updated_at": "2026-08-26T02:07:54.622500Z",
+      "slug": "revisor-r20",
+      "name": "Revisor de deteccao 20",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "31a1a01e-e635-491f-b0e4-33b79409554b",
+      "created_at": "2026-08-26T02:09:58.944981Z",
+      "updated_at": "2026-08-26T02:09:58.950065Z",
+      "slug": "revisor-r21",
+      "name": "Revisor de deteccao 21",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "506dd2d8-7e28-4a59-a97b-9dd9162bbcbd",
+      "created_at": "2026-08-26T02:11:13.173749Z",
+      "updated_at": "2026-08-26T02:11:13.178322Z",
+      "slug": "revisor-r22",
+      "name": "Revisor de deteccao 22",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "ef68574a-3e4e-4c64-a8eb-2c5af43ef724",
+      "created_at": "2026-08-26T01:38:19.483407Z",
+      "updated_at": "2026-08-26T01:38:19.491008Z",
+      "slug": "revisor-r5",
+      "name": "Revisor de deteccao 5",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "51e25b38-8043-429c-a120-fdc59bfab9cd",
+      "created_at": "2026-08-26T01:40:03.848645Z",
+      "updated_at": "2026-08-26T01:40:03.856218Z",
+      "slug": "revisor-r6",
+      "name": "Revisor de deteccao 6",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "2ef8243c-806a-48fa-81b1-68838642d771",
+      "created_at": "2026-08-26T01:41:13.439211Z",
+      "updated_at": "2026-08-26T01:41:13.445301Z",
+      "slug": "revisor-r7",
+      "name": "Revisor de deteccao 7",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "bb4ad726-3db1-4c71-acb3-33fef8515bca",
+      "created_at": "2026-08-26T01:42:22.754820Z",
+      "updated_at": "2026-08-26T01:42:22.759595Z",
+      "slug": "revisor-r8",
+      "name": "Revisor de deteccao 8",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "ff72aecb-a338-4c9f-902f-448e3cb22460",
+      "created_at": "2026-08-26T01:45:47.086194Z",
+      "updated_at": "2026-08-26T01:45:47.094087Z",
+      "slug": "revisor-r9",
+      "name": "Revisor de deteccao 9",
+      "description": "Agente que revisa deteccao do AdWatch.",
+      "kind": "agent",
+      "status": "draft",
+      "runtime": "langgraph",
+      "binding": {
+        "input_guardrail_id": null,
+        "system_prompt_id": null,
+        "output_guardrail_id": null,
+        "model": null,
+        "temperature": null,
+        "max_tokens": null,
+        "timeout_seconds": 60.0,
+        "tools": []
+      },
+      "config": {},
+      "tags": [],
+      "owner": null,
+      "version": "1.0.0"
+    },
+    {
+      "id": "b99dd187-0366-42cd-880a-a7e182035918",
+      "created_at": "2026-08-26T00:31:50.744347Z",
+      "updated_at": "2026-08-26T00:31:50.747356Z",
+      "slug": "triagem",
+      "name": "Triagem de atendimento",
+      "description": "Mesma classe 'processing' do assistente, com guardrail de entrada estrito, prompt de triagem, guardrail de saida auditado, temperatura zero e sem ferramentas. Nenhuma linha de codigo separa os dois.",
+      "kind": "agent",
+      "status": "active",
+      "runtime": "direct",
+      "binding": {
+        "input_guardrail_id": "0c5f7b19-ceba-4db4-865e-a8f8ab5b52b6",
+        "system_prompt_id": "45290b6d-dd88-405b-96a7-14cc0c69287a",
+        "output_guardrail_id": "9c6d4e83-558e-4ca1-ab89-512ab2cbaff3",
+        "model": "qwen-latest",
+        "temperature": 0.0,
+        "max_tokens": 512,
+        "timeout_seconds": 30.0,
+        "tools": []
+      },
+      "config": {
+        "module": "processing",
+        "planning": false,
+        "subagents": [],
+        "max_iterations": 1,
+        "response_schema": null
+      },
+      "tags": [
+        "seed",
+        "demo",
+        "atendimento"
+      ],
+      "owner": "seed",
+      "version": "1.0.0"
+    }
+  ],
+  "commercials": [
+    {
+      "id": "2c662003-958f-4d86-bd6e-1a3db655ca34",
+      "created_at": "2026-08-26T00:31:54.290517Z",
+      "updated_at": "2026-08-26T00:31:54.293727Z",
+      "commercial_id": "COM_000235",
+      "campaign": "Claro Flex",
+      "brand": "Claro",
+      "text": "Com Claro Flex voce controla tudo pelo aplicativo quando quiser",
+      "duration_expected": 15.0,
+      "keywords": [
+        "Claro Flex",
+        "aplicativo"
+      ],
+      "key_phrases": [
+        "controla tudo pelo aplicativo"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ebbf0985-27a0-4b9a-9403-388e82bed8fe",
+      "created_at": "2026-08-26T00:31:57.925883Z",
+      "updated_at": "2026-08-26T00:31:57.928971Z",
+      "commercial_id": "COM_000236",
+      "campaign": "Plano Familia",
+      "brand": "Claro",
+      "text": "Conheca o novo plano Claro com 50 giga de internet e WhatsApp ilimitado",
+      "duration_expected": 30.0,
+      "keywords": [
+        "50 giga",
+        "WhatsApp"
+      ],
+      "key_phrases": [
+        "WhatsApp ilimitado"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "d8350fd8-7107-41d0-b7ad-e0b90dbf5054",
+      "created_at": "2026-08-26T00:32:01.568167Z",
+      "updated_at": "2026-08-26T00:32:01.571387Z",
+      "commercial_id": "COM_000237",
+      "campaign": "Claro TV mais",
+      "brand": "Claro",
+      "text": "Assine o Claro TV e curta os melhores canais direto na sua televisao",
+      "duration_expected": 20.0,
+      "keywords": [
+        "Claro TV",
+        "canais"
+      ],
+      "key_phrases": [
+        "melhores canais"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "c5177375-1d03-4509-8cd2-d574a7887b55",
+      "created_at": "2026-08-26T00:32:05.178694Z",
+      "updated_at": "2026-08-26T00:32:05.181936Z",
+      "commercial_id": "COM_000238",
+      "campaign": "Claro Fibra",
+      "brand": "Claro",
+      "text": "Claro fibra chega na sua casa com instalacao rapida e wifi de verdade",
+      "duration_expected": 30.0,
+      "keywords": [
+        "Claro fibra",
+        "wifi"
+      ],
+      "key_phrases": [
+        "instalacao rapida"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "5e8dc801-6db7-4bdc-a34a-7701555d0041",
+      "created_at": "2026-08-26T01:21:54.455299Z",
+      "updated_at": "2026-08-26T01:21:54.464480Z",
+      "commercial_id": "COM_CETICO_77",
+      "campaign": "CAMPANHA CETICO",
+      "brand": "MARCA CETICO",
+      "text": "Locucao de teste do cetico para o comercial.",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "81bab000-6822-4b6f-bce2-20df1baef113",
+      "created_at": "2026-08-26T01:26:59.980323Z",
+      "updated_at": "2026-08-26T01:27:00.003927Z",
+      "commercial_id": "LOTE_A-R1",
+      "campaign": "lote-1",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "39519208-edf3-402b-9b33-41423f3607e2",
+      "created_at": "2026-08-26T01:47:39.413133Z",
+      "updated_at": "2026-08-26T01:47:39.421627Z",
+      "commercial_id": "LOTE_A-R10",
+      "campaign": "lote-10",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "bd306669-4437-4171-a113-131e82ec7eda",
+      "created_at": "2026-08-26T01:50:47.717271Z",
+      "updated_at": "2026-08-26T01:50:47.721958Z",
+      "commercial_id": "LOTE_A-R11",
+      "campaign": "lote-11",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "1dd14783-eb3f-4d59-a771-013b72288ffd",
+      "created_at": "2026-08-26T01:52:05.317939Z",
+      "updated_at": "2026-08-26T01:52:05.322658Z",
+      "commercial_id": "LOTE_A-R12",
+      "campaign": "lote-12",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "8d3f3ca1-84c4-4f4c-92c3-597c5acf4c3e",
+      "created_at": "2026-08-26T01:56:53.565093Z",
+      "updated_at": "2026-08-26T01:56:53.573200Z",
+      "commercial_id": "LOTE_A-R13",
+      "campaign": "lote-13",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "d2c78afc-20d9-4a4f-b945-b65c258efc4e",
+      "created_at": "2026-08-26T01:58:38.677078Z",
+      "updated_at": "2026-08-26T01:58:38.682796Z",
+      "commercial_id": "LOTE_A-R14",
+      "campaign": "lote-14",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "8267ae93-da68-4311-9eeb-f7706d365679",
+      "created_at": "2026-08-26T02:00:53.747206Z",
+      "updated_at": "2026-08-26T02:00:53.753833Z",
+      "commercial_id": "LOTE_A-R15",
+      "campaign": "lote-15",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "9768917c-ba89-4100-97da-c54c0df5ecd4",
+      "created_at": "2026-08-26T02:02:30.069692Z",
+      "updated_at": "2026-08-26T02:02:30.077121Z",
+      "commercial_id": "LOTE_A-R16",
+      "campaign": "lote-16",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "322710ed-d476-49c0-9097-4cccad17cda7",
+      "created_at": "2026-08-26T02:03:59.536381Z",
+      "updated_at": "2026-08-26T02:03:59.540498Z",
+      "commercial_id": "LOTE_A-R17",
+      "campaign": "lote-17",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "1368bc72-37af-45cb-815b-ad060ad31317",
+      "created_at": "2026-08-26T02:06:56.274003Z",
+      "updated_at": "2026-08-26T02:06:56.279147Z",
+      "commercial_id": "LOTE_A-R19",
+      "campaign": "lote-19",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "9472070b-dbc2-4ceb-be06-391313c4dbf1",
+      "created_at": "2026-08-26T01:27:32.201133Z",
+      "updated_at": "2026-08-26T01:27:32.231380Z",
+      "commercial_id": "LOTE_A-R2",
+      "campaign": "lote-2",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "6a2b13f1-03de-492d-902a-c255cd0d658a",
+      "created_at": "2026-08-26T02:08:12.352647Z",
+      "updated_at": "2026-08-26T02:08:12.358439Z",
+      "commercial_id": "LOTE_A-R20",
+      "campaign": "lote-20",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "80070b48-94b8-4db4-a015-51c527e32636",
+      "created_at": "2026-08-26T02:10:16.640244Z",
+      "updated_at": "2026-08-26T02:10:16.648053Z",
+      "commercial_id": "LOTE_A-R21",
+      "campaign": "lote-21",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "ce1a5a72-d416-48bb-b492-b5e812cc8dbb",
+      "created_at": "2026-08-26T02:11:30.747317Z",
+      "updated_at": "2026-08-26T02:11:30.755813Z",
+      "commercial_id": "LOTE_A-R22",
+      "campaign": "lote-22",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "d927072c-29d9-4a7a-9f9a-44249a663e05",
+      "created_at": "2026-08-26T01:33:17.366040Z",
+      "updated_at": "2026-08-26T01:33:17.370591Z",
+      "commercial_id": "LOTE_A-R3",
+      "campaign": "lote-3",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "eba79647-ce3f-48ef-a95c-b89647cfdf17",
+      "created_at": "2026-08-26T01:36:36.134717Z",
+      "updated_at": "2026-08-26T01:36:36.140818Z",
+      "commercial_id": "LOTE_A-R4",
+      "campaign": "lote-4",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "0730661e-729d-42a7-85d1-412c4377fc38",
+      "created_at": "2026-08-26T01:38:35.772577Z",
+      "updated_at": "2026-08-26T01:38:35.777273Z",
+      "commercial_id": "LOTE_A-R5",
+      "campaign": "lote-5",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "a6c6144e-0d77-42cb-8d5d-c46253c8f1b0",
+      "created_at": "2026-08-26T01:40:21.818915Z",
+      "updated_at": "2026-08-26T01:40:21.824821Z",
+      "commercial_id": "LOTE_A-R6",
+      "campaign": "lote-6",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "73dd7608-8b3f-4290-bcbe-b67f8b3d9f32",
+      "created_at": "2026-08-26T01:41:30.740016Z",
+      "updated_at": "2026-08-26T01:41:30.744472Z",
+      "commercial_id": "LOTE_A-R7",
+      "campaign": "lote-7",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "db07626f-5e5f-4506-af00-f43cb15ef8ed",
+      "created_at": "2026-08-26T01:42:39.186630Z",
+      "updated_at": "2026-08-26T01:42:39.192708Z",
+      "commercial_id": "LOTE_A-R8",
+      "campaign": "lote-8",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "aeaf1ce1-c0bb-4d20-bc32-ed2f6ba400ac",
+      "created_at": "2026-08-26T01:46:28.806897Z",
+      "updated_at": "2026-08-26T01:46:28.813643Z",
+      "commercial_id": "LOTE_A-R9",
+      "campaign": "lote-9",
+      "brand": "Marca A",
+      "text": "primeira peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "85a21ad1-6e09-4330-8fd6-26c5ed1d8247",
+      "created_at": "2026-08-26T01:27:00.012845Z",
+      "updated_at": "2026-08-26T01:27:00.016142Z",
+      "commercial_id": "LOTE_B-R1",
+      "campaign": "lote-1",
+      "brand": "Marca B",
+      "text": "segunda peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "3301dd0a-c98b-4316-9126-b14dca8ca5cd",
+      "created_at": "2026-08-26T01:27:32.236997Z",
+      "updated_at": "2026-08-26T01:27:32.246286Z",
+      "commercial_id": "LOTE_B-R2",
+      "campaign": "lote-2",
+      "brand": "Marca B",
+      "text": "segunda peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "b40b031b-638c-4c21-b08f-ba752fe5074e",
+      "created_at": "2026-08-26T02:08:12.371301Z",
+      "updated_at": "2026-08-26T02:08:12.376833Z",
+      "commercial_id": "LOTE_B-R20",
+      "campaign": "lote-20",
+      "brand": "Marca B",
+      "text": "segunda peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "1cebbc64-788a-4c72-9d21-6f9c66889f23",
+      "created_at": "2026-08-26T01:33:17.378757Z",
+      "updated_at": "2026-08-26T01:33:17.383835Z",
+      "commercial_id": "LOTE_B-R3",
+      "campaign": "lote-3",
+      "brand": "Marca B",
+      "text": "segunda peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "9d81d676-0e8f-4aed-823c-55739a95ec38",
+      "created_at": "2026-08-26T01:46:28.833490Z",
+      "updated_at": "2026-08-26T01:46:28.846264Z",
+      "commercial_id": "LOTE_B-R9",
+      "campaign": "lote-9",
+      "brand": "Marca B",
+      "text": "segunda peca do lote de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "74d3aa9a-c437-42c9-ad05-8ae206513db1",
+      "created_at": "2026-08-26T01:46:42.874012Z",
+      "updated_at": "2026-08-26T01:46:42.881665Z",
+      "commercial_id": "PROVA_SEL",
+      "campaign": "y",
+      "brand": "X",
+      "text": "um texto qualquer",
+      "duration_expected": 15.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "77d6b199-fb48-42d3-8328-689668436462",
+      "created_at": "2026-08-26T01:05:12.131281Z",
+      "updated_at": "2026-08-26T01:05:12.177625Z",
+      "commercial_id": "TESTE_BULK_1",
+      "campaign": "teste",
+      "brand": "Teste",
+      "text": "um texto qualquer de comercial de teste",
+      "duration_expected": 30.0,
+      "keywords": [],
+      "key_phrases": [],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "1d7ff60e-5dc8-40d3-8061-71a9b3975d5d",
+      "created_at": "2026-08-26T00:32:25.921100Z",
+      "updated_at": "2026-08-26T00:32:25.928384Z",
+      "commercial_id": "VIVO_FIBRA_300",
+      "campaign": "fibra-300-agosto",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "d5fb59d3-e8ec-4696-af07-e7f7f6cf3e4d",
+      "created_at": "2026-08-26T01:26:26.959711Z",
+      "updated_at": "2026-08-26T01:26:26.974275Z",
+      "commercial_id": "VIVO_FIBRA_300-R1",
+      "campaign": "fibra-300-rodada-1",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "0da50922-0244-4713-8783-8320e85bbec0",
+      "created_at": "2026-08-26T01:47:34.414977Z",
+      "updated_at": "2026-08-26T01:47:37.666794Z",
+      "commercial_id": "VIVO_FIBRA_300-R10",
+      "campaign": "fibra-300-rodada-10",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "aa817bb4-8fb3-410c-917a-7c1a1b841814",
+      "created_at": "2026-08-26T01:50:42.862252Z",
+      "updated_at": "2026-08-26T01:50:46.102559Z",
+      "commercial_id": "VIVO_FIBRA_300-R11",
+      "campaign": "fibra-300-rodada-11",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "7b56e11b-d10a-468b-9251-31b55c759c1e",
+      "created_at": "2026-08-26T01:52:00.634025Z",
+      "updated_at": "2026-08-26T01:52:03.772243Z",
+      "commercial_id": "VIVO_FIBRA_300-R12",
+      "campaign": "fibra-300-rodada-12",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "db485543-7ac9-4d43-933c-769da46e701f",
+      "created_at": "2026-08-26T01:56:48.933501Z",
+      "updated_at": "2026-08-26T01:56:52.018059Z",
+      "commercial_id": "VIVO_FIBRA_300-R13",
+      "campaign": "fibra-300-rodada-13",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "3b51b2c0-c2b8-4770-9b3f-5914e2b43e04",
+      "created_at": "2026-08-26T01:58:33.329626Z",
+      "updated_at": "2026-08-26T01:58:36.435581Z",
+      "commercial_id": "VIVO_FIBRA_300-R14",
+      "campaign": "fibra-300-rodada-14",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "58acaf67-38e7-4dd4-a849-ff28944f5eee",
+      "created_at": "2026-08-26T02:00:49.318838Z",
+      "updated_at": "2026-08-26T02:00:52.263493Z",
+      "commercial_id": "VIVO_FIBRA_300-R15",
+      "campaign": "fibra-300-rodada-15",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "e1d14bc6-6b52-4bab-bf68-bfd48671e7f9",
+      "created_at": "2026-08-26T02:02:25.494326Z",
+      "updated_at": "2026-08-26T02:02:28.538091Z",
+      "commercial_id": "VIVO_FIBRA_300-R16",
+      "campaign": "fibra-300-rodada-16",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "275e93a4-4d8e-4aa2-b585-f64d0e2d8147",
+      "created_at": "2026-08-26T02:03:55.055307Z",
+      "updated_at": "2026-08-26T02:03:58.117654Z",
+      "commercial_id": "VIVO_FIBRA_300-R17",
+      "campaign": "fibra-300-rodada-17",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "5c5ba4bb-3d21-4179-8824-84eae87560c9",
+      "created_at": "2026-08-26T02:06:51.827994Z",
+      "updated_at": "2026-08-26T02:06:54.849691Z",
+      "commercial_id": "VIVO_FIBRA_300-R19",
+      "campaign": "fibra-300-rodada-19",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "8dd11bff-53b5-4f57-8df5-b3484ffdebf5",
+      "created_at": "2026-08-26T01:26:59.211725Z",
+      "updated_at": "2026-08-26T01:26:59.217186Z",
+      "commercial_id": "VIVO_FIBRA_300-R2",
+      "campaign": "fibra-300-rodada-2",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "55e21ba8-0caf-4e2f-92e2-7618135223aa",
+      "created_at": "2026-08-26T02:08:07.873837Z",
+      "updated_at": "2026-08-26T02:08:10.892303Z",
+      "commercial_id": "VIVO_FIBRA_300-R20",
+      "campaign": "fibra-300-rodada-20",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "2927695a-2467-42e1-b817-eb39e2406b15",
+      "created_at": "2026-08-26T02:10:12.098286Z",
+      "updated_at": "2026-08-26T02:10:15.131944Z",
+      "commercial_id": "VIVO_FIBRA_300-R21",
+      "campaign": "fibra-300-rodada-21",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "f2fcd3c7-6f36-41c7-bf22-9c6bced52ee9",
+      "created_at": "2026-08-26T02:11:26.195912Z",
+      "updated_at": "2026-08-26T02:11:29.262425Z",
+      "commercial_id": "VIVO_FIBRA_300-R22",
+      "campaign": "fibra-300-rodada-22",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "5abedd0f-befc-4c49-b34d-aaac7d016c63",
+      "created_at": "2026-08-26T01:33:13.601204Z",
+      "updated_at": "2026-08-26T01:33:15.937147Z",
+      "commercial_id": "VIVO_FIBRA_300-R3",
+      "campaign": "fibra-300-rodada-3",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "c6280e26-4b0e-4c2f-9c7c-068dd4720035",
+      "created_at": "2026-08-26T01:36:32.242666Z",
+      "updated_at": "2026-08-26T01:36:34.586221Z",
+      "commercial_id": "VIVO_FIBRA_300-R4",
+      "campaign": "fibra-300-rodada-4",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "84420441-9381-4b9f-9f33-e2194885fea1",
+      "created_at": "2026-08-26T01:38:32.004775Z",
+      "updated_at": "2026-08-26T01:38:34.341590Z",
+      "commercial_id": "VIVO_FIBRA_300-R5",
+      "campaign": "fibra-300-rodada-5",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "eb510d3b-3df9-426d-b505-aa217b7ff6b0",
+      "created_at": "2026-08-26T01:40:17.361016Z",
+      "updated_at": "2026-08-26T01:40:20.378989Z",
+      "commercial_id": "VIVO_FIBRA_300-R6",
+      "campaign": "fibra-300-rodada-6",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "3d555b7e-f8af-40e6-8a17-02a128167587",
+      "created_at": "2026-08-26T01:41:26.841817Z",
+      "updated_at": "2026-08-26T01:41:29.228907Z",
+      "commercial_id": "VIVO_FIBRA_300-R7",
+      "campaign": "fibra-300-rodada-7",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "22ad67dc-6a48-4435-8708-77c9451bb927",
+      "created_at": "2026-08-26T01:42:34.666939Z",
+      "updated_at": "2026-08-26T01:42:37.081355Z",
+      "commercial_id": "VIVO_FIBRA_300-R8",
+      "campaign": "fibra-300-rodada-8",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "7d9a7e52-8f9f-45d0-beee-7b8db7fdca8d",
+      "created_at": "2026-08-26T01:46:01.204855Z",
+      "updated_at": "2026-08-26T01:46:01.210714Z",
+      "commercial_id": "VIVO_FIBRA_300-R9",
+      "campaign": "fibra-300-rodada-9",
+      "brand": "VIVO",
+      "text": "chegou a vivo fibra de trezentos mega para a sua casa instale hoje sem taxa de adesao e leve wifi seis incluso vivo fibra trezentos mega ligue agora",
+      "duration_expected": 15.0,
+      "keywords": [
+        "vivo",
+        "fibra",
+        "trezentos mega",
+        "wifi seis"
+      ],
+      "key_phrases": [
+        "vivo fibra trezentos mega",
+        "sem taxa de adesao"
+      ],
+      "language": "pt-BR",
+      "is_active": true,
+      "metadata": {}
+    }
+  ],
+  "media": [
+    {
+      "id": "73fdd0c5-17be-4280-a95d-160287bdf3c7",
+      "created_at": "2026-08-26T02:11:32.550858Z",
+      "updated_at": "2026-08-26T02:11:40.431878Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 22",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "73fdd0c5-17be-4280-a95d-160287bdf3c7",
+          "completed": [],
+          "elapsed_ms": 4.954,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "ef9e6f67-48ba-4d1d-bb88-c1a01b662d76",
+      "created_at": "2026-08-26T02:10:18.430074Z",
+      "updated_at": "2026-08-26T02:10:26.594967Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 21",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "ef9e6f67-48ba-4d1d-bb88-c1a01b662d76",
+          "completed": [],
+          "elapsed_ms": 3.813,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "0b5dd117-0bd0-4aff-9659-03475009f718",
+      "created_at": "2026-08-26T02:08:14.271686Z",
+      "updated_at": "2026-08-26T02:08:22.131717Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 20",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "0b5dd117-0bd0-4aff-9659-03475009f718",
+          "completed": [],
+          "elapsed_ms": 3.634,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "45c46e34-aa40-4143-b341-a94bda349051",
+      "created_at": "2026-08-26T02:06:58.133923Z",
+      "updated_at": "2026-08-26T02:07:05.954983Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 19",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "45c46e34-aa40-4143-b341-a94bda349051",
+          "completed": [],
+          "elapsed_ms": 3.78,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "d5166c8f-3f22-4750-a60e-b40196bd38ca",
+      "created_at": "2026-08-26T02:04:01.341436Z",
+      "updated_at": "2026-08-26T02:04:08.912875Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 17",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "d5166c8f-3f22-4750-a60e-b40196bd38ca",
+          "completed": [],
+          "elapsed_ms": 3.789,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "7d476717-12ba-4724-959a-62b46f928162",
+      "created_at": "2026-08-26T02:02:31.996133Z",
+      "updated_at": "2026-08-26T02:02:39.763069Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 16",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "7d476717-12ba-4724-959a-62b46f928162",
+          "completed": [],
+          "elapsed_ms": 4.134,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "4402c259-1d8c-4415-8655-b390fcc075ce",
+      "created_at": "2026-08-26T02:00:55.634497Z",
+      "updated_at": "2026-08-26T02:01:03.654196Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 15",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "4402c259-1d8c-4415-8655-b390fcc075ce",
+          "completed": [],
+          "elapsed_ms": 6.106,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "69a49e41-c5b3-459e-aa21-a3a993c468a8",
+      "created_at": "2026-08-26T01:58:40.542100Z",
+      "updated_at": "2026-08-26T01:58:48.078775Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 14",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "69a49e41-c5b3-459e-aa21-a3a993c468a8",
+          "completed": [],
+          "elapsed_ms": 3.11,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "7a4ac37e-2162-4ad8-adde-46b453948826",
+      "created_at": "2026-08-26T01:56:55.465822Z",
+      "updated_at": "2026-08-26T01:57:03.322860Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 13",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "7a4ac37e-2162-4ad8-adde-46b453948826",
+          "completed": [],
+          "elapsed_ms": 3.273,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "448083f6-5b2d-4931-9989-13cdb9d5bcc1",
+      "created_at": "2026-08-26T01:52:07.394341Z",
+      "updated_at": "2026-08-26T01:52:15.485257Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 12",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "448083f6-5b2d-4931-9989-13cdb9d5bcc1",
+          "completed": [],
+          "elapsed_ms": 4.018,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "8e19ee99-3bd0-4929-8b5e-f31962ddafa0",
+      "created_at": "2026-08-26T01:50:49.692519Z",
+      "updated_at": "2026-08-26T01:50:57.889054Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 11",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "8e19ee99-3bd0-4929-8b5e-f31962ddafa0",
+          "completed": [],
+          "elapsed_ms": 3.121,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "3c330dff-ad16-4fe7-9f6f-d101aa925282",
+      "created_at": "2026-08-26T01:47:41.396926Z",
+      "updated_at": "2026-08-26T01:47:49.090953Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 10",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "3c330dff-ad16-4fe7-9f6f-d101aa925282",
+          "completed": [],
+          "elapsed_ms": 4.174,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "eb717804-c90d-4223-8e53-7479e9ee9150",
+      "created_at": "2026-08-26T01:46:30.879021Z",
+      "updated_at": "2026-08-26T01:46:34.850172Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 9",
+      "status": "ingested",
+      "metadata": {}
+    },
+    {
+      "id": "65bb0813-ae02-4fbd-ab2c-2d434071c268",
+      "created_at": "2026-08-26T01:42:40.990474Z",
+      "updated_at": "2026-08-26T01:42:48.202052Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 8",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "65bb0813-ae02-4fbd-ab2c-2d434071c268",
+          "completed": [],
+          "elapsed_ms": 4.076,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "1b7a93d8-8eb1-45f4-bdec-ca9e801c1dec",
+      "created_at": "2026-08-26T01:41:32.604502Z",
+      "updated_at": "2026-08-26T01:41:40.026331Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 7",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "1b7a93d8-8eb1-45f4-bdec-ca9e801c1dec",
+          "completed": [],
+          "elapsed_ms": 3.196,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "f3a5bd0b-9735-46a2-b0a6-b0384408cc3e",
+      "created_at": "2026-08-26T01:40:23.665047Z",
+      "updated_at": "2026-08-26T01:40:30.947551Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 6",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "f3a5bd0b-9735-46a2-b0a6-b0384408cc3e",
+          "completed": [],
+          "elapsed_ms": 5.078,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "db143d92-4050-43ef-843b-0bbbcafcd113",
+      "created_at": "2026-08-26T01:38:37.653537Z",
+      "updated_at": "2026-08-26T01:38:44.784978Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 5",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "db143d92-4050-43ef-843b-0bbbcafcd113",
+          "completed": [],
+          "elapsed_ms": 4.074,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "7f52fd98-314e-4525-96d4-963d8ab2e94e",
+      "created_at": "2026-08-26T01:36:38.010239Z",
+      "updated_at": "2026-08-26T01:36:45.209982Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 4",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "7f52fd98-314e-4525-96d4-963d8ab2e94e",
+          "completed": [],
+          "elapsed_ms": 3.888,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "9da171f1-457f-44a6-8a2c-c767ae98b639",
+      "created_at": "2026-08-26T01:33:19.289248Z",
+      "updated_at": "2026-08-26T01:33:26.217077Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 3",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "9da171f1-457f-44a6-8a2c-c767ae98b639",
+          "completed": [],
+          "elapsed_ms": 3.912,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "36034953-c2da-4cdf-b5d5-1385f68e46c5",
+      "created_at": "2026-08-26T01:27:38.047165Z",
+      "updated_at": "2026-08-26T01:27:49.247328Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 2",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "36034953-c2da-4cdf-b5d5-1385f68e46c5",
+          "completed": [],
+          "elapsed_ms": 3.9,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "d119cb12-75b6-47e2-8d37-daf256cd407e",
+      "created_at": "2026-08-26T01:27:06.111891Z",
+      "updated_at": "2026-08-26T01:27:18.529068Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 149.2,
+      "fps": 0.0,
+      "title": "Grade TV - bloco da noite - rodada 1",
+      "status": "analyzed",
+      "metadata": {
+        "ingest": {
+          "fps": 0.0,
+          "steps": [
+            {
+              "name": "probe",
+              "items": 0,
+              "detail": "adaptador de probe indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "audio",
+              "items": 0,
+              "detail": "depende do probe",
+              "status": "skipped"
+            },
+            {
+              "name": "asr",
+              "items": 0,
+              "detail": "adaptador de ASR indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "scenes",
+              "items": 0,
+              "detail": "detector de cenas indisponivel",
+              "status": "skipped"
+            },
+            {
+              "name": "ocr",
+              "items": 0,
+              "detail": "motor de OCR indisponivel",
+              "status": "skipped"
+            }
+          ],
+          "failed": [],
+          "status": "analyzed",
+          "skipped": [
+            "probe",
+            "audio",
+            "asr",
+            "scenes",
+            "ocr"
+          ],
+          "media_id": "d119cb12-75b6-47e2-8d37-daf256cd407e",
+          "completed": [],
+          "elapsed_ms": 5.348,
+          "duration_seconds": 149.2
+        }
+      }
+    },
+    {
+      "id": "37062d2f-e5b9-4068-b694-58cefbc3cce5",
+      "created_at": "2026-08-26T01:25:24.611964Z",
+      "updated_at": "2026-08-26T01:29:50.291336Z",
+      "uri": "/dados/cetico-refutacao.mp4",
+      "kind": "video",
+      "duration_seconds": 28.17,
+      "fps": 0.0,
+      "title": "CETICO REFUTACAO - subliminar",
+      "status": "analyzed",
+      "metadata": {}
+    },
+    {
+      "id": "877aab47-bc01-4acc-b4cf-3e7d4883e9b1",
+      "created_at": "2026-08-26T01:21:46.038208Z",
+      "updated_at": "2026-08-26T01:21:46.039007Z",
+      "uri": "/dados/controle-cetico.mp4",
+      "kind": "video",
+      "duration_seconds": 0.0,
+      "fps": 0.0,
+      "title": "controle cetico urlencoded",
+      "status": "registered",
+      "metadata": {}
+    },
+    {
+      "id": "4ff99020-fc6f-45eb-ae43-7e9108ef49bf",
+      "created_at": "2026-08-26T01:20:42.855554Z",
+      "updated_at": "2026-08-26T01:22:01.554284Z",
+      "uri": "/tmp/claude-0/-home-user-lukato/e58ab289-e87e-55fc-ab2b-f402fa2bc67c/scratchpad/media/grade-teste.mp4",
+      "kind": "video",
+      "duration_seconds": 30.7,
+      "fps": 0.0,
+      "title": "TESTE CETICO 001",
+      "status": "ingested",
+      "metadata": {}
+    },
+    {
+      "id": "a37b8e8d-a849-4cb8-afe2-11522e1dcf35",
+      "created_at": "2026-08-26T01:20:33.091834Z",
+      "updated_at": "2026-08-26T01:20:33.092810Z",
+      "uri": "/tmp/claude-0/-home-user-lukato/e58ab289-e87e-55fc-ab2b-f402fa2bc67c/scratchpad/media/grade-teste.mp4",
+      "kind": "video",
+      "duration_seconds": 0.0,
+      "fps": 0.0,
+      "title": "TESTE CETICO 001",
+      "status": "registered",
+      "metadata": {}
+    },
+    {
+      "id": "2358473b-6d59-427a-b596-6072e479bfef",
+      "created_at": "2026-08-26T01:20:15.890614Z",
+      "updated_at": "2026-08-26T01:20:15.891365Z",
+      "uri": "/tmp/claude-0/-home-user-lukato/e58ab289-e87e-55fc-ab2b-f402fa2bc67c/scratchpad/media/grade-teste.mp4",
+      "kind": "video",
+      "duration_seconds": 0.0,
+      "fps": 0.0,
+      "title": "TESTE CETICO 001",
+      "status": "registered",
+      "metadata": {}
+    },
+    {
+      "id": "ce9e8017-e6bb-4a27-9ab7-89020d318376",
+      "created_at": "2026-08-26T01:03:57.930182Z",
+      "updated_at": "2026-08-26T01:19:20.257702Z",
+      "uri": "/tmp/teste-isentos.mp4",
+      "kind": "video",
+      "duration_seconds": 30.7,
+      "fps": 0.0,
+      "title": "teste isentos",
+      "status": "ingested",
+      "metadata": {}
+    },
+    {
+      "id": "6955f941-0575-4594-ac96-ca627459f6c1",
+      "created_at": "2026-08-26T00:32:34.565175Z",
+      "updated_at": "2026-08-26T01:14:39.580824Z",
+      "uri": "/home/user/Downloads/grade-tv-2026-08-26.mp4",
+      "kind": "video",
+      "duration_seconds": 150.9,
+      "fps": 0.0,
+      "title": "Grade TV - 26/08/2026 - bloco da noite",
+      "status": "analyzed",
+      "metadata": {}
+    },
+    {
+      "id": "ced8ac53-a5e0-4e01-ab31-1585f38a0124",
+      "created_at": "2026-08-26T00:32:08.892610Z",
+      "updated_at": "2026-08-26T00:41:55.933240Z",
+      "uri": "file:///demo/programa-lukato.mp4",
+      "kind": "video",
+      "duration_seconds": 300.0,
+      "fps": 25.0,
+      "title": "Programa demonstrativo lukato",
+      "status": "ingested",
+      "metadata": {
+        "origin": "seed",
+        "synthetic": true
+      }
+    }
+  ],
+  "nao_exportado": {
+    "segredos": "chave de API e hash de senha nunca saem daqui",
+    "derivados": "execucoes e deteccoes voltam rodando o funil de novo"
+  }
+}

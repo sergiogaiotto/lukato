@@ -170,7 +170,11 @@ class LLMSettings(BaseModel):
     model_config = _GROUP_CONFIG
 
     provider: str = "openai_compatible"
-    base_url: str = "https://hub-gpus-lab.usto.re/v1"
+    # Sem "-lab": o endereco com sufixo existe e responde (401), o que fez uma
+    # instalacao com chave valida perseguir o proprio modelo por tres rodadas de
+    # diagnostico — a chave estava certa, o host nao. Confirmado em uso real:
+    # `qwen-latest` responde neste endereco com a chave do documento de entrega.
+    base_url: str = "https://hub-gpus.usto.re/v1"
     api_key: SecretStr | None = None
     model: str = "qwen-latest"
     fallback_model: str = "openai/gpt-oss-20b"

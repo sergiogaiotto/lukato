@@ -455,7 +455,7 @@ Isto nao e ressalva formal. Sao dois pontos que ninguem exercitou, e quem implan
 sera **a primeira pessoa** a exercita-los:
 
 **1. O hub Qwen nunca foi exercitado de verdade.**
-`https://hub-gpus-lab.usto.re/v1` (LLM) e `https://hub-gpus.claro.com.br/embed06b/v1`
+`https://hub-gpus.usto.re/v1` (LLM) e `https://hub-gpus.claro.com.br/embed06b/v1`
 (embeddings) sao hosts internos, inalcancaveis do ambiente onde este projeto foi
 construido. Toda a suite de testes roda com o adaptador `echo` (LLM) e com o
 embedder `hashing`. Consequencias praticas:

@@ -21,7 +21,7 @@ data:
 
   # ---- LLM (hub interno, API compativel com OpenAI) ----
   LUKATO_LLM__PROVIDER: "openai_compatible"
-  LUKATO_LLM__BASE_URL: "https://hub-gpus-lab.usto.re/v1"
+  LUKATO_LLM__BASE_URL: "https://hub-gpus.usto.re/v1"
   LUKATO_LLM__MODEL: "qwen-latest"
   LUKATO_LLM__FALLBACK_MODEL: "openai/gpt-oss-20b"
   LUKATO_LLM__TEMPERATURE: "0.2"

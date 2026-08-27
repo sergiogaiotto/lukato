@@ -223,7 +223,14 @@ class Container:
             return _component(STATUS_DEGRADED, f"{type(exc).__name__}: {exc}")
         if healthy:
             return _component(STATUS_OK, f"modelo '{model}'")
-        return _component(STATUS_DEGRADED, f"modelo '{model}' indisponivel")
+        # A causa, quando o adaptador a guardou: "indisponivel" seco ja mandou
+        # um diagnostico inteiro atras de alias de modelo quando o problema era
+        # um 401 de chave ausente.
+        motivo = getattr(self.llm, "last_health_error", None)
+        detalhe = (
+            f"sonda de '{model}' falhou: {motivo}" if motivo else f"modelo '{model}' indisponivel"
+        )
+        return _component(STATUS_DEGRADED, detalhe)
 
     async def _check_embeddings(self) -> dict[str, str]:
         """Consulta `embeddings.health()` reportando modelo e dimensao."""
@@ -239,7 +246,11 @@ class Container:
             return _component(STATUS_DEGRADED, f"{type(exc).__name__}: {exc}")
         if healthy:
             return _component(STATUS_OK, f"modelo '{model}' com {dimensions} dimensoes")
-        return _component(STATUS_DEGRADED, f"modelo '{model}' indisponivel")
+        motivo = getattr(self.embeddings, "last_health_error", None)
+        detalhe = (
+            f"sonda de '{model}' falhou: {motivo}" if motivo else f"modelo '{model}' indisponivel"
+        )
+        return _component(STATUS_DEGRADED, detalhe)
 
     def _check_tracer(self) -> dict[str, str]:
         """Tracer no-op e degradacao esperada, nunca falha (SPEC-0008 secao 3)."""

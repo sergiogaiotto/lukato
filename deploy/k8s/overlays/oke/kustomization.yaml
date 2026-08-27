@@ -75,7 +75,7 @@ configMapGenerator:
       - LUKATO_DB__RUN_MIGRATIONS=false
 
       # ---- LLM / embeddings (hub interno) ----
-      # Os defaults do base apontam para hub-gpus-lab.usto.re (LLM) e
+      # Os defaults do base apontam para hub-gpus.usto.re (LLM) e
       # hub-gpus.claro.com.br/embed06b (embeddings). Confirme se sao os hosts de
       # PRODUCAO — nenhum dos dois foi exercitado a partir deste ambiente.
       - "LUKATO_LLM__BASE_URL=<PREENCHER: URL do hub de LLM em prod, terminando em /v1>"

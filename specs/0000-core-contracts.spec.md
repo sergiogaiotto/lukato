@@ -882,7 +882,7 @@ class DatabaseSettings(BaseModel):   # LUKATO_DB__*
 
 class LLMSettings(BaseModel):        # LUKATO_LLM__*
     provider="openai_compatible"     # openai_compatible|echo
-    base_url="https://hub-gpus-lab.usto.re/v1"
+    base_url="https://hub-gpus.usto.re/v1"
     api_key: SecretStr | None = None
     model="qwen-latest"
     fallback_model="openai/gpt-oss-20b"

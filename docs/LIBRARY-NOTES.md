@@ -100,7 +100,7 @@ porta `TracerPort` (assincrona) envolva-os com `contextlib.asynccontextmanager` 
 
 ```python
 from openai import AsyncOpenAI
-client = AsyncOpenAI(base_url="https://hub-gpus-lab.usto.re/v1", api_key=..., timeout=..., max_retries=...)
+client = AsyncOpenAI(base_url="https://hub-gpus.usto.re/v1", api_key=..., timeout=..., max_retries=...)
 resp = await client.chat.completions.create(model="qwen-latest", messages=[...], max_tokens=..., temperature=...)
 resp.choices[0].message.content
 resp.usage.prompt_tokens / completion_tokens / total_tokens
@@ -143,7 +143,7 @@ Limite de 72 bytes: faca pre-hash SHA-256 antes de `hashpw` para senhas longas.
 
 ## Ambiente deste repositorio
 
-* Os hosts `hub-gpus-lab.usto.re` e `hub-gpus.claro.com.br` sao **internos da Claro** e
+* Os hosts `hub-gpus.usto.re` e `hub-gpus.claro.com.br` sao **internos da Claro** e
   nao respondem fora da rede corporativa. Todo adaptador de rede precisa de um
   fallback offline deterministico, e a suite de testes nao pode depender de rede.
 * `pip` funciona; a venv de referencia fica em `.venv/`.
