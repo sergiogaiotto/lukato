@@ -59,6 +59,7 @@ from lukato.application.use_cases.adwatch import (
     MediaFilter,
     MediaInput,
     RegisterMedia,
+    ReindexCommercials,
 )
 from lukato.application.use_cases.guardrails import (
     CreatePolicy,
@@ -749,6 +750,34 @@ async def _todos(executar, filtro_de) -> list[Json]:
         offset += LIMITE_EXPORT
 
 
+async def _run_reindex(settings: Settings) -> int:
+    """Reassina o catalogo de comerciais com o embedder ATUAL.
+
+    Existe por causa de uma sequencia realista: catalogo importado com a
+    instalacao em modo offline (`HashingEmbedder`), rede do hub Qwen volta,
+    operador tira o modo offline — e a busca semantica passa a comparar vetores
+    de espacos diferentes, devolvendo similaridades sem significado, em
+    silencio. Um comando explicito e barato fecha essa janela.
+    """
+    principal = _root()
+    async with _container_scope(settings) as container:
+        embedder = container.embeddings
+        _out(f"reindexando com {embedder.model} ({embedder.dimensions} dimensoes)")
+        placar = await ReindexCommercials(container).execute(principal)
+    _out()
+    _out(f"{placar['total']} comercial(is) reassinado(s)")
+    _out(f"  com embedding: {placar['com_embedding']}")
+    if placar["sem_embedding"]:
+        _out(f"  SEM embedding: {placar['sem_embedding']} — o provedor falhou nesses;")
+        _out("  rode de novo com o provedor de pe para completar. Faltaram:")
+        for codigo in placar["faltantes"][:10]:
+            _out(f"    - {codigo}")
+        if len(placar["faltantes"]) > 10:
+            _out(f"    ... e mais {len(placar['faltantes']) - 10}")
+        return EXIT_ERROR
+    return EXIT_OK
+
+
 async def _montar_export(settings: Settings) -> Json:
     """Escreve num JSO o que esta instalacao tem de configuracao e catalogo.
 
@@ -1212,6 +1241,12 @@ def build_parser(settings: Settings) -> argparse.ArgumentParser:
     )
     export.set_defaults(handler="export")
 
+    reindex = commands.add_parser(
+        "reindex",
+        help="reassina o catalogo de comerciais com o embedder atual (rode ao trocar o provedor)",
+    )
+    reindex.set_defaults(handler="reindex")
+
     importar = commands.add_parser(
         "import", help="recria nesta instalacao o que um `lukato export` levou de outra"
     )
@@ -1288,6 +1323,8 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> int:
         return _run_export(settings, destino=args.out)
     if handler == "import":
         return _run_import(settings, origem=args.arquivo)
+    if handler == "reindex":
+        return asyncio.run(_run_reindex(settings))
     if handler == "health":
         return asyncio.run(_run_health(settings))
     if handler == "modules.list":

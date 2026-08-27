@@ -131,6 +131,7 @@ __all__ = [
     "MediaFilter",
     "MediaInput",
     "RegisterMedia",
+    "ReindexCommercials",
     "ReviewDetection",
     "UpdateCommercial",
     "extract_key_phrases",
@@ -1108,6 +1109,68 @@ class UpdateCommercial(_AdWatchUseCase):
         return bool(
             changes.keys() & {"text", "keywords", "key_phrases", "duration_expected", "brand"}
         )
+
+
+class ReindexCommercials(_AdWatchUseCase):
+    """Reconstroi as assinaturas de TODOS os comerciais com o embedder ATUAL.
+
+    A assinatura carrega um embedding, e embedding so compara com embedding do
+    MESMO espaco: um catalogo assinado pelo `HashingEmbedder` (o modo offline) e
+    consultado pelo Qwen depois de a rede voltar produz similaridades sem
+    significado — o `semantic_match` nao zera nem grita, ele devolve numeros
+    errados em silencio. E exatamente o que acontece ao importar um catalogo com
+    um embedder e operar com outro.
+
+    Trocou o provedor de embeddings, rode isto. A parte deterministica da
+    assinatura (tokens, keywords, frases) e recalculada junto, de graca — ela e
+    pura e barata; o custo real e o lote de embeddings.
+    """
+
+    async def execute(self, principal: Principal, *, page_size: int = 200) -> Json:
+        """Reassina o catalogo inteiro em lotes; devolve o placar da varredura.
+
+        `com_embedding`/`sem_embedding` sao o resultado que interessa: um provedor
+        fora do ar nao derruba a varredura (SPEC-0000 secao 14) — os comerciais
+        que ficaram sem vetor sao contados e nomeados no log, e uma nova rodada
+        com o provedor de pe completa o que faltou.
+        """
+        authorize(principal, ADWATCH_WRITE, "reindexar as assinaturas do catalogo")
+        builder = BuildFingerprint(self._container)
+        total = 0
+        embedded = 0
+        offset = 0
+        sem_vetor: list[str] = []
+        while True:
+            async with self._container.uow_factory() as uow:
+                lote = await uow.commercials.list(limit=page_size, offset=offset)
+            if not lote:
+                break
+            fingerprints = await builder.many(lote)
+            async with self._container.uow_factory() as uow:
+                for commercial, fingerprint in zip(lote, fingerprints, strict=True):
+                    await uow.commercials.upsert_fingerprint(fingerprint)
+                    total += 1
+                    if fingerprint.embedding is not None:
+                        embedded += 1
+                    else:
+                        sem_vetor.append(commercial.commercial_id)
+                await uow.commit()
+            offset += page_size
+        _logger.info(
+            "commercials_reindexed",
+            total=total,
+            embedded=embedded,
+            without_embedding=len(sem_vetor),
+            missing=sem_vetor[:20],
+            model=str(self._container.embeddings.model),
+        )
+        return {
+            "total": total,
+            "com_embedding": embedded,
+            "sem_embedding": len(sem_vetor),
+            "faltantes": sem_vetor,
+            "model": str(self._container.embeddings.model),
+        }
 
 
 class DeleteCommercial(_AdWatchUseCase):
