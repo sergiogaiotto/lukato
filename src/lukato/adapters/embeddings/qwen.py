@@ -161,6 +161,7 @@ class QwenEmbedder:
         request_timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         embedding = settings.embedding
+        self.last_health_error: str | None = None
         self._settings = settings
         self._model = embedding.model
         self._dimensions = embedding.dimensions
@@ -213,6 +214,10 @@ class QwenEmbedder:
             payload = await self._post([_HEALTH_PROBE], timeout_seconds=HEALTH_TIMEOUT_SECONDS)
             vectors = _extract_vectors(payload)
         except Exception as exc:
+            # Motivo preservado para o relatorio de saude — ver o comentario em
+            # `OpenAICompatibleLLM.health`: e o que distingue "sem credencial"
+            # de "hub fora do ar" para quem le o `/readyz`.
+            self.last_health_error = f"{type(exc).__name__}: {str(exc)[:160]}"
             _logger.info(
                 "embedding_health_unavailable",
                 endpoint=self._endpoint,
@@ -220,6 +225,7 @@ class QwenEmbedder:
                 detail=str(exc)[:200],
             )
             return False
+        self.last_health_error = None
         return bool(vectors)
 
     async def aclose(self) -> None:

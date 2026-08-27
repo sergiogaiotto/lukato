@@ -3,7 +3,7 @@
 **Status:** aceito · **Data:** 2026-08
 
 ## Contexto
-`hub-gpus-lab.usto.re` e `hub-gpus.claro.com.br` sao hosts internos. PostgreSQL,
+`hub-gpus.usto.re` e `hub-gpus.claro.com.br` sao hosts internos. PostgreSQL,
 Langfuse, FFmpeg, WhisperX, PaddleOCR e PySceneDetect podem nao existir no ambiente de
 quem desenvolve ou no runner de CI.
 
