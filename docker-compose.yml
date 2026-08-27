@@ -30,6 +30,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # A stack local constroi COM a capacidade multimodal (FFmpeg + ASR com
+        # timestamps por palavra) para processar video de verdade pela UI. A
+        # imagem enxuta para k8s continua sendo o default do Dockerfile.
+        WITH_MEDIA: "1"
     image: lukato:1.0.0
     container_name: lukato-api
     depends_on:
@@ -47,6 +52,10 @@ services:
     ports: ["8000:8000"]
     volumes:
       - adwatch:/app/var
+      # Videos locais para o AdWatch: ponha o arquivo em ./video/ no host e
+      # cadastre a midia no console com o caminho /app/video/<arquivo>. Somente
+      # leitura — o container nunca altera nem apaga o video original.
+      - ./video:/app/video:ro
     # Sem `healthcheck:` aqui de proposito: a imagem ja traz o dela (HEALTHCHECK no
     # Dockerfile) e duas definicoes se desencontram. Foi o que aconteceu: o curl
     # saiu da imagem e este bloco continuou chamando `curl`, deixando o container

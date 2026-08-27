@@ -177,14 +177,17 @@ CAPABILITY_REMEDIES: Final[Mapping[str, Mapping[str, str]]] = {
     "probe": {
         "adapter": "FFmpeg/ffprobe",
         "install": "instale o FFmpeg no sistema (ex.: `apt-get install -y ffmpeg`) e "
-        "garanta que `ffmpeg` e `ffprobe` estejam no PATH",
+        "garanta que `ffmpeg` e `ffprobe` estejam no PATH; no Docker, reconstrua a "
+        "imagem com `--build-arg WITH_MEDIA=1` (o docker-compose local ja o define)",
         "impact": "sem probe nao ha duracao, fps nem extracao de audio a partir do video",
         "workaround": "informe 'duration_seconds' e 'fps' ao registrar a midia",
     },
     "asr": {
         "adapter": "WhisperX",
         "install": "instale as dependencias multimodais com "
-        "`pip install -r requirements-media.txt` (traz whisperx)",
+        "`pip install -r requirements-media.txt` (traz whisperx); no Docker, "
+        "reconstrua a imagem com `--build-arg WITH_MEDIA=1` (o docker-compose "
+        "local ja o define)",
         "impact": "sem ASR a linha do tempo de palavras nao e extraida do audio",
         "workaround": "use a acao 'import_transcript' com a transcricao em JSON",
     },
@@ -198,7 +201,9 @@ CAPABILITY_REMEDIES: Final[Mapping[str, Mapping[str, str]]] = {
     "scenes": {
         "adapter": "PySceneDetect",
         "install": "instale as dependencias multimodais com "
-        "`pip install -r requirements-media.txt` (traz scenedetect e opencv)",
+        "`pip install -r requirements-media.txt` (traz scenedetect e opencv); no "
+        "Docker, reconstrua a imagem com `--build-arg WITH_MEDIA=1` (o "
+        "docker-compose local ja o define)",
         "impact": "sem cortes de cena o refino de fronteira usa a primeira e a ultima "
         "palavra casada, com erro maior de inicio e fim",
         "workaround": "importe os cortes prontos em POST /api/v1/adwatch/media/{id}/scenes",

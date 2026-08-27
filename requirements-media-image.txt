@@ -1,0 +1,40 @@
+# lukato 1.0.0 — dependencias multimodais DA IMAGEM DOCKER (CPU, x86_64)
+#
+# Irmao de `requirements-media.txt`, com duas diferencas deliberadas:
+#
+#   1. torch/torchaudio na variante `+cpu`: os wheels vem do indice
+#      https://download.pytorch.org/whl/cpu (o Dockerfile passa
+#      --extra-index-url). A variante do PyPI arrasta ~6 GB de bibliotecas
+#      CUDA da nvidia que nao servem para nada num container sem GPU.
+#   2. scenedetect SEM o extra [opencv]: o extra puxa opencv-python (build
+#      GUI), que exige libGL — biblioteca de sistema que esta imagem, sem
+#      apt, nao tem. O opencv-python-headless cobre o que os adaptadores
+#      usam (decodificacao de frames e I/O de video) sem dependencia de X11.
+#
+# paddleocr e faiss-cpu (presentes em requirements-media.txt) ficam FORA da
+# imagem de proposito: juntos passam de 1 GB e o produto ja opera sem eles —
+# o console mostra o teto efetivo de score sem OCR (85%) e o motivo. Quem
+# precisar de OCR na imagem instala requirements-media.txt por cima, num
+# ambiente com as bibliotecas de sistema que o paddle exige.
+#
+# Instalado junto com requirements.txt (o `-r` abaixo) para que o resolvedor
+# do pip honre os pins da base — em especial numpy — em vez de troca-los em
+# silencio numa segunda passada.
+-r requirements.txt
+
+ffmpeg-python==0.2.0
+scenedetect==0.6.7
+opencv-python-headless==4.10.0.84
+
+# ASR com timestamps por palavra (forced alignment)
+whisperx==3.4.4
+torch==2.5.1+cpu
+torchaudio==2.5.1+cpu
+
+# Guardas de major: o whisperx 3.4.4 declara `transformers>=4.48.0` e `pandas`
+# sem teto, entao um resolvedor solto escolhe transformers 5.x e pandas 3.x —
+# majors lancados DEPOIS dele, contra os quais nunca foi testado. Segura-los
+# abaixo do major reproduz o ambiente da epoca do release. Ao subir o pin do
+# whisperx, reavalie os dois.
+transformers<5
+pandas<3
