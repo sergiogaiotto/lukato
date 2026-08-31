@@ -11,8 +11,10 @@
 
 ffmpeg-python==0.2.0
 scenedetect[opencv]==0.6.7
-# ASR com timestamps por palavra (forced alignment)
-whisperx==3.4.4
+# ASR com timestamps por palavra (forced alignment) — 3.8.x pela
+# compatibilidade com torch >= 2.6/2.8; o racional completo esta em
+# requirements-media-image.txt.
+whisperx==3.8.6
 # OCR de frames (100+ idiomas)
 paddleocr==3.4.0
 # Indice vetorial local para catalogos grandes de comerciais
