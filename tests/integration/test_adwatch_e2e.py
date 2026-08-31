@@ -813,3 +813,100 @@ async def test_reindex_reassina_o_catalogo_com_o_embedder_atual(
     assert dims_depois == {outra_dimensao}, (
         f"o reindex nao reescreveu os vetores: dimensoes gravadas {sorted(dims_depois)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Upload de midia (POST /media/upload)
+# ---------------------------------------------------------------------------
+async def test_upload_grava_a_copia_no_workdir_e_registra_o_ativo(
+    client: AsyncClient, settings: Any
+) -> None:
+    """O caminho hospedado: o arquivo sobe, vira copia no volume e sai registrado."""
+    import asyncio
+    from pathlib import Path
+
+    conteudo = b"\x00\x00\x00\x18ftypmp42" + b"\xab" * 4096
+    resposta = await client.post(
+        f"{API}/media/upload",
+        files={"file": ("Torcida Multi (1).mp4", conteudo, "video/mp4")},
+        data={"title": "Torcida Multi", "kind": "video"},
+    )
+    assert resposta.status_code == 201, resposta.text
+    corpo = resposta.json()
+
+    gravado = Path(corpo["uri"])
+    esperado = Path(settings.adwatch.workdir) / "uploads"
+    assert gravado.parent == esperado, corpo["uri"]
+    dados_no_disco = await asyncio.to_thread(gravado.read_bytes)
+    assert dados_no_disco == conteudo, "a copia no disco difere do que subiu"
+    # O nome enviado e conteudo do cliente: parenteses e espacos nao sobrevivem,
+    # e um prefixo aleatorio impede colisao entre uploads homonimos.
+    assert gravado.name.endswith("-Torcida_Multi_1_.mp4"), gravado.name
+
+    assert corpo["status"] == "registered"
+    assert corpo["title"] == "Torcida Multi"
+    assert corpo["metadata"]["upload"]["original_filename"] == "Torcida Multi (1).mp4"
+    assert corpo["metadata"]["upload"]["size_bytes"] == len(conteudo)
+
+    detalhe = await client.get(f"{API}/media/{corpo['id']}")
+    assert detalhe.status_code == 200
+    assert detalhe.json()["media"]["uri"] == corpo["uri"]
+
+
+async def test_upload_sem_titulo_usa_o_nome_do_arquivo(client: AsyncClient) -> None:
+    """Sem titulo informado, o basename saneado (sem extensao) da nome ao ativo."""
+    resposta = await client.post(
+        f"{API}/media/upload",
+        files={"file": ("chamada.mp3", b"ID3\x04" + b"\x01" * 64, "audio/mpeg")},
+        data={"kind": "audio"},
+    )
+    assert resposta.status_code == 201, resposta.text
+    assert resposta.json()["title"] == "chamada"
+
+
+async def test_upload_rejeita_extensao_que_nao_corresponde_a_natureza(
+    client: AsyncClient, settings: Any
+) -> None:
+    """Extensao fora da lista da natureza responde 422 e nao deixa arquivo para tras."""
+    from pathlib import Path
+
+    casos = [
+        ("payload.exe", "video"),
+        ("video.mp4", "audio"),
+        ("sem_extensao", "video"),
+    ]
+    for nome, natureza in casos:
+        resposta = await client.post(
+            f"{API}/media/upload",
+            files={"file": (nome, b"\x00" * 32, "application/octet-stream")},
+            data={"kind": natureza},
+        )
+        assert resposta.status_code == 422, f"{nome}/{natureza}: {resposta.text}"
+
+    pasta = Path(settings.adwatch.workdir) / "uploads"
+    assert not pasta.exists() or not any(pasta.iterdir()), (
+        "upload rejeitado nao pode deixar arquivo no volume"
+    )
+
+
+async def test_upload_acima_do_teto_responde_413_e_apaga_o_parcial(
+    client: AsyncClient, settings: Any
+) -> None:
+    """Passar de `upload_max_mb` derruba o envio com 413 e descarta o parcial."""
+    from pathlib import Path
+
+    settings.adwatch.upload_max_mb = 1
+    try:
+        resposta = await client.post(
+            f"{API}/media/upload",
+            files={"file": ("longa.mp4", b"\x00" * (1024 * 1024 + 1), "video/mp4")},
+            data={"kind": "video"},
+        )
+    finally:
+        settings.adwatch.upload_max_mb = 2048
+    assert resposta.status_code == 413, resposta.text
+
+    pasta = Path(settings.adwatch.workdir) / "uploads"
+    assert not pasta.exists() or not any(pasta.iterdir()), (
+        "o parcial de um upload estourado deveria ter sido apagado"
+    )

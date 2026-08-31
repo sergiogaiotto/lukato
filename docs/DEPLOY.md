@@ -126,6 +126,16 @@ de ASR/alinhamento são baixados no primeiro uso e ficam em `/app/var/hf` e
 Em rede fechada, aponte `FFBIN_FFMPEG_URL`/`FFBIN_FFPROBE_URL` para o espelho
 interno e ajuste os respectivos `*_SHA256`.
 
+**Upload pela UI/API.** Hospedado num servidor, ninguém tem "caminho local":
+`POST /api/v1/adwatch/media/upload` (e o formulário *Enviar um arquivo* do
+console) recebe o vídeo/áudio em `multipart/form-data`, grava a cópia em
+`<LUKATO_ADWATCH__WORKDIR>/uploads` — dentro do volume `/app/var`, o mesmo do
+compose e do PVC no Kubernetes — e registra o ativo apontando para ela. O teto
+por arquivo é `LUKATO_ADWATCH__UPLOAD_MAX_MB` (padrão 2048 MiB); dimensione o
+volume/PVC de acordo. Atrás de um ingress/proxy, alinhe também o limite de corpo
+dele (ex.: `client_max_body_size` no NGINX), senão o upload morre antes de
+chegar à aplicação.
+
 Fumaça local (opcional, mas barato):
 
 ```bash

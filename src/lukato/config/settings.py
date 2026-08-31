@@ -388,6 +388,10 @@ class AdWatchSettings(BaseModel):
     top_k_retrieval: int = Field(default=10, ge=1)
     top_k_rerank: int = Field(default=3, ge=1)
     workdir: str = "./var/adwatch"
+    # Teto de `POST /media/upload`, em MiB. O upload grava em `<workdir>/uploads`,
+    # entao o limite real e o disco do volume — este numero so impede que um
+    # arquivo errado (uma imagem de disco, um zip) ocupe o volume inteiro.
+    upload_max_mb: int = Field(default=2048, ge=1)
 
     @field_validator("window_sizes", mode="before")
     @classmethod

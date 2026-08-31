@@ -40,10 +40,29 @@ injetado por :func:`lukato.interfaces.http.deps.get_container`.
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Annotated, Any, Final
+import pathlib
+import re
+from typing import Annotated, Any, BinaryIO, Final
+from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
+from fastapi import (
+    UploadFile as ApiUploadFile,
+)
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
@@ -71,12 +90,13 @@ from lukato.application.use_cases.adwatch import (
     ListDetections,
     ListMedia,
     MediaFilter,
+    MediaInput,
     RegisterMedia,
     ReviewDetection,
     UpdateCommercial,
 )
 from lukato.domain.errors import ValidationError
-from lukato.domain.models.adwatch import DetectionStatus
+from lukato.domain.models.adwatch import DetectionStatus, MediaKind
 from lukato.domain.models.identity import Principal
 from lukato.domain.types import Id, Json
 from lukato.interfaces.http.deps import ContainerDep, PaginationDep, require
@@ -583,6 +603,142 @@ async def register_media(
 ) -> MediaOut:
     """Registra o ativo e devolve a entidade gravada."""
     asset = await RegisterMedia(container).execute(payload.to_input(), principal)
+    return MediaOut.from_domain(asset)
+
+
+_UPLOAD_SUBDIR: Final[str] = "uploads"
+"""Subdiretorio de `adwatch.workdir` que recebe os uploads — dentro do volume."""
+
+_UPLOAD_CHUNK_BYTES: Final[int] = 1024 * 1024
+"""Bloco copiado por vez: 1 MiB mantem a memoria constante em arquivos de horas."""
+
+_UPLOAD_EXTENSIONS: Final[dict[MediaKind, frozenset[str]]] = {
+    MediaKind.VIDEO: frozenset({".avi", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".webm"}),
+    MediaKind.AUDIO: frozenset({".aac", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav"}),
+}
+"""Extensoes aceitas por natureza — os contenedores que a sondagem FFmpeg sabe ler."""
+
+_CARACTERE_FORA_DO_NOME: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9._-]+")
+"""Tudo que nao entra no nome gravado em disco vira `_`."""
+
+
+class _UploadExcedeuOTeto(Exception):
+    """O arquivo passou de `adwatch.upload_max_mb` no meio da copia."""
+
+
+def _nome_seguro(original: str) -> str:
+    """Reduz o nome enviado a um basename inofensivo.
+
+    Navegadores mandam so o basename, mas o campo e conteudo do cliente: pode
+    vir `C:\\pasta\\video.mp4`, `../../etc/cron.d/x` ou unicode de controle. O
+    nome final participa do caminho gravado, entao aqui ele perde qualquer
+    componente de diretorio e qualquer caractere fora de `[A-Za-z0-9._-]`.
+    """
+    base = pathlib.PurePosixPath(original.replace("\\", "/")).name
+    limpo = _CARACTERE_FORA_DO_NOME.sub("_", base).strip("._")
+    return (limpo or "midia")[-120:]
+
+
+def _copiar_upload(origem: BinaryIO, destino: pathlib.Path, *, teto_bytes: int) -> int:
+    """Copia o upload em blocos para `destino` e devolve o total de bytes.
+
+    Roda em thread (I/O sincrono fora do event loop). Passar do teto levanta
+    :class:`_UploadExcedeuOTeto` — quem chama apaga o parcial.
+    """
+    total = 0
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with destino.open("wb") as saida:
+        while bloco := origem.read(_UPLOAD_CHUNK_BYTES):
+            total += len(bloco)
+            if total > teto_bytes:
+                raise _UploadExcedeuOTeto
+            saida.write(bloco)
+    return total
+
+
+def _descartar_upload(destino: pathlib.Path) -> None:
+    """Apaga o arquivo parcial sem reclamar se ele nem chegou a existir."""
+    destino.unlink(missing_ok=True)
+
+
+@router.post(
+    "/media/upload",
+    response_model=MediaOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 403, 413, 422),
+    summary="Envia um arquivo de midia e registra o ativo",
+    description=(
+        "O irmao hospedado do `POST /media`: em vez de anotar um caminho que o "
+        "servidor ja enxerga, recebe o proprio arquivo em `multipart/form-data`, "
+        "grava a copia em `<adwatch.workdir>/uploads` (dentro do volume da "
+        "aplicacao) e registra o ativo apontando para ela — pronto para a "
+        "ingestao. O teto e `adwatch.upload_max_mb`; a extensao precisa "
+        "corresponder a natureza declarada em `kind`."
+    ),
+)
+async def upload_media(
+    container: ContainerDep,
+    principal: _Writer,
+    file: Annotated[ApiUploadFile, File(description="O arquivo de video ou audio.")],
+    kind: Annotated[MediaKind, Form(description="Natureza do ativo.")] = MediaKind.VIDEO,
+    title: Annotated[str, Form(description="Titulo exibido no console.")] = "",
+) -> MediaOut:
+    """Grava o arquivo enviado no armazenamento da aplicacao e registra o ativo."""
+    original = file.filename or ""
+    nome = _nome_seguro(original)
+    extensao = pathlib.PurePosixPath(nome).suffix.lower()
+    aceitas = _UPLOAD_EXTENSIONS[kind]
+    if extensao not in aceitas:
+        raise ValidationError(
+            f"a extensao {extensao or '(nenhuma)'} nao corresponde a natureza "
+            f"'{kind.value}'; aceitas: {', '.join(sorted(aceitas))}",
+            details={"filename": original, "kind": kind.value},
+        )
+
+    ajustes = container.settings.adwatch
+    teto_bytes = ajustes.upload_max_mb * 1024 * 1024
+    destino = pathlib.Path(ajustes.workdir) / _UPLOAD_SUBDIR / f"{uuid4().hex}-{nome}"
+    try:
+        total = await asyncio.to_thread(_copiar_upload, file.file, destino, teto_bytes=teto_bytes)
+    except _UploadExcedeuOTeto:
+        await asyncio.to_thread(_descartar_upload, destino)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"O arquivo excede o teto de {ajustes.upload_max_mb} MiB do upload "
+                "(`adwatch.upload_max_mb`). Aumente o limite ou registre a midia por "
+                "caminho, com o arquivo ja acessivel ao servidor."
+            ),
+        ) from None
+    except Exception:
+        await asyncio.to_thread(_descartar_upload, destino)
+        raise
+    if total == 0:
+        await asyncio.to_thread(_descartar_upload, destino)
+        raise ValidationError(
+            "o arquivo enviado esta vazio",
+            details={"filename": original, "kind": kind.value},
+        )
+
+    entrada = MediaInput(
+        uri=str(destino),
+        kind=kind,
+        title=title or pathlib.PurePosixPath(nome).stem,
+        metadata={
+            "upload": {
+                "original_filename": original,
+                "size_bytes": total,
+                "content_type": file.content_type or "",
+            }
+        },
+    )
+    try:
+        asset = await RegisterMedia(container).execute(entrada, principal)
+    except Exception:
+        # O registro falhou depois da copia: sem o ativo apontando para ele, o
+        # arquivo seria um orfao invisivel ocupando o volume para sempre.
+        await asyncio.to_thread(_descartar_upload, destino)
+        raise
     return MediaOut.from_domain(asset)
 
 

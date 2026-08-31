@@ -119,7 +119,8 @@
         <h2 class="lk-section__title">Registrar a mídia</h2>
         <p class="lk-muted">
           O ativo entra com <span class="lk-mono">status=registered</span>. Nada é copiado: o
-          caminho apontado precisa ser legível pelo processo da aplicação.
+          caminho apontado precisa ser legível pelo processo da aplicação. Para subir um
+          arquivo do seu computador, use <b>Enviar um arquivo</b>, ao lado.
         </p>
         <form class="lk-stack" method="post" action="/api/v1/adwatch/media">
           <div class="lk-field">
@@ -145,6 +146,39 @@
             </select>
           </div>
           <button class="lk-btn lk-btn--primary" type="submit">Registrar</button>
+        </form>
+      </section>
+
+      <section class="lk-step">
+        <h2 class="lk-section__title">Enviar um arquivo</h2>
+        <p class="lk-muted">
+          O caminho para o lukato hospedado: o arquivo sobe do seu computador, é copiado
+          para o armazenamento da aplicação (<span class="lk-mono">var/adwatch/uploads</span>,
+          dentro do volume) e o ativo já sai registrado apontando para a cópia — pronto
+          para a ingestão, sem depender de caminhos da máquina de quem opera.
+        </p>
+        <form
+          class="lk-stack"
+          method="post"
+          action="/api/v1/adwatch/media/upload"
+          enctype="multipart/form-data"
+        >
+          <div class="lk-field">
+            <label for="upload-file">Arquivo de vídeo ou áudio</label>
+            <input class="lk-input" id="upload-file" name="file" type="file" required />
+          </div>
+          <div class="lk-field">
+            <label for="upload-title">Título</label>
+            <input class="lk-input" id="upload-title" name="title" type="text" />
+          </div>
+          <div class="lk-field">
+            <label for="upload-kind">Natureza</label>
+            <select class="lk-select" id="upload-kind" name="kind">
+              <option value="video">vídeo</option>
+              <option value="audio">áudio</option>
+            </select>
+          </div>
+          <button class="lk-btn lk-btn--primary" type="submit">Enviar e registrar</button>
         </form>
       </section>
 
