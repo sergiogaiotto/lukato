@@ -768,3 +768,48 @@ async def test_detalhe_da_midia_mostra_os_artefatos_que_destravam_a_deteccao(
     assert corpo["capabilities"] == dict.fromkeys(
         ("probe", "asr", "ocr", "scenes", "vision"), False
     )
+
+
+async def test_reindex_reassina_o_catalogo_com_o_embedder_atual(
+    client: AsyncClient, catalogo: dict[str, dict[str, Any]], container
+) -> None:
+    """`ReindexCommercials` reescreve TODAS as assinaturas com o embedder de agora.
+
+    A sequencia que motivou o comando e realista: catalogo importado com a
+    instalacao em modo offline (`HashingEmbedder`), rede do hub volta, operador
+    troca o provedor — e a busca semantica passa a comparar vetores de espacos
+    diferentes, devolvendo similaridades sem significado, em silencio. O
+    reindex fecha essa janela; este teste prova que ele reescreve de verdade,
+    trocando o embedder por um de OUTRA dimensao e conferindo que os vetores
+    gravados acompanham.
+    """
+    from lukato.adapters.embeddings.hashing import HashingEmbedder
+    from lukato.application.use_cases.adwatch import ReindexCommercials
+    from lukato.domain.models.identity import Principal
+
+    principal = Principal.anonymous_root()
+
+    async with container.uow_factory() as uow:
+        antes = await uow.commercials.list_fingerprints()
+    dims_antes = {len(f.embedding) for f in antes if f.embedding}
+    assert dims_antes, "o catalogo de fixture deveria ter assinaturas com embedding"
+
+    outra_dimensao = 64
+    assert outra_dimensao not in dims_antes
+    original = container.embeddings
+    object.__setattr__(container, "embeddings", HashingEmbedder(dimensions=outra_dimensao))
+    try:
+        placar = await ReindexCommercials(container).execute(principal)
+    finally:
+        object.__setattr__(container, "embeddings", original)
+
+    assert placar["total"] == len(catalogo)
+    assert placar["com_embedding"] == len(catalogo)
+    assert placar["sem_embedding"] == 0
+
+    async with container.uow_factory() as uow:
+        depois = await uow.commercials.list_fingerprints()
+    dims_depois = {len(f.embedding) for f in depois if f.embedding}
+    assert dims_depois == {outra_dimensao}, (
+        f"o reindex nao reescreveu os vetores: dimensoes gravadas {sorted(dims_depois)}"
+    )

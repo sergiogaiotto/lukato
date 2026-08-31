@@ -109,6 +109,23 @@ interno:
 docker build --build-arg PYTHON_IMAGE=<registry-interno>/python:3.11-slim-bookworm -t lukato:1.0.0 .
 ```
 
+**Capacidade multimodal (opcional).** Por padrão a imagem é enxuta e o AdWatch
+opera pelos adaptadores de importação (transcrição/OCR/cenas em JSON). Para
+processar arquivos de vídeo de verdade — FFmpeg/ffprobe estáticos (pinados por
+sha256, como o tini) mais o subset CPU de `requirements-media-image.txt`
+(WhisperX com timestamps por palavra, PySceneDetect) — construa com:
+
+```bash
+docker build --build-arg WITH_MEDIA=1 -t lukato:1.0.0-media .
+```
+
+O `docker-compose.yml` local já define `WITH_MEDIA: "1"` e monta `./video` em
+`/app/video` (somente leitura) para a UI enxergar os vídeos do host. Os modelos
+de ASR/alinhamento são baixados no primeiro uso e ficam em `/app/var/hf` e
+`/app/var/torch` — dentro do volume, então sobrevivem a `--force-recreate`.
+Em rede fechada, aponte `FFBIN_FFMPEG_URL`/`FFBIN_FFPROBE_URL` para o espelho
+interno e ajuste os respectivos `*_SHA256`.
+
 Fumaça local (opcional, mas barato):
 
 ```bash

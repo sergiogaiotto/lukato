@@ -50,6 +50,9 @@ lukato.db*
 /tmp/
 /logs/
 *.log
+# Videos locais que o docker-compose monta em /app/video — conteudo do usuario,
+# nunca do repositorio.
+/video/
 
 # --- editores / SO -----------------------------------------------------------
 .idea/
