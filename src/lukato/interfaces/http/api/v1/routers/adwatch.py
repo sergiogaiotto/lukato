@@ -82,6 +82,7 @@ from lukato.application.use_cases.adwatch import (
     GetDetection,
     GetMedia,
     GetMediaCapabilities,
+    GetTranscript,
     ImportOcr,
     ImportScenes,
     ImportTranscript,
@@ -119,6 +120,8 @@ from lukato.interfaces.http.schemas.adwatch import (
     OcrImportRequest,
     SceneImportRequest,
     TranscriptImportRequest,
+    TranscriptMatchOut,
+    TranscriptOut,
 )
 from lukato.interfaces.http.schemas.common import OutSchema, Page, error_responses
 
@@ -127,6 +130,7 @@ __all__ = [
     "CapabilityOut",
     "MediaArtifactsOut",
     "MediaDetailOut",
+    "TranscriptDetailOut",
     "router",
 ]
 
@@ -212,6 +216,25 @@ class MediaDetailOut(OutSchema):
     def from_result(cls, report: Json) -> MediaDetailOut:
         """Converte o mapa devolvido por `GetMedia.detail`."""
         return cls.model_validate(report)
+
+
+class TranscriptDetailOut(OutSchema):
+    """Resposta de `GET /media/{id}/transcript`: a linha do tempo e a busca de frase."""
+
+    transcript: TranscriptOut
+    query: str | None = Field(default=None, description="Frase buscada, quando informada.")
+    matches: list[TranscriptMatchOut] = Field(
+        default_factory=list, description="Ocorrencias da frase, em ordem temporal."
+    )
+
+    @classmethod
+    def from_result(cls, report: Json) -> TranscriptDetailOut:
+        """Converte o mapa devolvido por `GetTranscript.execute`."""
+        return cls(
+            transcript=TranscriptOut.from_domain(report["transcript"]),
+            query=report["query"],
+            matches=[TranscriptMatchOut.from_domain(item) for item in report["occurrences"]],
+        )
 
 
 class CapabilityOut(OutSchema):
@@ -821,6 +844,35 @@ async def ingest_media(
     """Executa a ingestao e devolve o relatorio das etapas."""
     report = await IngestMedia(container).execute(media_id, principal)
     return IngestReportOut.from_result(report)
+
+
+@router.get(
+    "/media/{media_id}/transcript",
+    response_model=TranscriptDetailOut,
+    status_code=status.HTTP_200_OK,
+    responses=_ITEM_ERRORS,
+    summary="Le a transcricao",
+    description=(
+        "Devolve a transcricao palavra a palavra, cada uma com `start`/`end` em "
+        "segundos. Com `?q=` localiza toda ocorrencia exata da frase na linha do "
+        "tempo — maiusculas, acentos e pontuacao sao ignorados; a ordem e a "
+        "contiguidade das palavras, nao — e devolve cada uma com a faixa de tempo "
+        "precisa. `404` quando a midia ainda nao tem transcricao: o caminho e "
+        "executar a ingestao ou importar o JSON pronto."
+    ),
+)
+async def get_transcript(
+    container: ContainerDep,
+    principal: _Reader,
+    media_id: _MediaId,
+    query: Annotated[
+        str | None,
+        Query(alias="q", description="Frase a localizar na transcricao (casamento exato)."),
+    ] = None,
+) -> TranscriptDetailOut:
+    """Devolve a linha do tempo de palavras e as ocorrencias da frase buscada."""
+    report = await GetTranscript(container).execute(media_id, principal, query=query)
+    return TranscriptDetailOut.from_result(report)
 
 
 @router.post(

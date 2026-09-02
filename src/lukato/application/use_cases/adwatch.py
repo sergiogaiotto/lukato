@@ -76,6 +76,7 @@ from lukato.domain.services.matching import (
     TextWindow,
 )
 from lukato.domain.services.text_normalizer import ngrams, normalize, tokenize
+from lukato.domain.services.transcript_search import find_phrase
 from lukato.domain.types import Id, Json
 
 __all__ = [
@@ -119,6 +120,7 @@ __all__ = [
     "GetDetection",
     "GetMedia",
     "GetMediaCapabilities",
+    "GetTranscript",
     "ImportOcr",
     "ImportScenes",
     "ImportTranscript",
@@ -1324,6 +1326,51 @@ class GetMedia(_AdWatchUseCase):
                 "detections": int(detections),
             },
             "capabilities": self._container.media.capabilities(),
+        }
+
+
+class GetTranscript(_AdWatchUseCase):
+    """Le a transcricao palavra a palavra e localiza frases exatas nela.
+
+    A deteccao responde no nivel da veiculacao; este caso de uso responde no
+    nivel da palavra — e o que alimenta o `GET /media/{id}/transcript` da API e
+    a tela de transcricao do console.
+    """
+
+    async def execute(
+        self, media_id: Id, principal: Principal, *, query: str | None = None
+    ) -> Json:
+        """Como :meth:`report`, mas exige transcricao gravada.
+
+        E o contrato da API: pedir a transcricao de uma midia que nao tem uma e
+        `NotFoundError`, com a instrucao de ingerir ou importar antes.
+        """
+        report = await self.report(media_id, principal, query=query)
+        if report["transcript"] is None:
+            raise NotFoundError(
+                f"Midia '{media_id}' nao tem transcricao gravada: execute a ingestao "
+                "ou importe o JSON pronto antes de ler ou buscar.",
+                details={"media_id": media_id},
+            )
+        return report
+
+    async def report(self, media_id: Id, principal: Principal, *, query: str | None = None) -> Json:
+        """Devolve `{media, transcript, query, occurrences}`; sem transcricao, `transcript=None`.
+
+        A versao tolerante existe para a pagina do console, que prefere mostrar
+        o estado vazio com o caminho a seguir em vez de uma pagina de erro.
+        """
+        authorize(principal, ADWATCH_READ, "ler transcricao")
+        async with self._container.uow_factory() as uow:
+            asset = await _require_media(uow, media_id)
+            transcript = await uow.media.get_transcript(asset.id)
+        cleaned = (query or "").strip() or None
+        occurrences = find_phrase(transcript.words, cleaned) if transcript and cleaned else []
+        return {
+            "media": asset,
+            "transcript": transcript,
+            "query": cleaned,
+            "occurrences": occurrences,
         }
 
 

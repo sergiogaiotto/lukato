@@ -335,6 +335,28 @@
   white-space: nowrap;
 }
 
+/* Transcricao palavra a palavra: cada palavra carrega o timestamp no title, e
+   as casadas pela busca ganham <mark>. O sublinhado em --lk-warn (e nao so o
+   fundo) mantem o destaque legivel tambem no tema escuro. */
+.lk-transcript {
+  margin: 0;
+  line-height: 2;
+  color: var(--lk-text);
+}
+
+.lk-transcript span[title],
+.lk-transcript mark {
+  cursor: help;
+}
+
+.lk-transcript mark {
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--lk-warn-soft);
+  color: var(--lk-text);
+  box-shadow: inset 0 -2px 0 var(--lk-warn);
+}
+
 /* ==========================================================================
    Configuracoes
    ========================================================================== */

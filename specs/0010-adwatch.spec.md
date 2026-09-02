@@ -172,6 +172,7 @@ permanece em `NEEDS_REVIEW` (nunca promovido por falha de parsing).
 | `POST` | `/media` | registra midia |
 | `GET` | `/media` · `/media/{id}` | lista / detalhe (inclui capacidades disponiveis) |
 | `POST` | `/media/{id}/ingest` | executa a ingestao possivel |
+| `GET` | `/media/{id}/transcript` | le a transcricao palavra a palavra; `?q=` localiza uma frase exata na linha do tempo |
 | `POST` | `/media/{id}/transcript` | importa transcricao JSON |
 | `POST` | `/media/{id}/scenes` | importa cortes de cena JSON |
 | `POST` | `/media/{id}/ocr` | importa OCR JSON |

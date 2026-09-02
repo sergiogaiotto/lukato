@@ -1,0 +1,145 @@
+{#-
+  pages/adwatch_transcript.html — transcricao palavra a palavra + busca de frase
+  (`GET /adwatch/media/{id}/transcript`).
+
+  Contexto entregue pela rota:
+    `media`        `MediaAsset` dono da transcricao.
+    `transcript`   `Transcript` ou `none` (midia ainda sem linha do tempo).
+    `occurrences`  `PhraseOccurrence`s da frase buscada, em ordem temporal.
+    `highlighted`  indices de `transcript.words` cobertos por alguma ocorrencia.
+    `filters`      `{q}`.
+
+  A deteccao responde no nivel da veiculacao; esta tela responde no nivel da
+  palavra: *onde exatamente esta frase foi dita?* Cada palavra carrega o proprio
+  timestamp no `title`, e cada ocorrencia ganha a faixa exata em segundos — e o
+  degrau que faltava entre "o comercial foi ao ar" e "a frase esta em 00:00:09".
+-#}
+{% extends "base.html" %}
+
+{% from "partials/badge.html" import badge %}
+{% from "partials/card.html" import card %}
+{% from "partials/empty.html" import empty %}
+{% from "partials/hero.html" import hero %}
+
+{% block hero %}
+  {% call hero(
+       'Transcrição',
+       subtitle=(media.title if media.title else media.uri),
+       metrics=[
+         ('Palavras', (transcript.words | length | number) if transcript else '0'),
+         ('Duração', media.duration_seconds | duration),
+         ('Idioma', transcript.language if transcript else '—'),
+         ('Fonte', transcript.source if transcript else '—')
+       ]
+     ) %}
+    <a class="lk-btn lk-btn--outline" href="/adwatch">Voltar ao pipeline</a>
+  {% endcall %}
+{% endblock %}
+
+{% block toolbar %}
+  <form
+    class="lk-toolbar"
+    method="get"
+    action="/adwatch/media/{{ media.id }}/transcript"
+    role="search"
+  >
+    <div class="lk-field lk-grow">
+      <label for="filter-q">Buscar frase na transcrição</label>
+      <input
+        class="lk-input"
+        id="filter-q"
+        name="q"
+        type="search"
+        value="{{ filters.q }}"
+        placeholder="na compra de um motorola exclusivo claro"
+      />
+    </div>
+    <div class="lk-row">
+      <button class="lk-btn lk-btn--primary" type="submit">Buscar</button>
+      <a class="lk-btn lk-btn--ghost" href="/adwatch/media/{{ media.id }}/transcript">Limpar</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% block content %}
+  {% if not transcript %}
+    {% call card('Transcrição') %}
+      {{ empty(
+           'Esta mídia ainda não tem transcrição',
+           'Execute a ingestão automática ou importe o JSON pronto na coluna Ações do pipeline; depois volte aqui para ler e buscar palavra a palavra.',
+           name='film',
+           action_href='/adwatch',
+           action_label='Ir para o pipeline'
+         ) }}
+    {% endcall %}
+  {% else %}
+    {% if filters.q %}
+      {% call card('Ocorrências de "' ~ filters.q ~ '"') %}
+        {% if occurrences %}
+          <p class="lk-muted">
+            {{ occurrences | length | number }} ocorrência(s). A busca ignora maiúsculas,
+            acentos e pontuação; a ordem das palavras conta.
+          </p>
+          <div class="lk-stack">
+            {% for occurrence in occurrences %}
+              <div class="lk-hit">
+                <span class="lk-hit__score lk-timecode">
+                  {{ occurrence.start | duration }} → {{ occurrence.end | duration }}
+                </span>
+                <p class="lk-hit__snippet">“{{ occurrence.text }}”</p>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {{ empty(
+               'Frase não encontrada',
+               'A busca casa a sequência exata de palavras, ignorando maiúsculas, acentos e pontuação. Confira a grafia ou tente um trecho menor.',
+               name='spark'
+             ) }}
+        {% endif %}
+      {% endcall %}
+    {% endif %}
+
+    {% call card('Palavra a palavra') %}
+      <p class="lk-hint">
+        Passe o mouse sobre uma palavra para ver o instante em que ela é dita.
+        {% if occurrences %}As palavras destacadas pertencem às ocorrências acima.{% endif %}
+      </p>
+      <p class="lk-transcript">
+        {%- for word in transcript.words %}
+          {%- if loop.index0 in highlighted -%}
+            <mark title="{{ word.start | duration }} → {{ word.end | duration }}">{{ word.word }}</mark>
+          {%- else -%}
+            <span title="{{ word.start | duration }} → {{ word.end | duration }}">{{ word.word }}</span>
+          {%- endif %}
+        {% endfor %}
+      </p>
+    {% endcall %}
+  {% endif %}
+{% endblock %}
+
+{% block context_title %}Mídia{% endblock %}
+
+{% block context %}
+  <div class="lk-context__title">
+    <span class="lk-truncate">{{ media.title if media.title else media.uri }}</span>
+    {{ badge(media.status) }}
+  </div>
+
+  <dl class="lk-kv">
+    <dt>Tipo</dt>
+    <dd>{{ media.kind.value }}</dd>
+    <dt>Duração</dt>
+    <dd class="lk-timecode">{{ media.duration_seconds | duration }}</dd>
+    <dt>Arquivo</dt>
+    <dd class="lk-mono">{{ media.uri | truncate_mid(28) }}</dd>
+    <dt>Registrada</dt>
+    <dd>{{ media.created_at | timeago }}</dd>
+  </dl>
+
+  <div class="lk-context__actions">
+    <a class="lk-btn lk-btn--ghost lk-btn--sm" href="/adwatch/detections?media={{ media.id }}">
+      Detecções da mídia
+    </a>
+  </div>
+{% endblock %}
