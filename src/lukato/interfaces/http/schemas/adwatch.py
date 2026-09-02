@@ -40,6 +40,7 @@ from lukato.domain.models.adwatch import (
     Transcript,
     TranscriptWord,
 )
+from lukato.domain.services.transcript_search import PhraseOccurrence
 from lukato.domain.types import Id, Json
 from lukato.interfaces.http.schemas.common import InSchema, OutSchema
 
@@ -73,6 +74,7 @@ __all__ = [
     "SceneCutOut",
     "SceneImportRequest",
     "TranscriptImportRequest",
+    "TranscriptMatchOut",
     "TranscriptOut",
     "TranscriptWordOut",
 ]
@@ -577,6 +579,27 @@ class TranscriptOut(OutSchema):
             words=[TranscriptWordOut.from_domain(word) for word in transcript.words],
             text=transcript.text,
             duration=max((word.end for word in transcript.words), default=0.0),
+        )
+
+
+class TranscriptMatchOut(OutSchema):
+    """Ocorrencia de uma frase buscada na linha do tempo da transcricao."""
+
+    start: float = Field(description="Inicio da primeira palavra casada, em segundos.")
+    end: float = Field(description="Fim da ultima palavra casada, em segundos.")
+    first_word: int = Field(ge=0, description="Indice da primeira palavra casada em `words`.")
+    last_word: int = Field(ge=0, description="Indice da ultima palavra casada em `words`.")
+    text: str = Field(description="O trecho como foi falado, com a grafia original.")
+
+    @classmethod
+    def from_domain(cls, occurrence: PhraseOccurrence) -> TranscriptMatchOut:
+        """Converte a ocorrencia devolvida pelo servico de busca."""
+        return cls(
+            start=occurrence.start,
+            end=occurrence.end,
+            first_word=occurrence.first_word,
+            last_word=occurrence.last_word,
+            text=occurrence.text,
         )
 
 

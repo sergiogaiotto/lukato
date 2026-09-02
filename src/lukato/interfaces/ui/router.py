@@ -43,6 +43,7 @@ from lukato.application.use_cases.adwatch import (
     CommercialFilter,
     DetectionFilter,
     GetMediaCapabilities,
+    GetTranscript,
     ListCommercials,
     ListDetections,
     ListMedia,
@@ -1055,6 +1056,48 @@ async def adwatch_page(
         breadcrumb=[Crumb("AdWatch")],
         build=build,
         selected_id=sel,
+    )
+
+
+@router.get(
+    "/adwatch/media/{media_id}/transcript",
+    response_class=HTMLResponse,
+    summary="Transcricao da midia",
+)
+async def adwatch_transcript(
+    request: Request,
+    container: ContainerDep,
+    principal: PrincipalDep,
+    media_id: str = PathParam(description="Identificador do ativo de midia."),
+    q: str | None = _SearchQuery,
+) -> HTMLResponse:
+    """Linha do tempo palavra a palavra da midia, com busca de frase exata."""
+
+    async def build() -> Json:
+        report = await GetTranscript(container).report(media_id, principal, query=_text(q))
+        # O destaque e decisao de apresentacao: o caso de uso devolve as
+        # ocorrencias e a tela decide quais palavras pintar.
+        highlighted = {
+            index
+            for occurrence in report["occurrences"]
+            for index in range(occurrence.first_word, occurrence.last_word + 1)
+        }
+        return {
+            "media": report["media"],
+            "transcript": report["transcript"],
+            "occurrences": report["occurrences"],
+            "highlighted": highlighted,
+            "filters": {"q": report["query"] or ""},
+        }
+
+    return await _page(
+        request,
+        container,
+        template="pages/adwatch_transcript.html",
+        active="/adwatch",
+        title="Transcrição",
+        breadcrumb=[Crumb("AdWatch", "/adwatch"), Crumb("Transcrição")],
+        build=build,
     )
 
 

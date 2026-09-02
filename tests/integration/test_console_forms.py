@@ -157,7 +157,9 @@ def test_todo_formulario_do_console_aponta_para_um_alvo_traduzivel() -> None:
     fora: list[str] = []
     total = 0
     for arquivo in sorted(TEMPLATES.rglob("*.html")):
-        texto = arquivo.read_text()
+        # encoding explicito: no Windows o padrao e cp1252, que nao decodifica
+        # todos os bytes do UTF-8 dos templates (ex.: aspas tipograficas).
+        texto = arquivo.read_text(encoding="utf-8")
         for achado in re.finditer(r"<form\b[^>]*>", texto, re.S):
             tag = " ".join(achado.group(0).split())
             if 'method="post"' not in tag.lower():
