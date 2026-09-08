@@ -321,9 +321,25 @@ escolha — chave ausente, biblioteca ausente, ping que falhou. Sem isso, uma in
 rodando com `EchoLLM` e `HashingEmbedder` responderia `200` em tudo e pareceria saudavel.
 O modo degradado tem de ser legivel por quem opera, nao so por quem le o codigo.
 
-**A montagem nunca falha por indisponibilidade de rede.** O que derruba o boot e defeito
-de configuracao ou de esquema — coisas que nao se resolvem sozinhas em producao. E ha uma
-distincao fina entre os dois caminhos que levam ao modo degradado:
+**A montagem quase nunca falha por indisponibilidade de rede.** LLM, embeddings e tracer
+fora do ar nao derrubam o boot: a porta e marcada como degradada e a aplicacao sobe. Ha
+**uma excecao, e ela e do banco**:
+
+> Com `LUKATO_DB__AUTO_FALLBACK=false` **e** `LUKATO_DB__CREATE_ALL=true` (o padrao do
+> codigo), um PostgreSQL inalcancavel **derruba o boot**. O `ping` falha e marca a porta
+> como degradada, mas em seguida o `create_all` abre conexao de novo e a excecao escapa
+> crua (`ConnectionRefusedError`), porque so `SQLAlchemyError` e convertida em
+> `ProviderError`. Com `CREATE_ALL=false` a aplicacao sobe degradada, como se espera.
+>
+> Os manifestos de Kubernetes acertam: `deploy/k8s/base/configmap.yaml` desliga os dois
+> juntos. O `docker-compose.yml` usa a combinacao arriscada — `AUTO_FALLBACK: "false"` sem
+> declarar `CREATE_ALL` — e por isso um PostgreSQL que demore a ficar saudavel produz um
+> erro cru em vez de mensagem util. Em qualquer ambiente onde voce desligue o fallback,
+> desligue tambem o `create_all` e deixe o schema para as migracoes.
+
+Fora esse caso, o que derruba o boot e defeito de configuracao ou de esquema — coisas que
+nao se resolvem sozinhas em producao. E ha uma distincao fina entre os dois caminhos que
+levam ao modo degradado:
 
 - **configuracao escolhe o adaptador** — sem `LUKATO_LLM__API_KEY` entra o `EchoLLM`, sem
   endpoint de embeddings entra o `HashingEmbedder`, sem chaves do Langfuse entra o
@@ -478,8 +494,14 @@ middleware.
 | `/registry` | **Registry** | building blocks instalados, capabilities e schema de configuracao |
 | `/settings` | **Configuracoes** | configuracao efetiva, com segredos mascarados |
 | `/adwatch` | **AdWatch** | painel do funil: capacidades multimodais, midias, deteccao |
+| `/adwatch/media/{media_id}/transcript` | **Transcricao** | le a transcricao e busca frase exata, com os tempos |
 | `/adwatch/commercials` | **Catalogo de comerciais** | CRUD do texto conhecido, importacao em lote |
 | `/adwatch/detections` | **Deteccoes** | fila de revisao com evidencia por sinal |
+
+Sao **17 paginas** ao todo. Alem delas, o console tem duas rotas `POST` proprias
+(`/prompts/preview` e `/guardrails/test`, que devolvem o resultado na propria tela em vez
+de redirecionar) e uma rota de fragmento, `GET /ui/context/{entity}/{item_id}`, que
+alimenta o painel de contexto. O menu lateral organiza doze itens em cinco secoes.
 
 **O painel de contexto** (coluna da direita) muda conforme o objeto selecionado. Ha dez
 formatos: `module`, `prompt`, `guardrail`, `run`, `document`, `user`, `apikey`,
@@ -512,6 +534,14 @@ Interacoes que vale conhecer:
   de custo por hora e uma polilinha. As cores saem das variaveis CSS, entao os graficos
   acompanham o tema sozinhos.
 - **Acoes destrutivas** exigem confirmacao (`data-confirm`).
+
+> **Limitacao conhecida do console: nao da para desmarcar uma caixa.** Um `checkbox` HTML
+> desmarcado nao envia campo nenhum, e o middleware omite campo ausente para que o padrao
+> do schema valha. Como os schemas de atualizacao declaram `is_active: bool | None = None`,
+> o valor simplesmente nao muda. Na pratica: pelo console da para **ativar** uma politica
+> ou um prompt, nao para **desativar**. Os tres `checkbox` do console (`is_active` e
+> `fail_open` em guardrails, `is_active` em prompts) tem esse comportamento. Ate que
+> ganhem um campo oculto com `false` antes da caixa, desative por `PUT` na API.
 
 > **Como o console e a API sao a mesma coisa.** Os formularios HTML do console fazem
 > `POST` com `Content-Type: application/x-www-form-urlencoded` para as **mesmas rotas de
@@ -550,8 +580,18 @@ cima dele. A tabela completa:
 
 Listagens paginam com `limit` (1..200, padrao 50) e `offset`.
 
-**Middlewares**, na ordem em que a requisicao os atravessa: `cors` → `request_id` →
-`security_headers` → `rate_limit` → `timing` → `console_form`.
+**Middlewares**, na ordem real em que a requisicao os atravessa (de fora para dentro):
+
+```
+CORS → ConsoleForm → RequestId → SecurityHeaders → RateLimit → Timing → rotas
+```
+
+> O log `middlewares_installed` publica um campo `order` com uma ordem diferente
+> (`console_form` por ultimo). Esse campo e a intencao do registro, nao a pilha
+> construida: o `add_middleware` do Starlette insere no inicio da lista, entao o
+> **ultimo registrado fica por fora**. A pilha acima foi lida de
+> `create_app().user_middleware`. Na pratica isso significa que a traducao de formulario
+> acontece **antes** do `request_id` e do limitador — nao depois.
 
 - `X-Request-ID` e gerado ou propagado do cliente, injetado no contexto de log e
   carimbado tambem nas respostas de erro — o mesmo identificador liga log, metrica,
@@ -1223,6 +1263,18 @@ despercebida.
 Um bloqueio no guardrail de **entrada** acontece **antes** de qualquer chamada ao
 provedor: o texto barrado nunca sai da plataforma.
 
+### 7.4 Nao apague uma politica em uso — desative
+
+Nao ha chave estrangeira entre `guardrail_policies` e o binding dos modulos, e o `DELETE`
+nao limpa referencia nenhuma. O efeito de apagar uma politica ainda vinculada nao e o
+modulo virar permissivo: e o modulo **quebrar**. Na proxima invocacao o `ModuleComposer`
+encontra `policy_id` preenchido e a politica ausente, e levanta `not_found` (HTTP 404)
+nomeando o campo do binding.
+
+O caminho seguro para tirar uma politica de circulacao e `PUT` com `is_active: false` — a
+politica continua existindo, o motor a ignora e o modulo segue executando. Operar sem
+restricao naquele estagio so acontece quando o campo do binding e **nulo** desde o inicio.
+
 ---
 
 ## 8. Runtimes de agente e ferramentas
@@ -1253,6 +1305,18 @@ processa o resultado e decide se volta a `act`; `reflect` fecha o raciocinio;
 
 A escolha do runtime esta no binding — `"runtime": "langgraph"`. Trocar de runtime e
 trocar uma string, sem redeploy.
+
+Duas diferencas entre eles que nao aparecem na tabela:
+
+- **`direct` e `langgraph` montam as mensagens do mesmo jeito** — `[system?] + history +
+  user`. O **`deepagent` nao**: ele entrega ao harness um unico turno de usuario e passa o
+  system prompt por fora, na criacao do agente. Consequencia pratica: **`request.history`
+  e descartado em silencio no runtime `deepagent`**. Se a conversa depende de historico,
+  use `direct` ou `langgraph`.
+- **O gate do `deepagent`, na pratica, e so a credencial.** `deepagents` e
+  `langchain-openai` estao no `requirements.txt` base, entao a metade "bibliotecas
+  instaladas" ja vem satisfeita em qualquer instalacao normal; o que varia entre ambientes
+  e a `LUKATO_LLM__API_KEY`.
 
 ### 8.2 As ferramentas
 
@@ -1294,12 +1358,28 @@ o modulo nao abre conexao alguma — o que permite que a suite rode sem rede.
 
 `EchoLLM` e o irmao deterministico: devolve a entrada prefixada com `[echo]` e contabiliza
 tokens de forma estavel. Ele entra automaticamente quando falta credencial, e o motivo
-aparece no log e em `/readyz`:
+aparece no log de boot:
 
 ```
 LUKATO_LLM__API_KEY ausente: sem credencial nao ha como falar com o hub,
 entao o adaptador deterministico offline assume no lugar
 ```
+
+Para descobrir isso **pela API**, use `GET /api/v1/health/providers` — nao `/readyz`. O
+`/readyz` devolve por componente apenas `{status, detail}` (`"modelo 'echo'"`), enquanto
+`/health/providers` publica o quadro completo:
+
+```jsonc
+{ "name": "llm", "kind": "generation", "status": "ok", "detail": "modelo 'echo'",
+  "configured": true,
+  "info": { "provider": "echo", "effective_provider": "echo",
+            "base_url": "https://hub-gpus.usto.re/v1",
+            "model": "echo", "fallback_model": "openai/gpt-oss-20b" } }
+```
+
+`provider` e o que foi configurado, `effective_provider` e o que de fato assumiu. Quando
+os dois divergem, a instalacao esta degradada — e essa e a leitura que um alerta deve
+observar.
 
 ---
 
@@ -1737,6 +1817,12 @@ comentada esta em [`.env.example`](.env.example).
 | `FINOPS` | `ENABLED=true` · `CURRENCY=USD` · `DEFAULT_INPUT_USD_PER_1K=0.0` · `DEFAULT_OUTPUT_USD_PER_1K=0.0` |
 | `ADWATCH` | `WINDOW_SIZES=[15.0,30.0,60.0]` · `WINDOW_STRIDE=5.0` · pesos `0.40/0.25/0.15/0.15/0.05` · `ACCEPT_THRESHOLD=0.90` · `REVIEW_THRESHOLD=0.60` · `TOP_K_RETRIEVAL=10` · `TOP_K_RERANK=3` · `WORKDIR=./var/adwatch` · `UPLOAD_MAX_MB=2048` |
 
+Tres variaveis existem em `Settings` mas **nao aparecem** em `.env.example`:
+`LUKATO_APP__VERSION`, `LUKATO_APP__WORKERS` e `LUKATO_FINOPS__PRICES` (esta ultima e um
+mapa por modelo, `{"modelo": {"input": 0.0, "output": 0.0}}`, e o caminho para carregar a
+tabela de precos por ambiente em vez de por `PUT`). Funcionam normalmente; so nao estao
+no arquivo de exemplo.
+
 Validacoes que **recusam** em vez de corrigir em silencio:
 
 - os cinco pesos do AdWatch precisam somar 1.0 (tolerancia 1e-6);
@@ -1888,11 +1974,20 @@ Quatro jobs em `.github/workflows/ci.yml`:
 
 1. **lint · tipos · testes** — `ruff check`, `ruff format --check`, `mypy src/lukato`,
    `pytest` com cobertura, e exportacao do contrato OpenAPI;
-2. **integracao com PostgreSQL + pgvector** — servico real, `alembic upgrade head`,
-   `pytest -m integration`;
+2. **integracao com PostgreSQL + pgvector** — sobe `pgvector/pgvector:pg16` como servico e
+   roda `alembic upgrade head` contra ele, depois `pytest -m integration`;
 3. **build da imagem** — constroi, sobe o container e checa `/healthz`;
 4. **validacao dos manifestos Kubernetes** — `kustomize build` de cada overlay, contagem
    de recursos e verificacao de que nenhum segredo real foi versionado.
+
+> **O que o job 2 realmente cobre.** Quem le o nome supoe que os testes de integracao
+> falam com o PostgreSQL do servico. Nao falam: a fixture `_processo_isolado` apaga toda
+> variavel `LUKATO_*` do ambiente antes de cada teste, e a fixture `settings` fixa
+> `sqlite+aiosqlite:///:memory:` com `_env_file=None`. Apontar `LUKATO_DB__URL` para um
+> host inalcancavel nao faz um unico teste falhar. O `LUKATO_DB__URL` do job e lido apenas
+> pelo passo `alembic upgrade head` — **esse** sim exercita PostgreSQL e pgvector de
+> verdade, e e ele que garante que as migracoes rodam no dialeto de producao. Os testes
+> continuam em SQLite.
 
 ---
 
@@ -1913,7 +2008,15 @@ Marcadores: `unit` (puros, sem I/O), `integration` (sobem a aplicacao ou o banco
 A suite tem **1.140 testes em 39 arquivos** entre unidade, integracao e contrato, e passa
 inteira offline — sem PostgreSQL, sem GPU e sem rede. `EchoLLM`, `HashingEmbedder`,
 `NoopTracer`, SQLite e os importadores JSON de transcricao, cenas e OCR substituem tudo
-que exigiria a rede corporativa.
+que exigiria a rede corporativa. A fixture `_processo_isolado` apaga toda variavel
+`LUKATO_*` do ambiente antes de cada teste, e a fixture `settings` fixa
+`sqlite+aiosqlite:///:memory:` — o ambiente da maquina nao muda o resultado.
+
+Com **uma excecao**: `tests/integration/test_docs_ui.py::test_a_origem_dos_bundles_e_configuravel`
+chama `get_settings()`, e `Settings` declara `env_file=('.env',)`. A fixture limpa
+variaveis de ambiente, nao o **arquivo**. Se o `.env` do repositorio trouxer um
+`LUKATO_APP__DOCS_ASSETS_BASE` diferente do padrao, esse teste falha. A suite passa
+"offline" tambem porque o `.env` local costuma coincidir com o default.
 
 Dois testes merecem destaque:
 
@@ -2019,7 +2122,9 @@ tests/          unit · integration · contract
 | Erro de dimensao ao gravar embeddings | `DIMENSIONS` diverge do que a colecao registrou | reindexe a colecao ou volte a dimensao anterior |
 | Timeout ou 000 ao chamar o hub | `hub-gpus.usto.re` e `hub-gpus.claro.com.br` sao hosts internos | fora da rede corporativa, use o modo offline |
 | `429` do provedor | limite de requisicoes | o adaptador ja faz retry com backoff; reduza a concorrencia ou peca cota |
-| PostgreSQL indisponivel no boot | fallback automatico | com `AUTO_FALLBACK=true` cai para SQLite e loga WARNING; em producao use `false` |
+| PostgreSQL indisponivel no boot | fallback automatico | com `AUTO_FALLBACK=true` cai para SQLite e loga WARNING; em producao use `false` **junto com** `CREATE_ALL=false` (secao 3.4) |
+| Boot morre com `ConnectionRefusedError` cru, sem mensagem do projeto | `AUTO_FALLBACK=false` com `CREATE_ALL=true` (o padrao): o `create_all` reabre a conexao depois da sonda | ponha `LUKATO_DB__CREATE_ALL=false` e deixe o schema para `alembic upgrade head` |
+| `not_found` (404) citando um campo do binding numa invocacao que funcionava | a politica de guardrail vinculada foi **apagada** | recrie a politica, ou aponte o binding para outra; para tirar de circulacao sem quebrar, use `is_active: false` (secao 7.4) |
 | `/api/docs` responde 200 em branco | o navegador nao alcanca o CDN | aponte `LUKATO_APP__DOCS_ASSETS_BASE` para o espelho interno |
 | AdWatch nunca aceita automaticamente | sem OCR o teto de score e 0.85 (secao 10.6) | instale o OCR, ou revise manualmente a fila `needs_review` |
 | `CERTIFICATE_VERIFY_FAILED` no build | proxy com interceptacao TLS | ponha a CA em `deploy/ca/*.crt` |
