@@ -723,8 +723,9 @@ A senha do usuario root nunca vem do codigo: ou o operador informa por
 `LUKATO_SEED_ROOT_PASSWORD`, ou o seed sorteia uma com `secrets` e a imprime **uma unica
 vez**.
 
-`export`/`import` movem uma instalacao inteira entre ambientes; `import` le da entrada
-padrao, entao `lukato export | ssh outro-host lukato import` funciona.
+`export`/`import` movem uma instalacao inteira entre ambientes. O `import` le da entrada
+padrao, entao `cat instalacao.json | ssh outro-host lukato import` funciona — mas gere o
+arquivo com `lukato export --out`, e nao por redirecionamento (secao 5.11).
 
 ---
 
@@ -1022,10 +1023,33 @@ armazenamento do dado.
 ### 5.11 Receita 8 — mover a instalacao entre ambientes
 
 ```bash
-lukato export > instalacao.json        # prompts, guardrails, modulos, comerciais, midias
+lukato export --out instalacao.json    # prompts, guardrails, modulos, comerciais, midias
 lukato import < instalacao.json        # recria do outro lado
 lukato reindex                         # reassina o catalogo com o embedder atual
 ```
+
+O documento gerado se descreve:
+
+```jsonc
+{
+  "lukato_export": 1, "versao_da_aplicacao": "1.0.0",
+  "prompts": [...], "guardrails": [...], "modules": [...],
+  "commercials": [...], "media": [...],
+  "nao_exportado": {
+    "segredos":  "chave de API e hash de senha nunca saem daqui",
+    "derivados": "execucoes e deteccoes voltam rodando o funil de novo"
+  }
+}
+```
+
+O campo `nao_exportado` e uma escolha, nao uma limitacao: **credencial nao viaja em
+arquivo de configuracao**, e dado derivado (runs, deteccoes) se reconstroi rodando o funil
+no destino — copia-lo so criaria historico de uma execucao que nunca aconteceu ali.
+
+> Prefira `--out` a redirecionamento. Sem `--out` o JSON sai na saida padrao, mas os
+> avisos de log tambem escrevem ali (`database_fallback_activated`, por exemplo), e um
+> `lukato export > arquivo.json` numa instalacao degradada produz um JSON invalido. Com
+> `--out`, o arquivo sai limpo em qualquer estado.
 
 `reindex` e obrigatorio depois de trocar o provedor ou o modelo de embeddings: as
 assinaturas semanticas do catalogo de comerciais precisam viver no mesmo espaco vetorial
