@@ -465,6 +465,11 @@ banco, e a CLI tambem nao: as tres portas de entrada atravessam as mesmas classe
 `application/use_cases/`. O que voce faz pela tela, faz por `curl`, e faz por terminal —
 com o mesmo resultado e a mesma trilha de auditoria.
 
+> Ha **uma excecao**, e ela e honesta: as tres rotas de `/api/v1/registry` falam direto com
+> o registry do container, sem passar por caso de uso. Fazem sentido assim — o registry e
+> infraestrutura de processo, nao dado persistido —, mas quem for auditar o invariante
+> "tudo passa por um caso de uso" vai encontrar essa quebra, e e melhor encontra-la aqui.
+
 ### 5.1 O console web, tela a tela
 
 Layout de tres colunas: **menu recolhivel** (esquerda) · **conteudo** (centro) ·
@@ -774,6 +779,18 @@ lukato version    imprime a versao do pacote
 
 Codigos de saida: `0` sucesso, `1` erro de dominio/configuracao/instalacao nao pronta,
 `130` interrompido pelo operador (128 + SIGINT).
+
+Duas armadilhas de operacao que valem saber antes de escrever script em cima disso:
+
+- **`lukato health` sai `1` apenas quando o relatorio esta `down`** — na pratica, banco
+  fora do ar. `degraded` (LLM em eco, embeddings em hashing, tracer inerte) **mantem exit
+  `0`**. Se o seu portao de implantacao precisa recusar uma instalacao degradada, leia o
+  `status` do JSON; nao confie so no codigo de saida.
+- **Configuracao invalida derruba qualquer comando, inclusive `--version` e `-h`.** As
+  `Settings` sao carregadas antes do parse dos argumentos e fora do funil de excecoes,
+  entao um `LUKATO_APP__PORT=999999` produz o traceback do pydantic mesmo em
+  `lukato --version`. Se um comando trivial falhar de forma estranha, suspeite do
+  ambiente antes de suspeitar do comando.
 
 O `seed` e **idempotente**: rodar duas vezes nao duplica nada e nao falha. Ele existe
 para que uma instalacao recem-criada ja tenha a trinca configurada, dois agentes
@@ -1259,7 +1276,11 @@ configuracao de cada tipo** — e o que permite ao console montar o formulario c
 cada regra sem hardcode.
 
 Detalhe deliberado do `pii_redact`: conferir o digito verificador elimina o falso
-positivo classico de um numero de protocolo de 11 digitos virar "CPF".
+positivo classico de um numero de protocolo de 11 digitos virar "CPF". A mesma disciplina
+vale para o IPv4 (os quatro octetos precisam ser ≤ 255) e para o telefone brasileiro (DDI
+`+55` opcional, DDD ≥ 11, nono digito de celular). RG e CEP sao reconhecidos **so por
+formato** — nao ha digito a conferir —, entao sao os dois com maior chance de falso
+positivo.
 
 Detalhe deliberado do `llm_judge`: falha do provedor vira **aviso**, nao bloqueio — um
 juiz indisponivel nao pode derrubar a plataforma. Use-o sempre como ultima regra da
@@ -1291,6 +1312,21 @@ despercebida.
 
 `fail_open` e configuravel por politica **e** globalmente
 (`LUKATO_GUARDRAILS__FAIL_OPEN`, padrao `false`).
+
+Duas propriedades que completam o quadro:
+
+- **A saida tambem e saneada, nao so a entrada.** A resposta devolvida ao chamador e o
+  `content` do veredito de saida, nao o texto cru que o modulo produziu. O par
+  entrada/saida e simetrico: os dois reescrevem.
+- **Um decimo segundo tipo de regra entra sem tocar no motor.** `GuardrailRuleEvaluator` e
+  um `Protocol` do dominio, e o motor expoe `register(evaluator)` e a propriedade `kinds`.
+  Escrever um avaliador novo e implementar o protocolo e registra-lo — a mesma logica de
+  building block, um nivel abaixo.
+
+E limites defensivos que evitam que uma politica malformada vire negacao de servico:
+`keyword_block` aceita no maximo 2000 termos, `json_schema` para em 20 erros (mostrando 5
+na mensagem), `llm_judge` recorta o conteudo em 8000 caracteres e todo regex e limitado a
+500 caracteres.
 
 ### 7.3 As politicas que o seed entrega
 
@@ -1694,6 +1730,11 @@ esteja errada**.
   custo `0.00`, indistinguivel de um modelo realmente gratuito.
 - **A serie temporal devolve todos os baldes do intervalo, inclusive os de custo zero.**
   Um ponto ausente seria lido pelo grafico como "nao sei", quando o fato e "nao gastou".
+- **So o passo `llm` e cobrado.** Um `RunStep` de `tool`, `retrieval`, `plan` ou `reflect`
+  adotado de um runtime fica na trilha com custo zero — nao ha estimativa inventada para
+  ele. E o modelo cobravel de cada passo sai do proprio passo (a chave `model` do seu
+  input/output), caindo para o modelo do binding quando o runtime nao informa: um runtime
+  que reporte o modelo real muda a fatura sem que nada mais mude.
 - **O orcamento reporta situacao, nao so veredito.** `GET /budgets/{id}/status` devolve
   `ok`, `ratio`, `alert`, `blocked`, `spent`, `remaining`, `limit_usd`,
   `alert_threshold`, `hard_stop` e as bordas do periodo (`period_start`, `period_end`) —
@@ -1753,6 +1794,20 @@ por SHA-256 **antes** do bcrypt, entao o comprimento inteiro conta.
 com um principal implicito — comodo para desenvolver, **inaceitavel em producao**. A
 etapa 3 de `InvokeModule` exige `MODULE_INVOKE` de qualquer forma: `prova_trinca.py`
 asercao 6 confirma que um `viewer` recebe `403`.
+
+Duas coisas que a secao de seguranca precisa dizer em voz alta:
+
+- **As rotas de saude e metricas sao publicas, mesmo com a autenticacao ligada.**
+  `/healthz`, `/readyz`, `/metrics` e as tres de `/api/v1/health/*` nao declaram principal
+  nenhum. Isso e desejado para probes e Prometheus — mas significa que qualquer um que
+  alcance a porta le o retrato dos provedores (nomes, adaptadores, `configured`) e os
+  contadores. **Exponha essas rotas so na rede interna**; a `NetworkPolicy` e o Ingress do
+  `deploy/k8s/` sao o lugar de fazer isso.
+- **Trocar `LUKATO_SECURITY__API_KEY_HEADER` quebra o contrato publicado, em silencio.** A
+  verificacao real le o nome configurado, mas o esquema `apiKeyAuth` do OpenAPI e o
+  literal `X-API-Key`. Um cliente gerado a partir do contrato passa a mandar o cabecalho
+  errado e recebe `401` sem explicacao. Se precisar trocar o nome, avise os consumidores —
+  o contrato nao vai avisar por voce.
 
 ---
 
@@ -2172,6 +2227,9 @@ tests/          unit · integration · contract
 | PostgreSQL indisponivel no boot | fallback automatico | com `AUTO_FALLBACK=true` cai para SQLite e loga WARNING; em producao use `false` **junto com** `CREATE_ALL=false` (secao 3.4) |
 | Boot morre com `ConnectionRefusedError` cru, sem mensagem do projeto | `AUTO_FALLBACK=false` com `CREATE_ALL=true` (o padrao): o `create_all` reabre a conexao depois da sonda | ponha `LUKATO_DB__CREATE_ALL=false` e deixe o schema para `alembic upgrade head` |
 | `not_found` (404) citando um campo do binding numa invocacao que funcionava | a politica de guardrail vinculada foi **apagada** | recrie a politica, ou aponte o binding para outra; para tirar de circulacao sem quebrar, use `is_active: false` (secao 7.4) |
+| `lukato --version` ou `-h` devolve traceback do pydantic | as `Settings` sao carregadas antes do parse e fora do funil de excecoes | corrija a variavel `LUKATO_*` invalida que o traceback nomeia |
+| Cliente gerado do OpenAPI recebe `401` com a chave certa | `LUKATO_SECURITY__API_KEY_HEADER` foi trocado, mas o contrato publica o literal `X-API-Key` | volte ao padrao, ou avise os consumidores do nome real |
+| Portao de implantacao aceita instalacao degradada | `lukato health` sai `0` em `degraded`; so `down` sai `1` | leia o campo `status` do JSON em vez do codigo de saida |
 | `/api/docs` responde 200 em branco | o navegador nao alcanca o CDN | aponte `LUKATO_APP__DOCS_ASSETS_BASE` para o espelho interno |
 | AdWatch nunca aceita automaticamente | sem OCR o teto de score e 0.85 (secao 10.6) | instale o OCR, ou revise manualmente a fila `needs_review` |
 | `CERTIFICATE_VERIFY_FAILED` no build | proxy com interceptacao TLS | ponha a CA em `deploy/ca/*.crt` |
@@ -2196,6 +2254,8 @@ Checklist antes de ir para producao:
 [ ] guardrails de entrada e saida vinculados a TODOS os modulos ativos
 [ ] orcamentos FinOps com hard_stop nos modulos expostos ao publico
 [ ] senha do root trocada no primeiro acesso
+[ ] /healthz, /readyz, /metrics e /api/v1/health/* restritos a rede interna (sao publicos)
+[ ] LUKATO_SECURITY__API_KEY_HEADER no padrao, ou consumidores avisados do nome real
 ```
 
 Politica de divulgacao de vulnerabilidades: [`SECURITY.md`](SECURITY.md).
