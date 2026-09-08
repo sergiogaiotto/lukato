@@ -2140,7 +2140,25 @@ NetworkPolicy · Job de migracao (hook PreSync do ArgoCD) · ServiceMonitor.
 
 `deploy/k8s/base/secret.example.yaml` contem **apenas placeholders** e nao entra no
 `kustomization`. Em producao use ExternalSecrets/Vault. Nenhum segredo real e versionado
-— e o CI verifica isso.
+— e o CI verifica isso. O Deployment consome o Secret inteiro por `envFrom.secretRef`
+(nao chave a chave por `secretKeyRef`, como o `SECURITY.md` diz).
+
+Tres pontos do cluster que mudam o que a aplicacao consegue fazer la dentro:
+
+- **Upload acima de 32 MB nao chega na aplicacao.** O padrao interno e
+  `LUKATO_ADWATCH__UPLOAD_MAX_MB=2048`, mas o Ingress traz
+  `nginx.ingress.kubernetes.io/proxy-body-size: "32m"`. Quem enviar um video maior recebe
+  `413` **do nginx**, sem passar pela validacao da aplicacao e sem aparecer no log dela.
+  Alinhe os dois numeros antes de prometer 2 GB a alguem.
+- **Nao ha volume persistente.** Nao existe `PersistentVolumeClaim` em lugar nenhum do
+  repositorio: `/app/var` e um `emptyDir` de 2 GiB. Os uploads gravados em
+  `<workdir>/uploads` e os caches de modelo somem a cada reinicio ou reagendamento do pod.
+  Para guardar midia entre reinicios, monte um volume de verdade.
+- **A imagem que vai para o cluster e a enxuta.** Nenhum overlay passa `WITH_MEDIA=1`, e o
+  CI tambem constroi sem build-args. Em Kubernetes, portanto, **nao ha `ffmpeg`**: o
+  AdWatch opera pelo caminho de importacao JSON, e `/capabilities` vai reportar `probe` e
+  `asr` indisponiveis. Isso e uma escolha coerente (o cluster serve a API; a extracao
+  pesada e outro problema), mas precisa ser uma escolha consciente.
 
 ### 17.5 CI
 
@@ -2179,6 +2197,15 @@ make check    # lint + type + test
 Marcadores: `unit` (puros, sem I/O), `integration` (sobem a aplicacao ou o banco),
 `contract` (contrato OpenAPI), `slow`.
 
+> **`make check` nao e o que o CI roda.** O alvo encadeia `lint`, `type` e `test`; o CI
+> roda tambem `ruff format --check src tests`, que **nenhum alvo do Makefile executa**. Da
+> para ter `make check` verde e o CI vermelho por formatacao. Rode `make fmt` antes de
+> abrir PR. Nem o `ruff` nem o `mypy` olham `scripts/`.
+
+Cobertura: **74%** sobre 19.015 statements. Nao ha portao — nem `fail_under` no
+`pyproject`, nem `--cov-fail-under` no CI. A cobertura e publicada como artefato, nao
+imposta como criterio.
+
 A suite tem **1.140 testes em 39 arquivos** entre unidade, integracao e contrato, e passa
 inteira offline — sem PostgreSQL, sem GPU e sem rede. `EchoLLM`, `HashingEmbedder`,
 `NoopTracer`, SQLite e os importadores JSON de transcricao, cenas e OCR substituem tudo
@@ -2203,6 +2230,18 @@ Dois testes merecem destaque:
   e `/metrics`), que toda operacao declara ao menos uma tag e que nenhuma usa tag fora
   do catalogo de dez, e que os esquemas `bearerAuth` e `apiKeyAuth` estao declarados.
 
+Duas honestidades sobre o que a suite **nao** cobre:
+
+- **Nenhum teste exercita o pgvector de verdade.** Os testes de integracao rodam em SQLite
+  em memoria nos dois jobs de CI (secao 17.5), entao o `PgVectorStore`, os tipos `vector` e
+  os indices HNSW da migracao `0002` so sao exercitados pelo `alembic upgrade head` —
+  criacao, nao consulta.
+- **O contrato exportado nao e versionado.** `make openapi` escreve em
+  `specs/contracts/openapi.json`, mas esse diretorio nao existe no repositorio e o CI so
+  exporta para `/tmp` e confere que o arquivo nao esta vazio. Nao ha, hoje, deteccao de
+  quebra de contrato entre commits — o teste garante a **forma** do documento, nao a sua
+  **estabilidade**.
+
 ### Provas executaveis
 
 Para quando ler o codigo nao basta. Cada uma monta o proprio banco descartavel e nao toca
@@ -2215,6 +2254,10 @@ python scripts/navegacao_fim_a_fim.py  # as 30 operacoes de escrita do console, 
 ```
 
 As duas primeiras nao exigem nada: montam o proprio banco descartavel e nao tocam no seu.
+Rode-as **pelo caminho do arquivo** (`python scripts/prova_trinca.py`); `python -m
+scripts.prova_trinca` quebra, porque elas importam um auxiliar por nome nu. E vale saber
+que as duas montam o `Container` a mao, em vez de usar o `build_container`: provam a
+regra, nao a fiacao de producao.
 A terceira exige a aplicacao no ar em `http://127.0.0.1:8000` e o Chromium do Playwright,
 e existe por um motivo especifico: **a bateria de testes nao clica**. Cinco defeitos so
 apareceram quando alguem clicou — entre eles, o ouvinte do painel de contexto engolindo o
