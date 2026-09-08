@@ -1587,7 +1587,21 @@ testado e implantado.**
 
 ## 17. Implantacao
 
-### 17.1 A imagem
+### 17.1 As quatro listas de dependencia
+
+| Arquivo | Para que serve |
+| --- | --- |
+| `requirements.txt` | runtime. FastAPI 0.141, Pydantic 2.13, SQLAlchemy 2.0, LangGraph 1.2, `deepagents` 0.7, `openai` 3.3, Langfuse 4.14, structlog, `prometheus-client`, `rapidfuzz`, `numpy`, `bcrypt` — todos pinados |
+| `requirements-dev.txt` | qualidade: `pytest` 9.1, `pytest-asyncio`, `pytest-cov`, `ruff` 0.16, `mypy` 2.3 |
+| `requirements-media.txt` | pipeline multimodal **opcional**: `ffmpeg-python`, `scenedetect[opencv]`, `whisperx` 3.8.6, `paddleocr` 3.4, `faiss-cpu` |
+| `requirements-media-image.txt` | subset CPU para a imagem Docker (`WITH_MEDIA=1`), sem OCR nem faiss |
+
+A separacao nao e cosmetica. O modulo AdWatch **funciona sem** a terceira lista: os
+adaptadores de midia detectam capacidade em tempo de execucao e degradam para os
+importadores JSON. Instalar `requirements-media.txt` e uma escolha para quem vai
+processar arquivos de video de verdade — nao um pre-requisito para usar a plataforma.
+
+### 17.2 A imagem
 
 Docker multi-stage. O `Dockerfile` **nao roda `apt-get`**, entao o build nao depende de
 alcancar um espelho Debian. O que ele ainda precisa alcancar:
@@ -1610,7 +1624,7 @@ compilador. O entrypoint aceita `serve` (padrao), `migrate`, `seed` e `shell`.
 FFmpeg/FFprobe estaticos, conferidos por sha256 no mesmo padrao do `tini`. Sem esse
 build-arg, a imagem avisa explicitamente que nao ha `ffmpeg` e como reconstruir.
 
-### 17.2 Escala
+### 17.3 Escala
 
 O adjetivo "escalavel" do titulo tem tres significados distintos neste projeto, e vale
 separar:
@@ -1633,7 +1647,7 @@ comerciais crescer alem do que o pgvector atende bem, a troca ja esta prevista: 
 `VectorStorePort` isola a decisao, e `faiss-cpu` esta em `requirements-media.txt`
 justamente para isso (ADR-0005).
 
-### 17.3 Kubernetes
+### 17.4 Kubernetes
 
 `deploy/k8s/` com Kustomize (base + overlays `dev`, `prod`, `oke`):
 
@@ -1645,7 +1659,7 @@ NetworkPolicy · Job de migracao (hook PreSync do ArgoCD) · ServiceMonitor.
 `kustomization`. Em producao use ExternalSecrets/Vault. Nenhum segredo real e versionado
 — e o CI verifica isso.
 
-### 17.4 CI
+### 17.5 CI
 
 Quatro jobs em `.github/workflows/ci.yml`:
 
