@@ -26,9 +26,9 @@ a trinca **guardrail de entrada → system prompt → guardrail de saida** e par
 | **Agentes** | LangGraph · Deep-Agent Harness (`deepagents`) · runtime direto |
 | **LLM** | Qwen (`qwen-latest`) e `openai/gpt-oss-20b` via hub GPU corporativo (API compativel com OpenAI) |
 | **Embeddings** | `Qwen/Qwen3-Embedding-0.6B` — 1024 dimensoes, colecao pgvector `agente_evidence` |
-| **Banco** | PostgreSQL 16 + pgvector (fallback SQLite em dev/testes) · 17 tabelas · 2 migracoes |
+| **Banco** | PostgreSQL 16 + pgvector (fallback SQLite em dev/testes) · 18 tabelas · 2 migracoes |
 | **UI** | Jinja2, tres colunas, menu recolhivel, painel de contexto, paleta de comandos |
-| **Observabilidade** | Langfuse · structlog · Prometheus (11 metricas) |
+| **Observabilidade** | Langfuse · structlog · Prometheus (9 metricas) |
 | **Implantacao** | Docker multi-stage non-root · Kustomize para Kubernetes |
 
 ---
@@ -193,6 +193,31 @@ sete asercoes. Saida real:
 O contador em zero transforma "o guardrail bloqueia antes do provedor" de afirmacao em
 evidencia. E a trilha de passos mostra que o run bloqueado parou em `guardrail_in`: nao
 houve `prompt`, nao houve `llm`.
+
+### 2.4 O quadro de invariantes
+
+O que distingue este projeto nao e ter as garantias abaixo escritas em algum lugar — e
+elas serem **mecanicamente impostas** e **verificadas por teste**. Nenhuma depende de
+alguem lembrar.
+
+| # | Invariante | Onde e imposta | Como e verificada |
+| --- | --- | --- | --- |
+| 1 | Todo building block executa pela trinca; nao ha outro caminho | `InvokeModule` e o unico ponto de execucao | `prova_trinca.py` 1–2 · `test_module_lifecycle.py` |
+| 2 | Bloqueio de entrada precede qualquer chamada ao provedor | etapa 6 antes da etapa 8 | `prova_trinca.py` 3 (contador de chamadas em zero) |
+| 3 | Nenhum modulo instancia cliente de LLM | recebe `LLMPort` pelo `ModuleContext` | `test_architecture.py` |
+| 4 | Toda execucao vira `AgentRun` persistido — sucesso, bloqueio ou falha | etapas 5 e 11, com `FAILED` gravado antes de propagar | `prova_trinca.py` 7 |
+| 5 | Somente definicao `active` e invocavel | etapa 2 | `prova_trinca.py` 5 (`409`) |
+| 6 | Invocar exige `MODULE_INVOKE` | etapa 3 | `prova_trinca.py` 6 (`403`) |
+| 7 | Orcamento com `hard_stop` recusa antes de gastar | etapa 4 | `test_api_knowledge_finops.py` |
+| 8 | `domain/` nao importa framework nem adaptador | `ruff` banned-api + varredura por diretorio | `test_architecture.py` |
+| 9 | Os pesos de fusao do AdWatch somam 1.0 | `ScoreFusion.__init__` recusa (tolerancia 1e-6) | `test_matching.py` · `test_settings.py` |
+| 10 | `review_threshold` ≤ `accept_threshold` | `ScoreFusion.classify` recusa | `test_adwatch_scoring.py` · `test_settings.py` |
+| 11 | Embeddings nao degradam sozinhos; a colecao recusa provider/dimensao divergente | `EmbeddingSettings` + metadados da colecao | `test_embeddings.py` · `test_vector_store.py` |
+| 12 | Sem OCR, o teto de score fica **abaixo** do limiar de aceite | aritmetica dos pesos, exposta em `/capabilities` | `test_adwatch_scoring.py` · `prova_adwatch.py` 5 |
+| 13 | Sem juiz multimodal, `visual_match` **herda** a fala e viaja marcado — nunca 1.0 inventado | `CandidateBuilder.evaluate` | `test_adwatch_scoring.py` · `test_matching.py` |
+| 14 | O schema testado em CI e o mesmo implantado | trilha unica de migracao com `render_item` | `test_migrations.py` (tabela a tabela) |
+| 15 | Nenhum segredo real versionado | `.gitignore` + placeholders nos manifestos | job de CI dedicado |
+| 16 | Um formulario forjado nao escolhe qualquer verbo | `_method` aceita so `PUT`/`PATCH`/`DELETE` | `test_console_forms.py` |
 
 ---
 
@@ -897,13 +922,17 @@ da consulta (secao 9.3).
 
 ### 6.1 Os cinco modulos embutidos
 
-| slug | tipo | capabilities | o que faz |
+| slug | tipo | capabilities declaradas | o que faz |
 | --- | --- | --- | --- |
-| `auth` | auth | login, chaves, RBAC | JWT, chaves de API, papeis `root`/`admin`/`operator`/`viewer` |
-| `processing` | agent | `chat` | agente generico — **todo** o comportamento vem do binding |
-| `finops` | finops | custo, orcamento | custo por modulo/modelo/tenant, orcamentos, alertas e bloqueio |
-| `knowledge` | knowledge | ingestao, busca | chunking, embeddings Qwen, busca semantica com pgvector |
-| `adwatch` | pipeline | `crud_commercials`, `ingest_media`, `detect`, `review` | catalogo de comerciais e deteccao temporal multimodal |
+| `auth` | auth | `login` `issue_token` `api_keys` `rbac` | JWT, chaves de API, papeis `root`/`admin`/`operator`/`viewer` |
+| `processing` | agent | `chat` `structured_output` `tools` `streaming` | agente generico — **todo** o comportamento vem do binding |
+| `finops` | finops | `cost_summary` `budgets` `forecast` | custo por modulo/modelo/tenant, orcamentos, alertas e bloqueio |
+| `knowledge` | knowledge | `ingest` `chunk` `embed` `semantic_search` | chunking, embeddings Qwen, busca semantica com pgvector |
+| `adwatch` | pipeline | `crud_commercials` `ingest_media` `detect` `review` | catalogo de comerciais e deteccao temporal multimodal |
+
+`GET /api/v1/registry` devolve, para cada building block, as capabilities, a versao e o
+**JSON Schema da configuracao aceita** — e o que permite ao console montar o formulario
+certo sem conhecer o modulo de antemao.
 
 ### 6.2 Caminho A — sem codigo (o caminho normal)
 
@@ -997,11 +1026,11 @@ persistidos no run, mesmo os que nao bloquearam.
 
 | slug | estagio | regras |
 | --- | --- | --- |
-| `entrada-padrao` | input | tamanho, segredos, PII, prompt injection |
-| `entrada-estrita` | input | `entrada-padrao` + idioma + topicos proibidos (6 regras) |
-| `saida-padrao` | output | segredos, PII, truncamento (3 regras) |
-| `saida-json` | output | validacao de JSON Schema (2 regras) |
-| `saida-auditada` | output | `saida-padrao` + juiz LLM (4 regras) |
+| `entrada-padrao` | input | `max_length` · `secret_scan` · `pii_redact` · `keyword_block` (prompt injection) |
+| `entrada-estrita` | input | as quatro acima + `language_allow` · `topic_block` |
+| `saida-padrao` | output | `secret_scan` · `pii_redact` · `max_length` |
+| `saida-json` | output | `json_schema` · `max_length` |
+| `saida-auditada` | output | `secret_scan` · `pii_redact` · `max_length` · `llm_judge` |
 
 Um bloqueio no guardrail de **entrada** acontece **antes** de qualquer chamada ao
 provedor: o texto barrado nunca sai da plataforma.
@@ -1081,9 +1110,18 @@ documento → normalizacao → chunking → embeddings (lote de 32) → colecao 
 consulta → embedding da consulta → HNSW (cosseno) → top-k → [rerank lexico] → trechos
 ```
 
+**Chunking**: janelas de ate **1200 caracteres** com **200 de sobreposicao**. O corte nao
+e cego: procura o separador mais forte disponivel (`\n\n`, depois `\n`, depois `". "`,
+depois espaco) na **segunda metade** da janela, e so corta no limite exato quando nenhum
+deles existe. O ultimo trecho e descartado quando ja cabe inteiro dentro da sobreposicao
+do anterior — o que evitaria um fragmento redundante competindo na busca. A sobreposicao
+e limitada a metade do tamanho do chunk; acima disso, a configuracao e recusada.
+
 O `rerank` opcional combina o score vetorial com similaridade lexica (`rapidfuzz`, com
 irmao `difflib` quando a biblioteca nao esta instalada) — util quando a consulta tem
-termos literais que o vetor dilui, como um numero de contrato.
+termos literais que o vetor dilui, como um numero de contrato. Os dois scores parciais
+viajam no metadado do hit (`vector_score`, `lexical_score`, `backend`), entao da para
+auditar por que um trecho subiu na lista.
 
 ### 9.2 A colecao
 
@@ -1200,12 +1238,27 @@ configuracao com tolerancia de 1e-6, em vez de normalizar em silencio.
 }
 ```
 
-`max_score_effective: 0.85` e a leitura mais importante do endpoint. **Sem OCR, o score
-maximo alcancavel e 0.85 — abaixo do limiar de aceite de 0.90.** Nao e um acaso
-aritmetico: e a consequencia desejada de manter o peso do OCR fora do alcance quando o
-sinal nao existe. Uma instalacao sem OCR **nao consegue** aceitar automaticamente; ela
-para em `needs_review` e pede um humano. O sistema prefere admitir incerteza a afirmar
-sem evidencia.
+`max_score_effective` e a leitura mais importante do endpoint, e a distincao entre ele e
+`max_score_without` e deliberada:
+
+- `max_score_without` responde a duas perguntas **hipoteticas** — quanto se perde sem OCR
+  (`1 - 0.15 = 0.85`), quanto se perderia sem juiz visual;
+- `max_score_effective` responde a pergunta que o operador realmente tem: **com esta
+  maquina, do jeito que ela esta, ate onde uma deteccao consegue chegar?**
+
+E so o OCR entra nessa conta. A ausencia do juiz visual **nao** subtrai peso, porque
+`visual_match` herda `speech_match` como proxy; a ausencia do OCR subtrai, porque nao ha
+de onde herdar texto em tela.
+
+O numero decide o funil inteiro: **sem OCR o teto e 0.85, abaixo do limiar de aceite de
+0.90 — nenhuma deteccao e aceita automaticamente, todas caem em revisao humana.** Medido
+em producao: em 81 deteccoes reais, a maior confianca foi 0.845 e nenhuma passou de 0.90.
+
+Nao e um acaso aritmetico, e a consequencia desejada. Uma instalacao sem OCR **nao
+consegue** afirmar sozinha; ela para em `needs_review` e pede um humano. O sistema
+prefere admitir incerteza a afirmar sem evidencia — e o console diz isso na tela, com o
+teto em porcentagem, em vez de deixar o operador descobrir pela fila de revisao que nunca
+esvazia.
 
 ### 10.6 NMS e refino de fronteira
 
@@ -1408,7 +1461,7 @@ Validacoes que **recusam** em vez de corrigir em silencio:
 
 ## 16. Persistencia e migracoes
 
-**17 tabelas**, uma unica trilha de migracao Alembic (`0001_esquema_inicial`,
+**18 tabelas**, uma unica trilha de migracao Alembic (`0001_esquema_inicial`,
 `0002_indices_pgvector`):
 
 ```
