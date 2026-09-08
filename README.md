@@ -432,9 +432,26 @@ com o mesmo resultado e a mesma trilha de auditoria.
 ### 5.1 O console web, tela a tela
 
 Layout de tres colunas: **menu recolhivel** (esquerda) · **conteudo** (centro) ·
-**painel de contexto** (direita, com o objeto selecionado). Sem bundler, sem framework:
-Jinja2 no servidor e ES2020 puro no cliente, carregado com `defer`. Tudo funciona sem
-JavaScript — o JS so melhora o que ja funciona.
+**painel de contexto** (direita, com o objeto selecionado).
+
+Cinco principios governam o console (SPEC-0009 secao 1), e nenhum deles e estetico:
+
+1. **Renderizacao no servidor, pura.** Jinja2, sem framework SPA e sem etapa de build.
+2. **Zero CDN.** Todo CSS, JS e fonte sai de `interfaces/ui/static/`. A aplicacao precisa
+   renderizar **identica em rede fechada** — e por isso que os graficos sao SVG escrito a
+   mao em vez de uma biblioteca.
+3. **Progressive enhancement.** Toda tela funciona com formularios HTML; o JavaScript
+   apenas melhora (busca incremental, painel de contexto, toasts, atalhos). ES2020 sem
+   bundler e sem dependencia externa, carregado com `defer`.
+4. **Acessibilidade.** Landmarks (`header`/`nav`/`main`/`aside`/`footer`), `aria-current`,
+   foco visivel, contraste AA, navegacao por teclado.
+5. **O console consome a propria API v1** por `fetch` na mesma origem — nunca acessa
+   repositorio diretamente.
+
+Do lado da seguranca: autoescape do Jinja ligado, token CSRF nos formularios de mutacao
+quando a autenticacao esta ativa, segredos mascarados (`sk-…ultimos4` ou
+`(nao configurado)`) e `Content-Security-Policy: default-src 'self'` aplicada por
+middleware.
 
 | Rota | Tela | O que o operador faz ali |
 | --- | --- | --- |
