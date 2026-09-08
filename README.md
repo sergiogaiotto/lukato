@@ -455,6 +455,24 @@ JavaScript — o JS so melhora o que ja funciona.
 | `/adwatch/commercials` | **Catalogo de comerciais** | CRUD do texto conhecido, importacao em lote |
 | `/adwatch/detections` | **Deteccoes** | fila de revisao com evidencia por sinal |
 
+**O painel de contexto** (coluna da direita) muda conforme o objeto selecionado. Ha dez
+formatos: `module`, `prompt`, `guardrail`, `run`, `document`, `user`, `apikey`,
+`commercial`, `detection` e o `default`. Selecionar uma linha de tabela carrega ali o
+detalhe daquele objeto — sem sair da pagina, sem perder o filtro.
+
+Tres decisoes da moldura do console valem citar, porque definem como ele se comporta
+quando algo esta fora do ar:
+
+1. **Nada da moldura derruba uma pagina.** Saude e custo sao enfeites: com o banco fora, a
+   barra de status mostra `down` e a pagina **continua renderizando**. Toda consulta
+   auxiliar e envolvida por um degradador que registra o erro e devolve valor neutro.
+2. **A saude e cacheada por poucos segundos.** Sondar banco, LLM e embeddings a cada
+   clique transformaria a barra de status em um gerador de latencia.
+3. **Segredo nao chega ao template.** A configuracao publica e montada campo a campo, com
+   todo `SecretStr` passando obrigatoriamente por mascara e URLs de banco por mascara
+   propria. O template **nunca** recebe o objeto de configuracao — nao ha como vazar por
+   esquecimento.
+
 Interacoes que vale conhecer:
 
 - **`⌘K` / `Ctrl+K`** abre a paleta de comandos. Ela filtra rotas e modulos por
