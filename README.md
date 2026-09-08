@@ -1685,8 +1685,8 @@ de telemetria nunca derruba uma requisicao.
 | --- | --- | --- | --- |
 | LLM | `OpenAICompatibleLLM` (hub) | `EchoLLM` | **automatica** ao faltar credencial |
 | Banco | PostgreSQL 16 + pgvector | SQLite + cosseno em memoria | **automatica** com `AUTO_FALLBACK=true` |
-| Tracer | Langfuse | `NoopTracer` | **automatica** sem credencial |
-| Busca vetorial | HNSW `vector_cosine_ops` | cosseno em `numpy` | segue o banco |
+| Tracer | Langfuse | `NoopTracer` | **automatica** sem credencial ou com `auth_check()` falho |
+| Busca vetorial | HNSW `vector_cosine_ops` | varredura com cosseno em `numpy` | segue o dialeto do banco |
 | Embeddings | `Qwen3-Embedding-0.6B` | `HashingEmbedder` | **explicita** (secao 9.3) |
 | Probe/ASR/OCR/Cenas | FFmpeg · WhisperX · PaddleOCR · PySceneDetect | importacao de JSON | por disponibilidade |
 
