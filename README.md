@@ -1099,10 +1099,27 @@ politica.
 Acoes: `allow` · `warn` · `redact` · `transform` · `block`.
 Severidades: `low` · `medium` · `high` · `critical`.
 
-`redact` e `transform` **alteram o texto e a cadeia continua** com o texto alterado —
-foi o que aconteceu com o CPF na secao 5.6. `block` interrompe: `GuardrailViolation`,
-HTTP 422, `AgentRun(BLOCKED)`. As regras sao avaliadas em ordem, e todos os achados sao
-persistidos no run, mesmo os que nao bloquearam.
+O motor e determinista e encadeado:
+
+1. as regras habilitadas sao avaliadas na ordem `(order, id)` — nunca na ordem de
+   insercao, nunca em paralelo;
+2. **o conteudo de cada regra e o resultado da anterior**: as redacoes se acumulam. Foi
+   assim que, na secao 5.6, a credencial foi redigida por `secret_scan` e a regra seguinte
+   ja viu o texto sem ela;
+3. `redact` e `transform` alteram o texto e a cadeia **continua**;
+4. `block` interrompe **na hora**: `GuardrailViolation`, HTTP 422, `AgentRun(BLOCKED)`. As
+   regras posteriores nao sao avaliadas — nao ha custo depois da decisao;
+5. todos os achados sao persistidos no run, inclusive os que nao bloquearam.
+
+E o motor tem uma politica explicita para os proprios defeitos. Uma regra sem avaliador
+registrado, ou um avaliador que levanta excecao, **nao e ignorada**: com `fail_open=false`
+(o padrao) vira `UnsupportedCapability` ou `GuardrailViolation`; com `fail_open=true`
+vira um achado de aviso e a cadeia segue. Nos dois casos o fato fica escrito. O que nao
+existe e o caminho silencioso — uma regra de seguranca que nao rodou nunca passa
+despercebida.
+
+`fail_open` e configuravel por politica **e** globalmente
+(`LUKATO_GUARDRAILS__FAIL_OPEN`, padrao `false`).
 
 ### 7.3 As politicas que o seed entrega
 
