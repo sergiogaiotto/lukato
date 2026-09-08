@@ -1765,6 +1765,21 @@ O resultado e verificado por teste: `alembic upgrade head` e `Base.metadata.crea
 sao comparados tabela a tabela e coluna a coluna. **Uma trilha, um `head`, o mesmo schema
 testado e implantado.**
 
+### A armadilha do SQLite: chaves estrangeiras
+
+Vale para quem escrever teste neste repositorio. O SQLite **ignora `ON DELETE CASCADE`
+por padrao**; as cascatas so funcionam com `PRAGMA foreign_keys=ON` ligado em **cada
+conexao**, o que `build_engine` faz por um listener de `connect`.
+
+A consequencia e desagradavel: um engine criado a mao com `create_async_engine` passa em
+todos os testes de CRUD e **falha em silencio** nos de cascata — apagar uma midia deixa
+deteccoes orfas, e o teste acusa o codigo de producao por um defeito que esta no proprio
+teste. Em PostgreSQL o mesmo codigo cascateia normalmente, entao a divergencia so aparece
+localmente e no CI.
+
+Regra: obtenha o engine sempre por `build_engine`/`resolve_engine`, nunca por
+`create_async_engine` direto.
+
 ---
 
 ## 17. Implantacao
