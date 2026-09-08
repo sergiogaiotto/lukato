@@ -187,6 +187,14 @@ Duas garantias estruturais, e nao documentais:
 - **nao existe execucao invisivel.** Qualquer excecao entre as etapas 5 e 11 grava
   `AgentRun(FAILED)` antes de propagar.
 
+E um limite que vale dizer com todas as letras, porque a garantia sem ele soaria maior do
+que e: **a plataforma garante que as etapas acontecem, nao que voce vinculou uma politica
+a elas.** Um binding sem `input_guardrail_id` faz a etapa 6 avaliar uma politica vazia e
+liberar — o passo existe, so nao tem regra. E por isso que a checklist de producao
+(secao 22) traz "guardrails de entrada e saida vinculados a **todos** os modulos ativos",
+e por que o `dry-run` (secao 5.5) mostra `system_prompt.bound` e `output_guardrail_id`:
+para que a ausencia seja visivel antes de ir para producao, e nao depois.
+
 ### 2.3 A prova executavel
 
 Ler o codigo nao e a unica forma de conferir. `scripts/prova_trinca.py` monta um banco
@@ -758,9 +766,22 @@ Trocar a politica de seguranca depois, **em producao, sem redeploy**:
 
 ```bash
 curl -s -X PUT localhost:8000/api/v1/modules/triagem-fibra \
-  -H 'Content-Type: application/json' \
-  -d '{"binding":{"input_guardrail_id":"<outra politica>"}}' | jq
+  -H 'Content-Type: application/json' -d '{
+    "binding": {
+      "input_guardrail_id":  "<OUTRA politica de entrada>",
+      "system_prompt_id":    "PROMPT",
+      "output_guardrail_id": "OUT",
+      "model": "qwen-latest", "temperature": 0.0, "max_tokens": 512,
+      "tools": ["knowledge_search"]
+    }
+  }' | jq
 ```
+
+> **`PUT` substitui o binding inteiro.** Mandar so `{"binding":{"input_guardrail_id":...}}`
+> troca a politica de entrada **e zera o resto** — o system prompt, o guardrail de saida,
+> o modelo, a temperatura e as ferramentas voltam ao padrao. Leia a definicao antes, mude
+> o campo e devolva o binding completo. Vale conferir o resultado com um `GET` logo depois,
+> ou com um `dry-run` (secao 5.5), que mostra a trinca resolvida.
 
 ### 5.5 Receita 2 — ensaiar antes de gastar (`dry-run`)
 
