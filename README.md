@@ -1213,7 +1213,22 @@ VIDEO ──┬── audio ──→ ASR (WhisperX) ──→ palavras + timest
                                        Detection persistida com evidencia por sinal
 ```
 
-### 10.3 Como cada sinal e calculado
+### 10.3 A ingestao nao e tudo ou nada
+
+O ativo de midia caminha por quatro estados: `registered` → `ingested` → `analyzed`, com
+`failed` para o caso terminal.
+
+`POST /media/{id}/ingest` executa **a ingestao possivel**: sondagem com FFmpeg, extracao
+de audio, ASR, deteccao de cenas e OCR. Cada etapa cujo adaptador nao esteja instalado e
+**registrada e pulada** — nenhuma indisponibilidade, e nenhuma falha de adaptador, derruba
+a ingestao. O relatorio devolve o que foi alcancado, e o `status` do ativo reflete
+exatamente isso.
+
+E por isso que `can_ingest` em `/capabilities` e `probe AND asr`: sem FFmpeg e sem
+WhisperX nao ha o que extrair de um arquivo de video. Mas `can_detect` continua `true` —
+porque a transcricao pode ter vindo pela importacao, e o funil so precisa dela.
+
+### 10.4 Como cada sinal e calculado
 
 Tudo em `domain/services/matching.py` — dominio puro, sem I/O, sem `numpy`.
 
@@ -1239,7 +1254,7 @@ Duas salvaguardas contra o auto-engano:
 Os pesos sao configuraveis, e a soma **precisa** valer 1.0 — a validacao recusa a
 configuracao com tolerancia de 1e-6, em vez de normalizar em silencio.
 
-### 10.4 As tres faixas de decisao
+### 10.5 As tres faixas de decisao
 
 | Faixa | Status | O que acontece |
 | --- | --- | --- |
@@ -1247,7 +1262,7 @@ configuracao com tolerancia de 1e-6, em vez de normalizar em silencio.
 | `0.60 ≤ S < 0.90` | `needs_review` | juiz Qwen-VL decide; sem ele, vai para a fila de revisao humana |
 | `S < 0.60` | `rejected` | descartado (persistido apenas com `--keep-rejected`) |
 
-### 10.5 O teto que impede a afirmacao sem prova
+### 10.6 O teto que impede a afirmacao sem prova
 
 `GET /api/v1/adwatch/capabilities` devolve, alem do que esta instalado:
 
@@ -1284,7 +1299,7 @@ prefere admitir incerteza a afirmar sem evidencia — e o console diz isso na te
 teto em porcentagem, em vez de deixar o operador descobrir pela fila de revisao que nunca
 esvazia.
 
-### 10.6 NMS e refino de fronteira
+### 10.7 NMS e refino de fronteira
 
 - **NMS (`NonMaximumSuppression`)**: candidatos do mesmo comercial com IoU temporal acima
   de 0.5 sao fundidos. Mantem-se o de maior score e o intervalo e expandido para a uniao
@@ -1293,7 +1308,7 @@ esvazia.
   ate 3 s de deslocamento. Empate de distancia fica com a fronteira anterior. Se o
   encaixe inverteria o intervalo, o refino e descartado.
 
-### 10.7 O caminho offline e a prova
+### 10.8 O caminho offline e a prova
 
 O caminho de **importacao de transcricao** (JSON no formato WhisperX) torna o funil
 inteiro executavel sem FFmpeg, sem GPU e sem rede. E o caminho usado nos testes e em
@@ -1323,7 +1338,7 @@ inteiro executavel sem FFmpeg, sem GPU e sem rede. E o caminho usado nos testes 
 O comercial presente para em `needs_review` porque falta OCR: e o pipeline obedecendo a
 SPEC-0010 secao 3.6, nao um defeito.
 
-### 10.8 Por que o funil e barato
+### 10.9 Por que o funil e barato
 
 O argumento economico da inversao (secao 10.1) e estrutural, mas da para medir. Na
 execucao de demonstracao — 300 s de midia, catalogo de 5 comerciais, modo offline:
@@ -1344,7 +1359,7 @@ o corte economiza chamada, nao evidencia.
 
 Esse e o padrao do projeto inteiro: o caminho caro e o ultimo, e ele e limitado.
 
-### 10.9 O que fica registrado
+### 10.10 O que fica registrado
 
 Cada `Detection` guarda `start`, `end`, `confidence`, `status`, `refined_by_scene`,
 `verified_by_vlm` e a `DetectionEvidence` completa — os cinco sinais, `order_ok`,
@@ -1584,7 +1599,7 @@ minuto quando sobra. Cada pod pede 250m de CPU e 512Mi, com teto de 1 CPU e 1Gi.
 manutencao e o `preStop` drena as conexoes antes do encerramento.
 
 **Escala de dado.** Embeddings vao em lote (32 por chamada), a busca usa indice HNSW no
-pgvector, e o funil do AdWatch e barato por construcao (secao 10.8). Quando o catalogo de
+pgvector, e o funil do AdWatch e barato por construcao (secao 10.9). Quando o catalogo de
 comerciais crescer alem do que o pgvector atende bem, a troca ja esta prevista: a porta
 `VectorStorePort` isola a decisao, e `faiss-cpu` esta em `requirements-media.txt`
 justamente para isso (ADR-0005).
@@ -1652,7 +1667,7 @@ no seu: rode quantas vezes quiser, com ou sem `.env`.
 
 ```bash
 python scripts/prova_trinca.py     # o requisito central, em 7 asercoes (secao 2.3)
-python scripts/prova_adwatch.py    # o funil do AdWatch sem FFmpeg/GPU/rede (secao 10.7)
+python scripts/prova_adwatch.py    # o funil do AdWatch sem FFmpeg/GPU/rede (secao 10.8)
 python scripts/navegacao_fim_a_fim.py  # as 30 operacoes de escrita do console, clicando
 ```
 
@@ -1740,7 +1755,7 @@ tests/          unit · integration · contract
 | `429` do provedor | limite de requisicoes | o adaptador ja faz retry com backoff; reduza a concorrencia ou peca cota |
 | PostgreSQL indisponivel no boot | fallback automatico | com `AUTO_FALLBACK=true` cai para SQLite e loga WARNING; em producao use `false` |
 | `/api/docs` responde 200 em branco | o navegador nao alcanca o CDN | aponte `LUKATO_APP__DOCS_ASSETS_BASE` para o espelho interno |
-| AdWatch nunca aceita automaticamente | sem OCR o teto de score e 0.85 (secao 10.5) | instale o OCR, ou revise manualmente a fila `needs_review` |
+| AdWatch nunca aceita automaticamente | sem OCR o teto de score e 0.85 (secao 10.6) | instale o OCR, ou revise manualmente a fila `needs_review` |
 | `CERTIFICATE_VERIFY_FAILED` no build | proxy com interceptacao TLS | ponha a CA em `deploy/ca/*.crt` |
 
 ---
