@@ -295,6 +295,35 @@ mock de biblioteca.
 
 Trocar qualquer um deles e escrever um adaptador. Nenhuma linha de `domain/` muda.
 
+### 3.4 O composition root
+
+`src/lukato/composition.py` e o **unico** modulo autorizado a importar `adapters`,
+`application` e `interfaces` ao mesmo tempo. Todo o resto do sistema so conhece portas;
+quem decide qual implementacao ocupa cada porta e uma funcao, uma vez por processo.
+`build_container` resolve banco, LLM, embeddings, guardrails, tracer, orquestradores,
+registry, precos, seguranca e capacidades multimodais; `dispose_container` desfaz na
+ordem inversa, sem deixar telemetria nem pool de conexao pendurados.
+
+Duas regras dessa montagem valem citar, porque explicam o comportamento de boot:
+
+**O log de selecao e parte do contrato.** Cada porta emite uma linha INFO
+`port_adapter_selected` com o adaptador escolhido, se ele esta degradado e **o motivo** da
+escolha — chave ausente, biblioteca ausente, ping que falhou. Sem isso, uma instalacao
+rodando com `EchoLLM` e `HashingEmbedder` responderia `200` em tudo e pareceria saudavel.
+O modo degradado tem de ser legivel por quem opera, nao so por quem le o codigo.
+
+**A montagem nunca falha por indisponibilidade de rede.** O que derruba o boot e defeito
+de configuracao ou de esquema — coisas que nao se resolvem sozinhas em producao. E ha uma
+distincao fina entre os dois caminhos que levam ao modo degradado:
+
+- **configuracao escolhe o adaptador** — sem `LUKATO_LLM__API_KEY` entra o `EchoLLM`, sem
+  endpoint de embeddings entra o `HashingEmbedder`, sem chaves do Langfuse entra o
+  `NoopTracer`. Decisao estavel e previsivel;
+- **sonda apenas classifica** — um hub que nao responde marca a porta como `degraded` no
+  log e em `/readyz`, mas **nao troca** o adaptador. As duas excecoes sao deliberadas: o
+  banco troca por SQLite quando o `ping` falha (e o que `LUKATO_DB__AUTO_FALLBACK`
+  autoriza explicitamente) e o Langfuse vira `NoopTracer` quando o `auth_check()` falha.
+
 ---
 
 ## 4. Inicio rapido
