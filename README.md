@@ -1052,6 +1052,12 @@ janelas=172 candidatos=99 comerciais=5 persistidas=1 substituidas=0
 aceitas=0 revisao=1 rejeitadas=0 vlm=sim semantico=sim tempo=95ms
 ```
 
+> **Comercial sem texto util fica sem assinatura.** O fingerprint e construido **depois**
+> do commit do comercial, em transacao separada. Se o texto normalizar para vazio — so
+> pontuacao, por exemplo — o comercial fica gravado e a chamada responde `422`. O catalogo
+> passa a ter uma linha que nunca casara com nada. Confira `fingerprint` no `GET` do
+> comercial: `null` ali significa "cadastrado e inerte".
+
 Buscar uma frase exata na transcricao, com os tempos:
 
 ```bash
@@ -1570,6 +1576,16 @@ E por isso que `can_ingest` em `/capabilities` e `probe AND asr`: sem FFmpeg e s
 WhisperX nao ha o que extrair de um arquivo de video. Mas `can_detect` continua `true` —
 porque a transcricao pode ter vindo pela importacao, e o funil so precisa dela.
 
+> **`probe → audio → asr` e uma cadeia dura.** Sem FFmpeg nao ha sondagem; sem sondagem
+> nao ha audio extraido; e sem audio o ASR e pulado com "sem audio extraido" **mesmo com o
+> WhisperX instalado**. Quem instala so o WhisperX ve o relatorio pular a transcricao sem
+> explicar que o elo que faltou foi o FFmpeg. O relatorio inteiro fica gravado em
+> `MediaAsset.metadata['ingest']` — a auditoria da ultima ingestao mora no proprio ativo.
+
+`GET /media/{id}` devolve **contagens, nao conteudo**: `transcript` (booleano),
+`transcript_words`, `transcript_source`, `scene_cuts`, `ocr_texts`, `detections` e as
+capacidades. As palavras so saem por `GET /media/{id}/transcript`.
+
 ### 10.4 Como cada sinal e calculado
 
 Tudo em `domain/services/matching.py` — dominio puro, sem I/O, sem `numpy`.
@@ -1581,6 +1597,14 @@ Tudo em `domain/services/matching.py` — dominio puro, sem I/O, sem `numpy`.
 | **ocr** (`ocr_match`) | 0.15 | melhor entre a similaridade do texto em tela com o texto do comercial e a melhor similaridade com qualquer palavra-chave |
 | **visual** (`visual_match`) | 0.15 | veredito do juiz multimodal; **na ausencia dele, herda o sinal de fala como proxy conservador** |
 | **duracao** (`duration_match`) | 0.05 | `1 - min(1, |dur_janela - duracao_esperada| / max(duracao_esperada, 1))` |
+
+> **O sinal semantico nao detecta troca de embedder.** `similarity` reescala o cosseno de
+> `[-1, 1]` para `[0, 1]`, entao cosseno `0.0` vira **0.5** — e cosseno `0.0` e o que sai
+> de vetores de **dimensoes diferentes**, nao so de vetores ortogonais. Consequencia: um
+> catalogo assinado com um embedder e janelas produzidas por outro nao zeram a parcela
+> semantica; contribuem com um neutro `0.25 × 0.5 = 0.125`, indistinguivel de uma
+> comparacao legitimamente ambigua. E mais uma razao para `lukato reindex` ser obrigatorio
+> ao trocar de provedor (secao 9.3), e nao apenas recomendado.
 
 Duas salvaguardas contra o auto-engano:
 
@@ -1603,6 +1627,17 @@ configuracao com tolerancia de 1e-6, em vez de normalizar em silencio.
 | `S ≥ 0.90` | `accepted` | aceita sem juiz multimodal |
 | `0.60 ≤ S < 0.90` | `needs_review` | juiz Qwen-VL decide; sem ele, vai para a fila de revisao humana |
 | `S < 0.60` | `rejected` | descartado (persistido apenas com `--keep-rejected`) |
+
+**O juiz pode rebaixar, nao so promover.** Um `visual_match` confirmado baixo — ou um
+veredito valido com `commercial_detected: false`, que zera a parcela — substitui o proxy
+herdado da fala, o score e **recalculado**, e o candidato pode cair abaixo de 0.60. Como o
+descarte dos rejeitados roda depois do juiz, um candidato que entrou em revisao pode
+terminar fora do resultado.
+
+O `vision_calls` do relatorio conta **chamadas feitas**, nao vereditos aproveitados: o
+contador incrementa antes da validacao, e um juiz que responda JSON invalido ou estoure o
+tempo devolve veredito neutro em vez de erro. Numero alto de `vision_calls` com poucas
+mudancas de status significa juiz respondendo mal, nao funil indeciso.
 
 ### 10.6 O teto que impede a afirmacao sem prova
 
