@@ -1184,9 +1184,24 @@ levanta excecao e nao inventa resposta.
 ### 8.3 O adaptador de LLM
 
 `OpenAICompatibleLLM` fala com qualquer endpoint compativel com a API da OpenAI —
-`LUKATO_LLM__BASE_URL`. Timeout de 60 s e ate 3 tentativas com backoff exponencial
+`LUKATO_LLM__BASE_URL`. Timeout de 60 s e ate 3 tentativas
 (`LUKATO_LLM__TIMEOUT`, `LUKATO_LLM__MAX_RETRIES`). Ha um `fallback_model`
 (`openai/gpt-oss-20b`) para o caso de o modelo principal nao atender.
+
+Tres decisoes deste adaptador valem registro:
+
+- **A retentativa e do projeto, nao do SDK.** O cliente e criado com `max_retries=0` e a
+  politica de repeticao fica em `tenacity`, para que backoff, limite e log fiquem no mesmo
+  lugar em **todos** os adaptadores de borda.
+- **So o que e transitorio repete.** `APIConnectionError`, `APITimeoutError` e
+  `RateLimitError` sao retentados; qualquer outro erro de status (tipicamente `4xx` de
+  contrato) falha na primeira tentativa — repetir um `400` so queima tempo e cota.
+- **Nenhum erro de biblioteca escapa.** Tudo vira erro de dominio: `rate_limited` para
+  `429` e `provider_error` (com `details` contendo `status` e `body`) para o resto. A
+  camada HTTP nunca ve uma excecao do SDK.
+
+`health()` nunca levanta: erra para `False` e deixa o composition root decidir. E importar
+o modulo nao abre conexao alguma — o que permite que a suite rode sem rede.
 
 `EchoLLM` e o irmao deterministico: devolve a entrada prefixada com `[echo]` e contabiliza
 tokens de forma estavel. Ele entra automaticamente quando falta credencial, e o motivo
