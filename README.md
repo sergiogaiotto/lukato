@@ -1648,13 +1648,34 @@ lukato_provider_errors_total            erros de provedores externos, por codigo
 O par `guardrail_findings_total` / `guardrail_blocks_total` responde, sem consulta ao
 banco, a pergunta que auditoria faz: quanto a plataforma barrou, onde e por qual regra.
 
-**Log estruturado** (`structlog`), com `LUKATO_OBSERVABILITY__LOG_JSON=true` para
-ingestao. **Tracing** opcional no Langfuse: cada run abre um span, com geracoes aninhadas
-por chamada de LLM. Sem credencial, o `NoopTracer` assume, `/readyz` reporta `degraded`
-para o componente `tracer` e nada mais muda.
+**Tracing** opcional no Langfuse, com uma convencao fixa de arvore:
 
-O `trace_id` viaja no `AgentRun` e na resposta da API, e o `request_id` e propagado por
-middleware — o mesmo identificador liga log, metrica, trace e registro no banco.
+```text
+trace  module.invoke:<slug>
+ ├─ span  guardrail.input      (rules, findings, blocked)
+ ├─ span  prompt.render        (prompt_slug, variables)
+ ├─ span  runtime.<runtime>
+ │    ├─ generation  llm.chat  (model, usage, cost_usd, latency)
+ │    └─ span        tool.<nome>
+ └─ span  guardrail.output
+```
+
+Atributos obrigatorios do trace: `module_slug`, `run_id`, `tenant_id`, `actor`,
+`environment` e `version`. Scores automaticos: `guardrail_blocked` (0/1), `latency_ms` e
+`cost_usd`. O `trace_id` e gravado em `AgentRun.trace_id` **e** devolvido no header
+`X-Trace-Id` — a mesma execucao e localizavel pelo banco, pelo log e pela resposta HTTP.
+
+A arvore espelha as onze etapas: quem abre um trace ve a trinca desenhada, e um run
+bloqueado aparece como um `guardrail.input` sem irmaos.
+
+**Log estruturado** com `structlog`, e `LUKATO_OBSERVABILITY__LOG_JSON=true` para
+ingestao. O `request_id` e propagado por middleware e injetado no contexto de log, entao
+o mesmo identificador liga log, metrica, trace e registro no banco.
+
+**O codigo de negocio nunca verifica se ha tracer** — sempre existe um. Sem credencial,
+ou se o `auth_check()` do Langfuse falhar no boot, o `NoopTracer` assume, o log registra
+WARNING e `/readyz` reporta `degraded` para o componente `tracer`. Nada mais muda: falha
+de telemetria nunca derruba uma requisicao.
 
 ---
 
