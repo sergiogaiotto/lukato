@@ -120,9 +120,10 @@ Sete termos aparecem o tempo todo neste documento. Vale fixa-los antes.
 | **fingerprint** | a assinatura de um comercial: texto normalizado, tokens, ancoras e vetor semantico |
 | **janela** | um recorte temporal da transcricao (15, 30 ou 60 s) confrontado com os fingerprints |
 
-A distincao que mais importa e a primeira: **classe e codigo, definicao e configuracao**.
-Duas definicoes sobre a mesma classe sao dois agentes diferentes, e nenhuma linha de
-codigo os separa.
+A distincao que mais importa e entre a segunda e a terceira linha: **building block e
+codigo, definicao e configuracao**. Duas definicoes sobre a mesma classe sao dois agentes
+diferentes, e nenhuma linha de codigo os separa. Quem le "modulo" em qualquer lugar deste
+documento precisa saber de qual dos dois se trata.
 
 ---
 
@@ -1501,12 +1502,22 @@ Detalhes normativos: [`specs/0010-adwatch.spec.md`](specs/0010-adwatch.spec.md) 
 
 Cada invocacao gera um `UsageRecord` com tokens de entrada e saida, modelo, modulo,
 tenant e custo calculado a partir da tabela de precos (`input_usd_per_1k`,
-`output_usd_per_1k`). O custo agregado no run tem 8 casas decimais — chamadas baratas
-nao somam zero por arredondamento.
+`output_usd_per_1k`). O custo e guardado com **8 casas decimais** e formatado com 5 na
+tela — chamadas baratas nao somam zero por arredondamento. Quando o provedor nao reporta
+tokens, ha uma heuristica declarada (4 caracteres por token) em vez de um zero silencioso.
 
-Modelos **sem preco cadastrado** nao somem: caem no preco padrao e aparecem em
-`unknown_models` no resumo, para que ninguem descubra depois que 30% do consumo estava
-fora da conta.
+Tres decisoes de FinOps existem para o mesmo fim: **impedir que a conta feche certinho e
+esteja errada**.
+
+- **Modelo sem preco cadastrado nao some.** Cai no preco padrao e aparece nomeado em
+  `unknown_models` no resumo. Sem esse campo, um modelo novo em producao apareceria com
+  custo `0.00`, indistinguivel de um modelo realmente gratuito.
+- **A serie temporal devolve todos os baldes do intervalo, inclusive os de custo zero.**
+  Um ponto ausente seria lido pelo grafico como "nao sei", quando o fato e "nao gastou".
+- **O orcamento reporta situacao, nao so veredito.** `GET /budgets/{id}/status` devolve
+  `ok`, `ratio`, `alert`, `blocked`, `spent`, `remaining`, `limit_usd`,
+  `alert_threshold`, `hard_stop` e as bordas do periodo (`period_start`, `period_end`) —
+  da para agir antes do corte, nao so descobrir depois dele.
 
 Orcamentos tem escopo em string (`global`, `module:<slug>`, `tenant:<id>`), periodo
 (`daily`, `weekly`, `monthly`, `total`), `alert_threshold` (padrao 0.8) e `hard_stop`.
