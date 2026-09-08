@@ -561,7 +561,15 @@ Listagens paginam com `limit` (1..200, padrao 50) e `offset`.
   `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `Permissions-Policy` e HSTS
   quando em HTTPS;
 - limite de **240 requisicoes por 60 s** por padrao, com `429`, `Retry-After`,
-  `X-RateLimit-Limit` e `X-RateLimit-Window`. Rotas de saude e metricas sao isentas.
+  `X-RateLimit-Limit` e `X-RateLimit-Window`. A identidade do chamador vem da credencial
+  apresentada (resumo do JWT ou da chave de API) e, na falta dela, do IP de origem — o
+  `Principal` ainda nao foi resolvido nessa altura da pilha. Sondas, metricas e arquivos
+  estaticos sao isentos.
+
+> **O limite e por replica, nao global.** A janela deslizante vive na memoria do processo
+> quando nao ha cache compartilhado injetado. E um anteparo consciente — proteger o
+> processo com um contador local vale mais do que nao limitar nada — mas com 10 replicas o
+> teto efetivo e dez vezes maior. Para um teto global, injete um `CachePort` compartilhado.
 
 #### Mapa das rotas
 
@@ -1814,6 +1822,11 @@ replicas** por CPU (70%) e memoria (80%), com janela de estabilizacao de 30 s pa
 minuto quando sobra. Cada pod pede 250m de CPU e 512Mi, com teto de 1 CPU e 1Gi.
 `topologySpreadConstraints` espalha as replicas, o `PodDisruptionBudget` protege durante
 manutencao e o `preStop` drena as conexoes antes do encerramento.
+
+A unica coisa que **nao** e compartilhada por padrao e a janela do limitador de
+requisicoes, que vive na memoria de cada processo (secao 5.2). Com varias replicas, o teto
+efetivo se multiplica pelo numero delas ate que um `CachePort` compartilhado seja
+injetado.
 
 **Escala de dado.** Embeddings vao em lote (32 por chamada), a busca usa indice HNSW no
 pgvector, e o funil do AdWatch e barato por construcao (secao 10.9). Quando o catalogo de
