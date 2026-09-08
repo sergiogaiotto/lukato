@@ -1436,9 +1436,31 @@ Permissoes: `module:read` · `module:write` · `module:invoke` · `prompt:read` 
 `prompt:write` · `guardrail:read` · `guardrail:write` · `knowledge:read` ·
 `knowledge:write` · `finops:read` · `finops:write` · `run:read` · `admin:*`.
 
-Autenticacao por JWT (HS256, expiracao de 3600 s por padrao, renovavel) ou por chave de
-API no header `X-API-Key`. A chave e exibida **uma unica vez** na criacao; o banco guarda
-apenas o hash. Rotacao e revogacao sao endpoints proprios.
+Dois esquemas de credencial convivem, ambos declarados no OpenAPI:
+
+**`Authorization: Bearer <JWT>`** — HS256, assinado com `LUKATO_SECURITY__JWT_SECRET`,
+expiracao de 3600 s por padrao, renovavel por `POST /identity/token/refresh`. Claims:
+`sub`, `role`, `tenant`, `kind`, `iat`, `exp` e `iss="lukato"`.
+
+O token **nao carrega a lista de permissoes**, e a decisao e deliberada: o `Principal` e
+reconstruido no `decode` sempre a partir de `ROLE_PERMISSIONS[role]`. Duas consequencias
+que so aparecem por causa disso — mudar o mapa de permissoes de um papel vale
+**imediatamente** para os tokens ja emitidos (nao ha janela ate expirar), e um token
+adulterado nao consegue pedir permissao que o seu papel nao tem, porque a permissao nunca
+esteve escrita nele. Qualquer falha de validacao — assinatura, expiracao, emissor, papel
+desconhecido — vira `UnauthorizedError`; nenhuma excecao da biblioteca de JWT vaza para a
+camada HTTP.
+
+**`X-API-Key: lk_<prefixo>_<segredo>`** — o prefixo (8 caracteres) indexa a linha no
+banco e o segredo (32 bytes, `secrets.token_urlsafe`) e conferido contra o
+`hashed_secret`. O banco guarda **apenas o prefixo e o hash**; a chave completa e exibida
+uma unica vez, na criacao. Chaves tem papel, tenant, validade opcional e registro de
+ultimo uso. Rotacao e revogacao sao endpoints proprios.
+
+**Senhas**: bcrypt com custo 12, sem `passlib`. Ha uma sutileza tratada explicitamente —
+o bcrypt trunca em silencio qualquer entrada acima de 72 bytes, o que faria duas senhas
+longas com o mesmo prefixo virarem a mesma credencial. A senha e reduzida a 64 bytes ASCII
+por SHA-256 **antes** do bcrypt, entao o comprimento inteiro conta.
 
 `LUKATO_SECURITY__AUTH_ENABLED=false` (padrao de desenvolvimento) faz a aplicacao operar
 com um principal implicito — comodo para desenvolver, **inaceitavel em producao**. A
