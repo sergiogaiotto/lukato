@@ -951,7 +951,7 @@ Ciclo de vida (`status`): `draft` → `active` → `paused` → `deprecated`, po
 ### 6.3 Caminho B — com codigo (quando ha logica propria de verdade)
 
 ```python
-from lukato.modules.base import BaseModule, ModuleRequest, ModuleResponse
+from lukato.modules.base import BaseModule, ModuleRequest, ModuleResponse, UIDescriptor, UINavItem
 from lukato.modules.registry import register_module
 from lukato.domain.models.module import ModuleKind
 
@@ -961,15 +961,39 @@ class MeuModulo(BaseModule):
     name = "Meu modulo"
     kind = ModuleKind.AGENT
     capabilities = ("chat",)
+    config_schema = {"type": "object", "properties": {"limite": {"type": "integer"}}}
+
+    async def setup(self, ctx) -> None: ...          # opcional
+    async def teardown(self) -> None: ...            # opcional
 
     async def handle(self, request: ModuleRequest, ctx) -> ModuleResponse:
-        # ctx entrega portas ja resolvidas: llm, embeddings, uow, tracer,
-        # e a fachada ctx.services["pipeline"] (system prompt + runtime do binding).
+        # ctx entrega portas ja resolvidas: llm, embeddings, guardrails, tracer,
+        # uow_factory, orchestrators, settings — e a fachada
+        # ctx.services["pipeline"], que ja recebe o system prompt renderizado
+        # e chama o runtime declarado no binding.
         ...
+
+    def ui(self) -> UIDescriptor:                    # opcional
+        return UIDescriptor(nav=[UINavItem(label="Meu modulo", icon="cube",
+                                           endpoint="/meu-modulo")])
 ```
 
-O modulo **nao instancia** cliente de LLM: recebe a porta pelo `ModuleContext`. E o que
-impede que a trinca vire opcional.
+Tres pontos importam aqui:
+
+1. **O modulo nao instancia cliente de LLM** — recebe a porta pelo `ModuleContext`. E o
+   que impede que a trinca vire opcional: nao existe caminho alternativo para chamar o
+   provedor.
+2. **`config_schema` e contrato publico.** O registry o expoe, e o console monta o
+   formulario de configuracao a partir dele — sem conhecer o modulo.
+3. **`ui()` publica menu e templates no console.** Um building block de terceiros
+   aparece na navegacao, com pagina central e painel de contexto proprios, sem tocar em
+   nada da plataforma. Ha teste para isso
+   (`test_modulo_de_fora_publica_item_de_menu_no_console`), e tambem para o caso
+   inverso: remover o modulo do registry **nao derruba a aplicacao**.
+
+`ModuleRequest` carrega `input`, `payload`, `variables`, `history` e `stream`;
+`ModuleResponse` devolve `output`, `data`, `run_id`, `usage`, `cost_usd`, `findings` e
+`metadata`.
 
 Distribua como pacote com entry point no grupo `lukato.modules`:
 
@@ -978,8 +1002,8 @@ Distribua como pacote com entry point no grupo `lukato.modules`:
 meu-modulo = "meu_pacote.modulo:MeuModulo"
 ```
 
-O nucleo descobre sozinho — `POST /api/v1/registry/discover` reexecuta a varredura sem
-reiniciar o processo. Nenhuma alteracao no codigo da plataforma.
+O nucleo descobre sozinho — `POST /api/v1/registry/discover` reexecuta a varredura **sem
+reiniciar o processo**. Nenhuma alteracao no codigo da plataforma.
 
 ---
 
@@ -1299,7 +1323,28 @@ inteiro executavel sem FFmpeg, sem GPU e sem rede. E o caminho usado nos testes 
 O comercial presente para em `needs_review` porque falta OCR: e o pipeline obedecendo a
 SPEC-0010 secao 3.6, nao um defeito.
 
-### 10.8 O que fica registrado
+### 10.8 Por que o funil e barato
+
+O argumento economico da inversao (secao 10.1) e estrutural, mas da para medir. Na
+execucao de demonstracao — 300 s de midia, catalogo de 5 comerciais, modo offline:
+
+```
+janelas=172  candidatos=99  comerciais=5  persistidas=1  tempo=95ms
+```
+
+172 janelas avaliadas contra 5 fingerprints em **95 ms de CPU**, sem uma unica chamada de
+GPU no caminho textual. O modelo multimodal so entraria na faixa 0.60–0.90 — e mesmo la
+existe um **teto defensivo de 24 chamadas por execucao** (`MAX_VISION_CALLS`).
+
+O teto tem um motivo preciso: a classificacao acontece **antes** da supressao, entao uma
+midia longa pode produzir centenas de candidatos na faixa de revisao, e sem teto uma unica
+deteccao dispararia centenas de chamadas caras. Os candidatos sao ordenados por score
+decrescente e os excedentes **permanecem em revisao humana** em vez de serem descartados —
+o corte economiza chamada, nao evidencia.
+
+Esse e o padrao do projeto inteiro: o caminho caro e o ultimo, e ele e limitado.
+
+### 10.9 O que fica registrado
 
 Cada `Detection` guarda `start`, `end`, `confidence`, `status`, `refined_by_scene`,
 `verified_by_vlm` e a `DetectionEvidence` completa — os cinco sinais, `order_ok`,
@@ -1521,7 +1566,30 @@ compilador. O entrypoint aceita `serve` (padrao), `migrate`, `seed` e `shell`.
 FFmpeg/FFprobe estaticos, conferidos por sha256 no mesmo padrao do `tini`. Sem esse
 build-arg, a imagem avisa explicitamente que nao ha `ffmpeg` e como reconstruir.
 
-### 17.2 Kubernetes
+### 17.2 Escala
+
+O adjetivo "escalavel" do titulo tem tres significados distintos neste projeto, e vale
+separar:
+
+**Escala de funcionalidade.** O custo marginal de um agente novo e uma linha no banco.
+Nao ha repositorio, pipeline nem deploy por agente. Dez agentes e uma instalacao; cem
+agentes e a mesma instalacao com cem linhas.
+
+**Escala de carga.** A aplicacao e sem estado — sessao nenhuma vive no processo, o estado
+vive no PostgreSQL. Isso permite replicas horizontais: o HPA v2 sobe de **2 para ate 10
+replicas** por CPU (70%) e memoria (80%), com janela de estabilizacao de 30 s para subir e
+300 s para descer, dobrando a capacidade a cada 30 s quando precisa e removendo um pod por
+minuto quando sobra. Cada pod pede 250m de CPU e 512Mi, com teto de 1 CPU e 1Gi.
+`topologySpreadConstraints` espalha as replicas, o `PodDisruptionBudget` protege durante
+manutencao e o `preStop` drena as conexoes antes do encerramento.
+
+**Escala de dado.** Embeddings vao em lote (32 por chamada), a busca usa indice HNSW no
+pgvector, e o funil do AdWatch e barato por construcao (secao 10.8). Quando o catalogo de
+comerciais crescer alem do que o pgvector atende bem, a troca ja esta prevista: a porta
+`VectorStorePort` isola a decisao, e `faiss-cpu` esta em `requirements-media.txt`
+justamente para isso (ADR-0005).
+
+### 17.3 Kubernetes
 
 `deploy/k8s/` com Kustomize (base + overlays `dev`, `prod`, `oke`):
 
@@ -1533,7 +1601,7 @@ NetworkPolicy · Job de migracao (hook PreSync do ArgoCD) · ServiceMonitor.
 `kustomization`. Em producao use ExternalSecrets/Vault. Nenhum segredo real e versionado
 — e o CI verifica isso.
 
-### 17.3 CI
+### 17.4 CI
 
 Quatro jobs em `.github/workflows/ci.yml`:
 
@@ -1561,9 +1629,10 @@ make check    # lint + type + test
 Marcadores: `unit` (puros, sem I/O), `integration` (sobem a aplicacao ou o banco),
 `contract` (contrato OpenAPI), `slow`.
 
-A suite tem **39 arquivos de teste** entre unidade, integracao e contrato, e roda inteira
-offline: `EchoLLM`, `HashingEmbedder`, `NoopTracer`, SQLite e importadores JSON
-substituem tudo que exigiria rede.
+A suite tem **1.140 testes em 39 arquivos** entre unidade, integracao e contrato, e passa
+inteira offline — sem PostgreSQL, sem GPU e sem rede. `EchoLLM`, `HashingEmbedder`,
+`NoopTracer`, SQLite e os importadores JSON de transcricao, cenas e OCR substituem tudo
+que exigiria a rede corporativa.
 
 Dois testes merecem destaque:
 
@@ -1584,8 +1653,18 @@ no seu: rode quantas vezes quiser, com ou sem `.env`.
 ```bash
 python scripts/prova_trinca.py     # o requisito central, em 7 asercoes (secao 2.3)
 python scripts/prova_adwatch.py    # o funil do AdWatch sem FFmpeg/GPU/rede (secao 10.7)
-python scripts/navegacao_fim_a_fim.py  # percorre o console tela a tela
+python scripts/navegacao_fim_a_fim.py  # as 30 operacoes de escrita do console, clicando
 ```
+
+As duas primeiras nao exigem nada: montam o proprio banco descartavel e nao tocam no seu.
+A terceira exige a aplicacao no ar em `http://127.0.0.1:8000` e o Chromium do Playwright,
+e existe por um motivo especifico: **a bateria de testes nao clica**. Cinco defeitos so
+apareceram quando alguem clicou — entre eles, o ouvinte do painel de contexto engolindo o
+clique de qualquer botao dentro de uma `<tr>`, o que deixava *todas* as acoes de linha
+mudas, sem erro nenhum. Cada operacao do script confere o **estado depois do clique**,
+lendo a API: a versao anterior assertava so que a URL nao tinha caido no `/api/`, e dava
+verde em cinco operacoes que nunca gravaram nada. Cada rodada usa o proprio sufixo, entao
+rodar de novo mede convivencia com o que a rodada anterior deixou.
 
 `fixtures/demo-export.json` e um `lukato export` completo de uma instalacao de
 demonstracao — util para levantar um ambiente com dados realistas em um comando.
