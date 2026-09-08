@@ -1956,7 +1956,7 @@ tests/          unit · integration · contract
 | [`specs/0009`](specs/0009-console-ui.spec.md) · [`0010`](specs/0010-adwatch.spec.md) | console web e AdWatch |
 | [`specs/0011`](specs/0011-persistencia.spec.md) · [`0012`](specs/0012-deploy-kubernetes.spec.md) | persistencia e Kubernetes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | visao de arquitetura |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | guia de implantacao |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | runbook de implantacao em OKE (Oracle Kubernetes): imagem, OCIR, banco, pgvector, segredos |
 | [`docs/LIBRARY-NOTES.md`](docs/LIBRARY-NOTES.md) | APIs reais das versoes usadas |
 | [`readme.txt`](readme.txt) | guia operacional em texto puro |
 
@@ -1987,6 +1987,8 @@ tests/          unit · integration · contract
 | `/api/docs` responde 200 em branco | o navegador nao alcanca o CDN | aponte `LUKATO_APP__DOCS_ASSETS_BASE` para o espelho interno |
 | AdWatch nunca aceita automaticamente | sem OCR o teto de score e 0.85 (secao 10.6) | instale o OCR, ou revise manualmente a fila `needs_review` |
 | `CERTIFICATE_VERIFY_FAILED` no build | proxy com interceptacao TLS | ponha a CA em `deploy/ca/*.crt` |
+| `permission denied to create extension "vector"` na migracao | em banco gerenciado o usuario da aplicacao nao e superusuario | peca ao DBA para rodar `CREATE EXTENSION vector` e `pg_trgm` **uma vez**; o `IF NOT EXISTS` das migracoes vira no-op e passa com o usuario comum |
+| `TypeError: connect() got an unexpected keyword argument 'sslmode'` no boot | `?sslmode=require` na `LUKATO_DB__URL` | o `asyncpg` so entende `sslmode` em DSN literal; tire da URL. Para `verify-full`, passe um `ssl.SSLContext` por `connect_args` (ver [`docs/DEPLOY.md`](docs/DEPLOY.md) secao 3.3) |
 
 ---
 
