@@ -106,6 +106,24 @@ Consequencias diretas, todas verificaveis neste repositorio:
   o texto procurado ja e conhecido, entao o problema e alinhamento temporal, e o modelo
   multimodal so entra como juiz no fim do funil.
 
+### 1.4 Vocabulario
+
+Sete termos aparecem o tempo todo neste documento. Vale fixa-los antes.
+
+| Termo | O que e |
+| --- | --- |
+| **trinca** | guardrail de entrada → system prompt → guardrail de saida. A invariante central. |
+| **building block** | a **classe** de um modulo — codigo instalado, descoberto por entry point |
+| **definicao** (`ModuleDefinition`) | a **configuracao** de um agente — uma linha no banco, apontando para uma classe |
+| **binding** | o campo da definicao que amarra a trinca, o modelo, a temperatura e as ferramentas |
+| **run** (`AgentRun`) | o registro persistido de uma invocacao, com passos, tokens, custo e trace |
+| **fingerprint** | a assinatura de um comercial: texto normalizado, tokens, ancoras e vetor semantico |
+| **janela** | um recorte temporal da transcricao (15, 30 ou 60 s) confrontado com os fingerprints |
+
+A distincao que mais importa e a primeira: **classe e codigo, definicao e configuracao**.
+Duas definicoes sobre a mesma classe sao dois agentes diferentes, e nenhuma linha de
+codigo os separa.
+
 ---
 
 ## 2. A invariante central: a trinca
@@ -901,8 +919,19 @@ curl -s localhost:8000/api/v1/runs/$RUN/steps | jq
 ```
 
 Toda invocacao — bem-sucedida, bloqueada ou falha — vira um `AgentRun` persistido com
-`steps`, tokens, custo e `trace_id`. Um run bloqueado tem exatamente um passo
-(`guardrail_in`), o que torna trivial provar que o provedor nao foi chamado.
+`steps`, tokens, custo e `trace_id`.
+
+`RunStatus`: `pending` · `running` · `succeeded` · `failed` · `blocked` · `cancelled`.
+`StepKind`: `guardrail_in` · `prompt` · `llm` · `tool` · `retrieval` · `plan` ·
+`reflect` · `guardrail_out` · `error`.
+
+A leitura mais util e a sequencia de `StepKind`. Um run bem-sucedido no runtime `direct`
+tem `['guardrail_in', 'prompt', 'llm', 'guardrail_out']`. Um run **bloqueado na entrada
+tem exatamente um passo: `['guardrail_in']`** — nao ha `prompt`, nao ha `llm`. Provar que
+o provedor nao foi chamado e ler uma lista, nao inspecionar log de rede.
+
+O texto gravado em cada passo e recortado em 4000 caracteres: a trilha e auditoria, nao
+armazenamento do dado.
 
 ### 5.11 Receita 8 — mover a instalacao entre ambientes
 
