@@ -993,7 +993,15 @@ curl -s -X POST localhost:8000/api/v1/knowledge/search \
 ```
 
 O `checksum` torna a ingestao idempotente: reenviar o mesmo conteudo devolve
-`idempotent: true` em vez de duplicar. E cada chunk carrega o `embedding_provider`,
+`idempotent: true` em vez de duplicar. Leia esse campo com cuidado: ele e **derivado** de
+`embedded` — qualquer caminho que nao gere embedding responde `idempotent: true`, mesmo
+quando o motivo foi outro. Quem precisa distinguir reindexacao de ingestao nova deve olhar
+`reindexed`.
+
+Nem a ingestao nem o `DELETE` sao atomicos: vetores e linha do documento sao gravados (ou
+apagados) em transacoes separadas. A ingestao trata o estado orfao explicitamente; o
+`DELETE` nao tem compensacao, entao uma falha entre as duas etapas deixa o documento
+gravado e sem indice. E cada chunk carrega o `embedding_provider`,
 `embedding_model` e `embedding_dimensions` que o produziram — e por isso que a colecao
 consegue recusar uma escrita divergente (secao 9.3).
 
@@ -1482,7 +1490,9 @@ documento → normalizacao → chunking → embeddings (lote de 32) → colecao 
 consulta → embedding da consulta → HNSW (cosseno) → top-k → [rerank lexico] → trechos
 ```
 
-**Chunking**: janelas de ate **1200 caracteres** com **200 de sobreposicao**. O corte nao
+**Chunking**: janelas de ate **1200 caracteres** com **200 de sobreposicao** — valores
+fixos no codigo, sem variavel `LUKATO_*` que os altere (`GET /knowledge/health` os
+reporta, mas nao ha o que configurar). O corte nao
 e cego: procura o separador mais forte disponivel (`\n\n`, depois `\n`, depois `". "`,
 depois espaco) na **segunda metade** da janela, e so corta no limite exato quando nenhum
 deles existe. O ultimo trecho e descartado quando ja cabe inteiro dentro da sobreposicao
@@ -1757,6 +1767,14 @@ tenant e custo calculado a partir da tabela de precos (`input_usd_per_1k`,
 tela — chamadas baratas nao somam zero por arredondamento. Quando o provedor nao reporta
 tokens, ha uma heuristica declarada (4 caracteres por token) em vez de um zero silencioso.
 
+> **O que o FinOps nao ve.** A etapa 10 (`UsageRecord` + custo) so e alcancada no caminho
+> de sucesso, e o guardrail de **saida** e a etapa 9. Ou seja: um run barrado na saida
+> **ja pagou o provedor** e mesmo assim nao gera `UsageRecord`, nao soma em
+> `AgentRun.cost_usd` e nao aparece em `/finops/summary`. O mesmo vale para run que falha
+> depois da chamada. Se as politicas de saida bloqueiam com frequencia, o custo real fica
+> acima do relatorio — e a diferenca cresce com o volume de bloqueios. Ate que isso mude,
+> cruze `GET /runs?status=blocked` com a fatura do provedor.
+
 Tres decisoes de FinOps existem para o mesmo fim: **impedir que a conta feche certinho e
 esteja errada**.
 
@@ -1772,8 +1790,10 @@ esteja errada**.
   que reporte o modelo real muda a fatura sem que nada mais mude.
 - **O orcamento reporta situacao, nao so veredito.** `GET /budgets/{id}/status` devolve
   `ok`, `ratio`, `alert`, `blocked`, `spent`, `remaining`, `limit_usd`,
-  `alert_threshold`, `hard_stop` e as bordas do periodo (`period_start`, `period_end`) —
-  da para agir antes do corte, nao so descobrir depois dele.
+  `alert_threshold`, `hard_stop` e o par `period_start` / `period_end` — da para agir
+  antes do corte, nao so descobrir depois dele. Atencao ao par: `period_end` e **o
+  instante da consulta**, nao o fim da janela do orcamento. Leia-o como "inicio da janela"
+  + "agora", nao como "a janela".
 
 Orcamentos tem escopo em string (`global`, `module:<slug>`, `tenant:<id>`), periodo
 (`daily`, `weekly`, `monthly`, `total`), `alert_threshold` (padrao 0.8) e `hard_stop`.
@@ -1820,7 +1840,10 @@ banco e o segredo (32 bytes, `secrets.token_urlsafe`) e conferido contra o
 uma unica vez, na criacao. Chaves tem papel, tenant, validade opcional e registro de
 ultimo uso. Rotacao e revogacao sao endpoints proprios.
 
-**Senhas**: bcrypt com custo 12, sem `passlib`. Ha uma sutileza tratada explicitamente —
+**Senhas**: bcrypt com custo 12 — fixo, sem variavel de ambiente que o altere (a classe
+aceita 4 a 16, mas o composition root a instancia sem argumento). Existe `needs_rehash`,
+porem nenhum caminho de login o consulta: subir o custo no futuro **nao** re-hasheia as
+senhas existentes. Sem `passlib`. Ha uma sutileza tratada explicitamente —
 o bcrypt trunca em silencio qualquer entrada acima de 72 bytes, o que faria duas senhas
 longas com o mesmo prefixo virarem a mesma credencial. A senha e reduzida a 64 bytes ASCII
 por SHA-256 **antes** do bcrypt, entao o comprimento inteiro conta.
@@ -1853,17 +1876,31 @@ Duas coisas que a secao de seguranca precisa dizer em voz alta:
 ```
 lukato_http_requests_total              por metodo, template de rota e status
 lukato_http_request_duration_seconds    histograma de latencia HTTP
-lukato_module_invocations_total         por modulo e status final
+lukato_module_invocations_total         por modulo e status  (so `succeeded` na pratica)
 lukato_module_latency_seconds           latencia ponta a ponta da invocacao
 lukato_llm_tokens_total                 por modelo e tipo (prompt/completion)
 lukato_llm_cost_usd_total               custo acumulado por modelo e modulo
 lukato_guardrail_findings_total         por estagio, tipo de regra e acao aplicada
 lukato_guardrail_blocks_total           bloqueios efetivos por estagio e politica
-lukato_provider_errors_total            erros de provedores externos, por codigo
+lukato_provider_errors_total            exposta, mas sem nenhum chamador hoje
 ```
 
 O par `guardrail_findings_total` / `guardrail_blocks_total` responde, sem consulta ao
 banco, a pergunta que auditoria faz: quanto a plataforma barrou, onde e por qual regra.
+
+Duas ressalvas para quem for montar alerta em cima disso:
+
+- **`lukato_module_invocations_total` tem o rotulo `status`, mas so recebe amostra no
+  caminho de sucesso.** Execucoes bloqueadas e falhas nao incrementam o contador — elas
+  aparecem em `guardrail_blocks_total` e, sempre, em `GET /runs?status=blocked`. Contar
+  taxa de erro por essa metrica da zero para sempre; conte pelos runs.
+- **`lukato_provider_errors_total` esta permanentemente vazia.** O metodo existe na porta
+  e no adaptador, mas nenhum ponto do codigo o chama. Sao **oito** das nove metricas
+  efetivamente alimentadas. Para erro de provedor, o sinal disponivel e o log
+  (`llm_call_retry`, `provider_error`) e o `status` dos runs.
+
+E, como o limitador (secao 5.2), **os contadores vivem na memoria do processo**: com N
+replicas, `/metrics` de um pod mostra a fatia daquele pod. E o Prometheus que soma.
 
 **Tracing** opcional no Langfuse, com uma convencao fixa de arvore:
 
