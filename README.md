@@ -5,16 +5,22 @@ Cada funcionalidade e um *building block* independente. Para **todo e qualquer m
 a trinca **guardrail de entrada → system prompt → guardrail de saida** e parametrizavel
 — sem escrever codigo.
 
-```
-                  ┌──────────────────────────────────────────────────────────┐
-                  │                   NUCLEO DA PLATAFORMA                   │
-                  │ registry · composer · guardrails · runs · finops · trace │
-                  └───┬──────────┬───────────┬───────────┬───────────┬───────┘
-                      │          │           │           │           │
-                 ┌────▼───┐ ┌────▼─────┐ ┌───▼────┐ ┌────▼─────┐ ┌───▼─────┐
-                 │  auth  │ │processing│ │ finops │ │knowledge │ │ adwatch │
-                 └────────┘ └──────────┘ └────────┘ └──────────┘ └─────────┘
-                        building blocks — plugaveis, versionados, isolados
+```mermaid
+flowchart TD
+    NUCLEO["NUCLEO DA PLATAFORMA<br/>registry · composer · guardrails · runs · finops · trace"]
+    subgraph BB[" building blocks — plugaveis, versionados, isolados "]
+        direction LR
+        AUTH["auth"]
+        PROC["processing"]
+        FIN["finops"]
+        KNOW["knowledge"]
+        ADW["adwatch"]
+    end
+    NUCLEO --> AUTH
+    NUCLEO --> PROC
+    NUCLEO --> FIN
+    NUCLEO --> KNOW
+    NUCLEO --> ADW
 ```
 
 | | |
@@ -162,22 +168,28 @@ separa os dois.
 `InvokeModule` e o **unico** lugar onde um building block executa. Ele cumpre onze
 etapas normativas (SPEC-0001 secao 4) nesta ordem exata, sem atalho:
 
-```
- 1  resolve a definicao            7  renderiza o system prompt
- 2  exige status ACTIVE            8  executa o modulo (module.handle)
- 3  exige permissao MODULE_INVOKE  9  GUARDRAIL DE SAIDA
- 4  verifica orcamentos FinOps    10  grava UsageRecord + custo
- 5  abre trace + AgentRun         11  finaliza o run e commita
- 6  GUARDRAIL DE ENTRADA
+```mermaid
+flowchart TD
+    IN(["entrada"]) --> S1["1 · resolve a definicao"]
+    S1 --> S2["2 · exige status ACTIVE"]
+    S2 --> S3["3 · exige permissao MODULE_INVOKE"]
+    S3 --> S4["4 · verifica orcamentos FinOps"]
+    S4 --> S5["5 · abre trace + AgentRun"]
+    S5 --> S6{"6 · GUARDRAIL DE ENTRADA"}
+    S6 -->|bloqueia| B1["AgentRun BLOCKED · HTTP 422<br/>o provedor nunca e chamado"]
+    S6 -->|libera| S7["7 · renderiza o system prompt"]
+    S7 --> S8["8 · executa o modulo · module.handle"]
+    S8 --> S9{"9 · GUARDRAIL DE SAIDA"}
+    S9 -->|bloqueia| B2["AgentRun BLOCKED · HTTP 422<br/>o provedor ja foi pago"]
+    S9 -->|libera| S10["10 · grava UsageRecord + custo"]
+    S10 --> S11["11 · finaliza o run e commita"]
+    S11 --> OUT(["resposta"])
 ```
 
-A trinca **envolve** o `handle`, seja qual for o building block:
+Os dois losangos sao a trinca. Ela **envolve** o `handle`, seja qual for o building block:
 
 ```
-entrada → [guardrail de entrada] → [system prompt] → [runtime] → [guardrail de saida] → resposta
-                    ↓ bloqueio                                          ↓ bloqueio
-              run BLOCKED, 422                                    run BLOCKED, 422
-              (o provedor nunca e chamado)
+guardrail de entrada → module.handle(request, ctx) → guardrail de saida
 ```
 
 Duas garantias estruturais, e nao documentais:
@@ -263,22 +275,41 @@ alguem lembrar.
 
 ### 3.1 Hexagonal, com a regra de dependencia verificada por teste
 
-```text
-                       ┌───────────────────────────────────┐
-   driving adapters    │            APPLICATION            │    driven adapters
-   (quem chama)        │        (casos de uso)             │    (quem e chamado)
-                       │   ┌───────────────────────────┐   │
-  HTTP  ──────────────▶│   │          DOMAIN           │   │◀────────── PostgreSQL
-  UI (Jinja2) ────────▶│   │  modelos · portas ·       │   │◀────────── pgvector
-  CLI  ───────────────▶│   │  servicos puros           │   │◀────────── Qwen (LLM)
-  modules ────────────▶│   └───────────────────────────┘   │◀────────── Qwen (embeddings)
-                       └───────────────────────────────────┘◀────────── Langfuse
-                                                             ◀────────── FFmpeg/WhisperX/OCR
+```mermaid
+flowchart LR
+    subgraph DRIVING["driving adapters · quem chama"]
+        direction TB
+        HTTP["HTTP · API v1"]
+        UIJ["UI · Jinja2"]
+        CLI["CLI"]
+        MODS["modules"]
+    end
+    subgraph APP["APPLICATION · casos de uso"]
+        DOM["DOMAIN<br/>modelos · portas · servicos puros<br/>zero I/O"]
+    end
+    subgraph DRIVEN["driven adapters · quem e chamado"]
+        direction TB
+        PG["PostgreSQL + pgvector"]
+        QLLM["Qwen · LLM"]
+        QEMB["Qwen · embeddings"]
+        LF["Langfuse"]
+        MED["FFmpeg · WhisperX · OCR"]
+    end
+    HTTP --> APP
+    UIJ --> APP
+    CLI --> APP
+    MODS --> APP
+    PG --> APP
+    QLLM --> APP
+    QEMB --> APP
+    LF --> APP
+    MED --> APP
 ```
 
-As setas apontam sempre para dentro. `domain/` nao conhece `sqlalchemy`, `fastapi`,
-`httpx`, `openai`, `langgraph`, `langfuse` nem `jinja2` — e isso e **verificado**, em
-duas camadas:
+As setas sao de **dependencia**, nao de chamada — e por isso as duas colunas apontam para
+dentro, inclusive os adaptadores que a aplicacao e quem invoca. `domain/` nao conhece
+`sqlalchemy`, `fastapi`, `httpx`, `openai`, `langgraph`, `langfuse` nem `jinja2` — e isso
+e **verificado**, em duas camadas:
 
 - estaticamente, por `ruff` (`flake8-tidy-imports.banned-api` proibe `lukato.adapters`
   em `domain/` e `application/`);
@@ -598,8 +629,9 @@ Listagens paginam com `limit` (1..200, padrao 50) e `offset`.
 
 **Middlewares**, na ordem real em que a requisicao os atravessa (de fora para dentro):
 
-```
-CORS → ConsoleForm → RequestId → SecurityHeaders → RateLimit → Timing → rotas
+```mermaid
+flowchart LR
+    REQ(["requisicao"]) --> CORS["CORS"] --> CF["ConsoleForm"] --> RID["RequestId"] --> SEC["SecurityHeaders"] --> RL["RateLimit"] --> TIM["Timing"] --> ROT(["rotas"])
 ```
 
 > O log `middlewares_installed` publica um campo `order` com uma ordem diferente
@@ -1190,11 +1222,32 @@ Este e o caminho para 90% dos casos: um agente novo e configuracao.
 Tipos possiveis (`kind`): `agent` · `tool` · `pipeline` · `auth` · `finops` ·
 `knowledge` · `custom`.
 
-Ciclo de vida (`status`): `draft` → `active` → `paused` → `deprecated`, por
-`PATCH /api/v1/modules/{slug}/status`. **Somente `active` e invocavel**: a etapa 2 de
-`InvokeModule` recusa qualquer outro estado com `409 conflict` — verificado em
-`prova_trinca.py`, asercao 5. Um agente novo pode nascer em `draft`, ser revisado com
-`dry-run` e so entao ir para `active`.
+Ciclo de vida (`status`), por `PATCH /api/v1/modules/{slug}/status`:
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft: POST /modules
+    draft --> active
+    active --> paused
+    paused --> active
+    active --> deprecated
+    paused --> deprecated
+    deprecated --> active
+    active --> [*]: DELETE
+    note right of active
+        somente ACTIVE e invocavel
+        qualquer outro estado: 409 conflict
+        nenhuma transicao e proibida
+    end note
+```
+
+**Somente `active` e invocavel**: a etapa 2 de `InvokeModule` recusa qualquer outro estado
+com `409 conflict` — verificado em `prova_trinca.py`, asercao 5. Um agente novo pode nascer
+em `draft`, ser revisado com `dry-run` e so entao ir para `active`.
+
+O caso de uso **nao impoe ordem**: qualquer estado vai para qualquer outro, e mudar para o
+estado que ja vale e um no-op idempotente. As setas acima sao o caminho esperado, nao uma
+maquina que recusa desvio.
 
 ### 6.3 Caminho B — com codigo (quando ha logica propria de verdade)
 
@@ -1381,12 +1434,18 @@ restricao naquele estagio so acontece quando o campo do binding e **nulo** desde
 
 O grafo do runtime `langgraph`:
 
-```
-START → prepare ─┬→ plan → act ─┬→ observe ─┬→ act        (laco de ferramentas)
-                 │              │           └→ reflect
-                 └────────────→ act         └→ reflect
-                                                  ↓
-                                              finalize → END
+```mermaid
+flowchart TD
+    S(["START"]) --> PREP["prepare"]
+    PREP -->|planning| PLAN["plan"]
+    PREP -->|sem planning| ACT["act"]
+    PLAN --> ACT
+    ACT -->|ha tool_calls| OBS["observe"]
+    ACT -->|sem tool_calls| REFL["reflect"]
+    OBS -->|iteracoes < max_iterations| ACT
+    OBS -->|esgotou max_iterations| REFL
+    REFL --> FIN["finalize"]
+    FIN --> E(["END"])
 ```
 
 `prepare` decide se ha planejamento; `act` chama o modelo ou uma ferramenta; `observe`
@@ -1484,10 +1543,18 @@ observar.
 
 ### 9.1 O caminho
 
-```
-documento → normalizacao → chunking → embeddings (lote de 32) → colecao pgvector
-                                                                      ↓
-consulta → embedding da consulta → HNSW (cosseno) → top-k → [rerank lexico] → trechos
+```mermaid
+flowchart LR
+    subgraph ING["ingestao"]
+        direction LR
+        DOC["documento"] --> NORM["normalizacao"] --> CHK["chunking<br/>1200 chars · 200 overlap"] --> EMB["embeddings<br/>lote de 32"]
+    end
+    subgraph QRY["consulta"]
+        direction LR
+        Q["consulta"] --> QE["embedding da consulta"] --> HNSW["HNSW · cosseno"] --> TOPK["top-k"] --> RR["rerank lexico<br/>opcional"] --> HITS["trechos"]
+    end
+    EMB --> COL[("colecao pgvector<br/>agente_evidence")]
+    COL --> HNSW
 ```
 
 **Chunking**: janelas de ate **1200 caracteres** com **200 de sobreposicao** — valores
@@ -1549,32 +1616,47 @@ por sinal, e o pipeline roda **sem GPU** quando ha transcricao.
 
 ### 10.2 O funil
 
-```
-VIDEO ──┬── audio ──→ ASR (WhisperX) ──→ palavras + timestamps ──┐
-        └── frames ─→ scene detect + OCR ─→ texto na tela ───────┤
-                                                                 ▼
-                                          LINHA DO TEMPO MULTIMODAL
-                                                                 ▼
-                              janelas deslizantes 15/30/60 s, passo 5 s
-                                                                 ▼
-                    retrieval sobre fingerprints do catalogo → TOP-K (10)
-                                                                 ▼
-                                          rerank (TOP-K 3) + fusao de sinais
-                                                                 ▼
-                                S = 0.40·lexico + 0.25·semantico
-                                  + 0.15·ocr + 0.15·visual + 0.05·duracao
-                                                                 ▼
-                  S ≥ 0.90 aceita │ 0.60 ≤ S < 0.90 juiz Qwen-VL │ S < 0.60 rejeita
-                                                                 ▼
-                        NMS por IoU > 0.5 → refino de fronteira por cortes de cena
-                                                                 ▼
-                                       Detection persistida com evidencia por sinal
+```mermaid
+flowchart TD
+    V(["VIDEO"]) --> AUD["audio"]
+    V --> FRM["frames"]
+    AUD --> ASR["ASR · WhisperX<br/>palavras + timestamps"]
+    FRM --> SC["scene detect"]
+    FRM --> OCR["OCR · texto na tela"]
+    ASR --> TL["LINHA DO TEMPO MULTIMODAL"]
+    OCR --> TL
+    TL --> WIN["janelas deslizantes<br/>15 / 30 / 60 s · passo 5 s"]
+    WIN --> RET["retrieval sobre os fingerprints<br/>TOP-K 10"]
+    RET --> RRK["rerank TOP-K 3 + fusao de sinais"]
+    RRK --> SCORE["S = 0.40·lexico + 0.25·semantico<br/>+ 0.15·ocr + 0.15·visual + 0.05·duracao"]
+    SCORE --> D{"faixa de S"}
+    D -->|"0.60 ≤ S < 0.90"| VLM["juiz Qwen-VL<br/>teto de 24 chamadas"]
+    VLM --> RESC["score recalculado<br/>o juiz promove ou rebaixa"]
+    D -->|"S ≥ 0.90 ou S < 0.60"| POOL["conjunto de candidatos"]
+    RESC --> POOL
+    POOL --> NMS1["NMS por IoU > 0.5"]
+    NMS1 --> REF["refino de fronteira<br/>pelos cortes de cena · ate 3 s"]
+    SC --> REF
+    REF --> NMS2["NMS + absorcao de fragmentos"]
+    NMS2 --> FIM{"status final"}
+    FIM -->|"accepted · needs_review"| DET[("Detection persistida<br/>com evidencia por sinal")]
+    FIM -->|"rejected"| DROP["descartado<br/>salvo com --keep-rejected"]
 ```
 
 ### 10.3 A ingestao nao e tudo ou nada
 
-O ativo de midia caminha por quatro estados: `registered` → `ingested` → `analyzed`, com
-`failed` para o caso terminal.
+O ativo de midia caminha por quatro estados:
+
+```mermaid
+stateDiagram-v2
+    [*] --> registered: POST /adwatch/media
+    registered --> ingested: transcricao importada
+    registered --> ingested: ingest produziu transcricao, cenas ou OCR
+    registered --> failed: ingest so acumulou falhas
+    ingested --> analyzed: POST /detect
+    registered --> analyzed: POST /detect
+    analyzed --> analyzed: nova deteccao substitui a anterior
+```
 
 `POST /media/{id}/ingest` executa **a ingestao possivel**: sondagem com FFmpeg, extracao
 de audio, ASR, deteccao de cenas e OCR. Cada etapa cujo adaptador nao esteja instalado e
